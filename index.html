@@ -1,0 +1,183 @@
+﻿<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Resource Vault</title>
+  </head>
+  <body>
+    <div class="app">
+      <aside class="sidebar">
+        <div class="sidebar__top">
+          <div id="brand" class="brand">Vault</div>
+
+          <div class="sidebar__actions">
+            <div class="lang">
+              <button id="langRu" class="lang__btn" type="button">RU</button>
+              <button id="langEn" class="lang__btn" type="button">EN</button>
+            </div>
+
+            <button id="btnNewCollection" class="btn btn--ghost" type="button">+ Collection</button>
+          </div>
+        </div>
+
+        <nav id="collectionsList" class="collections"></nav>
+
+        <div class="sidebar__bottom sidebar__bottom--stack">
+          <button id="btnAddLink" class="btn" type="button">+ Add link</button>
+
+          <div class="row row--stack">
+            <button id="btnExport" class="btn btn--ghost" type="button">Export JSON</button>
+            <button id="btnImport" class="btn btn--ghost" type="button">Import JSON</button>
+            <input id="fileImport" type="file" accept="application/json" hidden />
+          </div>
+
+          <div id="localHint" class="hint">Данные хранятся локально в браузере (localStorage).</div>
+        </div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div class="topbar__left">
+            <div id="activeTitle" class="title">All</div>
+            <div id="activeMeta" class="meta"></div>
+          </div>
+          <div class="topbar__right">
+            <input id="searchInput" class="search" placeholder="Search in this collection..." />
+          </div>
+        </header>
+
+        <section class="chipsbar">
+          <div id="chips" class="chips"></div>
+        </section>
+
+        <section id="grid" class="grid"></section>
+      </main>
+    </div>
+
+    <dialog id="modalAddLink" class="modal">
+      <form method="dialog" class="modal__card" id="formAddLink">
+        <div class="modal__header">
+          <div id="modalAddTitle" class="modal__title">Add link</div>
+          <button id="addCloseX" class="btn btn--ghost" type="button" aria-label="Close">×</button>
+        </div>
+
+        <label class="field">
+          <span id="labelAddUrl">URL</span>
+          <input name="url" required placeholder="https://..." />
+        </label>
+
+        <label class="field">
+          <span id="labelAddTitle">Title</span>
+          <input id="inputAddTitle" name="title" placeholder="Optional (auto from page/domain if empty)" />
+        </label>
+
+        <label class="field">
+          <span id="labelAddTags">Tags (comma)</span>
+          <input id="inputAddTags" name="tags" placeholder="dark, fintech, landing" />
+        </label>
+
+        <div class="row">
+          <label class="field">
+            <span id="labelAddType">Type</span>
+            <select name="type">
+              <option value="project">Project</option>
+              <option value="studio">Studio</option>
+              <option value="designer">Designer</option>
+              <option value="inspiration">Inspiration</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span id="labelAddSource">Source</span>
+            <select name="source">
+              <option value="site">Site</option>
+              <option value="behance">Behance</option>
+              <option value="awwwards">Awwwards</option>
+              <option value="pinterest">Pinterest</option>
+              <option value="dribbble">Dribbble</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
+        </div>
+
+        <label class="field">
+          <span id="labelAddNote">Note</span>
+          <textarea id="inputAddNote" name="note" rows="3" placeholder="Why saved?"></textarea>
+        </label>
+
+        <div class="row row--end">
+          <button id="addCancel" class="btn btn--ghost" type="button">Cancel</button>
+          <button id="addSave" class="btn" type="submit">Save</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="modalCollection" class="modal">
+      <form method="dialog" class="modal__card" id="formCollection">
+        <div class="modal__header">
+          <div id="modalCollectionTitle" class="modal__title">New smart collection</div>
+          <button id="colCloseX" class="btn btn--ghost" type="button" aria-label="Close">×</button>
+        </div>
+
+        <label class="field">
+          <span id="labelColName">Name</span>
+          <input name="name" required placeholder="Dark Fintech Landings" />
+        </label>
+
+        <div class="row">
+          <label class="field">
+            <span id="labelColTypes">Types</span>
+            <select name="types" multiple size="4">
+              <option value="project">Project</option>
+              <option value="studio">Studio</option>
+              <option value="designer">Designer</option>
+              <option value="inspiration">Inspiration</option>
+            </select>
+            <small id="labelColTypesHint">Ctrl/Shift to select</small>
+          </label>
+
+          <label class="field">
+            <span id="labelColSources">Sources</span>
+            <select name="sources" multiple size="4">
+              <option value="site">Site</option>
+              <option value="behance">Behance</option>
+              <option value="awwwards">Awwwards</option>
+              <option value="pinterest">Pinterest</option>
+              <option value="dribbble">Dribbble</option>
+              <option value="other">Other</option>
+            </select>
+            <small id="labelColSourcesHint">Ctrl/Shift to select</small>
+          </label>
+        </div>
+
+        <label class="field">
+          <span id="labelColAllTags">ALL tags (comma) - must include all</span>
+          <input id="inputColAllTags" name="allTags" placeholder="dark, fintech" />
+        </label>
+
+        <label class="field">
+          <span id="labelColAnyTags">ANY tags (comma) - at least one</span>
+          <input id="inputColAnyTags" name="anyTags" placeholder="landing, typography" />
+        </label>
+
+        <label class="field">
+          <span id="labelColQuery">Contains text</span>
+          <input id="inputColQuery" name="query" placeholder="e.g. saas, serif, motion" />
+        </label>
+
+        <label class="check">
+          <input type="checkbox" name="favoriteOnly" />
+          <span id="labelColFavOnly">Favorites only</span>
+        </label>
+
+        <div class="row row--end">
+          <button id="colCancel" class="btn btn--ghost" type="button">Cancel</button>
+          <button id="colCreate" class="btn" type="submit">Create</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
