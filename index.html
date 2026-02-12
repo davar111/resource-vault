@@ -9,27 +9,41 @@
     <div class="app">
       <aside class="sidebar">
         <div class="sidebar__top">
-          <div id="brand" class="brand">Vault</div>
-
-          <div class="sidebar__actions">
+          <div class="brand-row">
+            <div id="brand" class="brand">Vault</div>
             <div class="lang">
               <button id="langRu" class="lang__btn" type="button">RU</button>
               <button id="langEn" class="lang__btn" type="button">EN</button>
             </div>
+          </div>
 
-            <button id="btnNewCollection" class="btn btn--ghost" type="button">+ Collection</button>
+          <div class="sidebar__section">
+            <div class="sidebar__label" id="labelNav">Navigation</div>
+            <div class="sidebar__stack">
+              <button id="navAll" class="nav-item" type="button">All links</button>
+              <button id="navFav" class="nav-item" type="button">Favorites</button>
+            </div>
+          </div>
+
+          <div class="sidebar__section">
+            <div class="sidebar__section-head">
+              <div class="sidebar__label" id="labelCollections">Collections</div>
+              <button id="btnNewCollection" class="btn btn--secondary btn--icon" type="button" aria-label="New collection">+</button>
+            </div>
+            <nav id="collectionsList" class="collections"></nav>
           </div>
         </div>
 
-        <nav id="collectionsList" class="collections"></nav>
-
         <div class="sidebar__bottom sidebar__bottom--stack">
-          <button id="btnAddLink" class="btn" type="button">+ Add link</button>
+          <button id="btnAddLink" class="btn btn--primary" type="button">+ Add link</button>
 
-          <div class="row row--stack">
-            <button id="btnExport" class="btn btn--ghost" type="button">Export JSON</button>
-            <button id="btnImport" class="btn btn--ghost" type="button">Import JSON</button>
-            <input id="fileImport" type="file" accept="application/json" hidden />
+          <div class="settings">
+            <button id="btnSettings" class="btn btn--ghost" type="button">Settings</button>
+            <div id="settingsMenu" class="settings__menu" hidden>
+              <button id="btnExport" class="settings__item" type="button">Export JSON</button>
+              <button id="btnImport" class="settings__item" type="button">Import JSON</button>
+              <input id="fileImport" type="file" accept="application/json" hidden />
+            </div>
           </div>
 
           <div id="localHint" class="hint">Данные хранятся локально в браузере (localStorage).</div>
@@ -39,16 +53,49 @@
       <main class="main">
         <header class="topbar">
           <div class="topbar__left">
-            <div id="activeTitle" class="title">All</div>
+            <div id="activeTitle" class="title">All links</div>
             <div id="activeMeta" class="meta"></div>
           </div>
+
           <div class="topbar__right">
-            <input id="searchInput" class="search" placeholder="Search in this collection..." />
+            <input id="searchInput" class="search" placeholder="Search in current context..." />
+            <button id="btnFilters" class="btn btn--secondary" type="button">Filters</button>
+            <select id="sortSelect" class="sort" aria-label="Sort">
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+              <option value="title_asc">Title A-Z</option>
+              <option value="title_desc">Title Z-A</option>
+              <option value="source_asc">By source</option>
+            </select>
           </div>
         </header>
 
+        <section id="filtersPanel" class="filters-panel" hidden>
+          <div class="filters-grid">
+            <fieldset class="field multi">
+              <legend id="labelFilterTypes">Types</legend>
+              <div class="multi__chips" id="filterTypes"></div>
+            </fieldset>
+
+            <fieldset class="field multi">
+              <legend id="labelFilterSources">Sources</legend>
+              <div class="multi__chips" id="filterSources"></div>
+            </fieldset>
+
+            <label class="field">
+              <span id="labelFilterTag">Tag contains</span>
+              <input id="filterTagInput" placeholder="fintech" />
+            </label>
+
+            <label class="check">
+              <input id="filterFavoriteOnly" type="checkbox" />
+              <span id="labelFilterFavorite">Only favorites</span>
+            </label>
+          </div>
+        </section>
+
         <section class="chipsbar">
-          <div id="chips" class="chips"></div>
+          <div id="activeFilters" class="chips"></div>
         </section>
 
         <section id="grid" class="grid"></section>
@@ -59,56 +106,72 @@
       <form method="dialog" class="modal__card" id="formAddLink">
         <div class="modal__header">
           <div id="modalAddTitle" class="modal__title">Add link</div>
-          <button id="addCloseX" class="btn btn--ghost" type="button" aria-label="Close">×</button>
+          <button id="addCloseX" class="btn btn--icon btn--ghost" type="button" aria-label="Close">×</button>
         </div>
 
-        <label class="field">
-          <span id="labelAddUrl">URL</span>
-          <input name="url" required placeholder="https://..." />
-        </label>
-
-        <label class="field">
-          <span id="labelAddTitle">Title</span>
-          <input id="inputAddTitle" name="title" placeholder="Optional (auto from page/domain if empty)" />
-        </label>
-
-        <label class="field">
-          <span id="labelAddTags">Tags (comma)</span>
-          <input id="inputAddTags" name="tags" placeholder="dark, fintech, landing" />
-        </label>
-
-        <div class="row">
+        <div class="modal__section">
           <label class="field">
-            <span id="labelAddType">Type</span>
-            <select name="type">
-              <option value="project">Project</option>
-              <option value="studio">Studio</option>
-              <option value="designer">Designer</option>
-              <option value="inspiration">Inspiration</option>
-            </select>
+            <span id="labelAddUrl">URL</span>
+            <input name="url" required placeholder="https://..." />
           </label>
 
           <label class="field">
-            <span id="labelAddSource">Source</span>
-            <select name="source">
-              <option value="site">Site</option>
-              <option value="behance">Behance</option>
-              <option value="awwwards">Awwwards</option>
-              <option value="pinterest">Pinterest</option>
-              <option value="dribbble">Dribbble</option>
-              <option value="other">Other</option>
-            </select>
+            <span id="labelAddTitle">Title</span>
+            <input id="inputAddTitle" name="title" placeholder="Optional" />
           </label>
         </div>
 
-        <label class="field">
-          <span id="labelAddNote">Note</span>
-          <textarea id="inputAddNote" name="note" rows="3" placeholder="Why saved?"></textarea>
-        </label>
+        <div class="modal__section">
+          <div id="labelAddTo" class="modal__section-title">Add to</div>
+          <div id="addCollectionsList" class="multi__chips"></div>
+          <label class="check">
+            <input id="addFavorite" type="checkbox" name="favorite" />
+            <span id="labelAddFavorite">Mark as favorite</span>
+          </label>
+        </div>
+
+        <div class="modal__section">
+          <div id="sectionAddClassify" class="modal__section-title">Classification</div>
+          <label class="field">
+            <span id="labelAddTags">Tags (comma)</span>
+            <input id="inputAddTags" name="tags" placeholder="dark, fintech" />
+          </label>
+
+          <div class="row">
+            <label class="field">
+              <span id="labelAddType">Type</span>
+              <select name="type">
+                <option value="project">Project</option>
+                <option value="studio">Studio</option>
+                <option value="designer">Designer</option>
+                <option value="inspiration">Inspiration</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span id="labelAddSource">Source</span>
+              <select name="source">
+                <option value="site">Site</option>
+                <option value="behance">Behance</option>
+                <option value="awwwards">Awwwards</option>
+                <option value="pinterest">Pinterest</option>
+                <option value="dribbble">Dribbble</option>
+                <option value="other">Other</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
+        <div class="modal__section">
+          <label class="field">
+            <span id="labelAddNote">Note</span>
+            <textarea id="inputAddNote" name="note" rows="3" placeholder="Why saved?"></textarea>
+          </label>
+        </div>
 
         <div class="row row--end">
-          <button id="addCancel" class="btn btn--ghost" type="button">Cancel</button>
-          <button id="addSave" class="btn" type="submit">Save</button>
+          <button id="addCancel" class="btn btn--secondary" type="button">Cancel</button>
+          <button id="addSave" class="btn btn--primary" type="submit">Save</button>
         </div>
       </form>
     </dialog>
@@ -116,8 +179,8 @@
     <dialog id="modalCollection" class="modal">
       <form method="dialog" class="modal__card" id="formCollection">
         <div class="modal__header">
-          <div id="modalCollectionTitle" class="modal__title">New smart collection</div>
-          <button id="colCloseX" class="btn btn--ghost" type="button" aria-label="Close">×</button>
+          <div id="modalCollectionTitle" class="modal__title">Create collection</div>
+          <button id="colCloseX" class="btn btn--icon btn--ghost" type="button" aria-label="Close">×</button>
         </div>
 
         <label class="field">
@@ -125,55 +188,55 @@
           <input name="name" required placeholder="Dark Fintech Landings" />
         </label>
 
-        <div class="row">
-          <label class="field">
-            <span id="labelColTypes">Types</span>
-            <select name="types" multiple size="4">
-              <option value="project">Project</option>
-              <option value="studio">Studio</option>
-              <option value="designer">Designer</option>
-              <option value="inspiration">Inspiration</option>
-            </select>
-            <small id="labelColTypesHint">Ctrl/Shift to select</small>
-          </label>
-
-          <label class="field">
-            <span id="labelColSources">Sources</span>
-            <select name="sources" multiple size="4">
-              <option value="site">Site</option>
-              <option value="behance">Behance</option>
-              <option value="awwwards">Awwwards</option>
-              <option value="pinterest">Pinterest</option>
-              <option value="dribbble">Dribbble</option>
-              <option value="other">Other</option>
-            </select>
-            <small id="labelColSourcesHint">Ctrl/Shift to select</small>
-          </label>
-        </div>
-
         <label class="field">
-          <span id="labelColAllTags">ALL tags (comma) - must include all</span>
-          <input id="inputColAllTags" name="allTags" placeholder="dark, fintech" />
-        </label>
-
-        <label class="field">
-          <span id="labelColAnyTags">ANY tags (comma) - at least one</span>
-          <input id="inputColAnyTags" name="anyTags" placeholder="landing, typography" />
-        </label>
-
-        <label class="field">
-          <span id="labelColQuery">Contains text</span>
-          <input id="inputColQuery" name="query" placeholder="e.g. saas, serif, motion" />
+          <span id="labelColDescription">Description</span>
+          <input name="description" placeholder="Optional short description" />
         </label>
 
         <label class="check">
-          <input type="checkbox" name="favoriteOnly" />
-          <span id="labelColFavOnly">Favorites only</span>
+          <input id="rulesEnabled" type="checkbox" name="rulesEnabled" />
+          <span id="labelRulesEnabled">Autofill (by rules)</span>
         </label>
 
+        <div id="collectionRules" class="modal__section" hidden>
+          <div id="sectionColRules" class="modal__section-title">Collection rules</div>
+
+          <div class="row">
+            <fieldset class="field multi">
+              <legend id="labelColTypes">Types</legend>
+              <div class="multi__chips" id="colTypesChips"></div>
+            </fieldset>
+
+            <fieldset class="field multi">
+              <legend id="labelColSources">Sources</legend>
+              <div class="multi__chips" id="colSourcesChips"></div>
+            </fieldset>
+          </div>
+
+          <label class="field">
+            <span id="labelColAllTags">All tags (required)</span>
+            <input id="inputColAllTags" name="allTags" placeholder="dark, fintech" />
+          </label>
+
+          <label class="field">
+            <span id="labelColAnyTags">Any tag (at least one)</span>
+            <input id="inputColAnyTags" name="anyTags" placeholder="landing, typography" />
+          </label>
+
+          <label class="field">
+            <span id="labelColQuery">Contains text</span>
+            <input id="inputColQuery" name="query" placeholder="saas, serif, motion" />
+          </label>
+
+          <label class="check">
+            <input type="checkbox" name="favoriteOnly" />
+            <span id="labelColFavOnly">Only favorites</span>
+          </label>
+        </div>
+
         <div class="row row--end">
-          <button id="colCancel" class="btn btn--ghost" type="button">Cancel</button>
-          <button id="colCreate" class="btn" type="submit">Create</button>
+          <button id="colCancel" class="btn btn--secondary" type="button">Cancel</button>
+          <button id="colCreate" class="btn btn--primary" type="submit">Create</button>
         </div>
       </form>
     </dialog>

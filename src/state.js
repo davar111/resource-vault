@@ -1,13 +1,19 @@
 ﻿export const state = {
   lang: "ru",
   activeCollectionId: "all",
+  sortBy: "newest",
   search: "",
-  activeTag: "",
+  filters: {
+    types: [],
+    sources: [],
+    tag: "",
+    favoriteOnly: false
+  },
+  ui: {
+    filtersOpen: false
+  },
   items: [],
-  collections: [
-    { id: "all", name: "All", rules: {} },
-    { id: "fav", name: "Favorites", rules: { favoriteOnly: true } }
-  ]
+  collections: []
 };
 
 export function uid(prefix = "id") {
