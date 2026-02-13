@@ -1,17 +1,32 @@
-﻿export function normalizeTags(str) {
-  return String(str || "")
-    .split(",")
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean);
+export function normalizeTags(input) {
+  const rawList = Array.isArray(input)
+    ? input
+    : String(input || "").split(",");
+
+  const seen = new Set();
+  const out = [];
+
+  for (const raw of rawList) {
+    const next = String(raw || "").trim().toLowerCase();
+    if (!next || seen.has(next)) continue;
+    seen.add(next);
+    out.push(next);
+  }
+
+  return out;
+}
+
+export function normalizeSearchText(input) {
+  return String(input || "").trim().toLowerCase();
 }
 
 export function detectSource(url) {
   const u = String(url || "").toLowerCase();
-  if (u.includes("behance.net")) return "behance";
-  if (u.includes("awwwards.com")) return "awwwards";
-  if (u.includes("pinterest.")) return "pinterest";
-  if (u.includes("dribbble.com")) return "dribbble";
-  return "site";
+  if (u.includes("behance.net")) return "Behance";
+  if (u.includes("awwwards.com")) return "Awwwards";
+  if (u.includes("pinterest.")) return "Pinterest";
+  if (u.includes("dribbble.com")) return "Dribbble";
+  return "Site";
 }
 
 export function domainFromUrl(url) {
@@ -91,30 +106,34 @@ export function previewFallbackUrl(url) {
   return `https://image.thum.io/get/width/1200/noanimate/${encodeURI(normalized)}`;
 }
 
-export function matchesCollectionRules(item, rules) {
-  if (!rules) return true;
+export function matchesLink(link, filterOrRules = {}) {
+  const types = Array.isArray(filterOrRules.types) ? filterOrRules.types : [];
+  const sources = Array.isArray(filterOrRules.sources) ? filterOrRules.sources : [];
+  const requiredTags = normalizeTags(filterOrRules.requiredTags || []);
+  const anyTags = normalizeTags(filterOrRules.anyTags || []);
+  const containsText = normalizeSearchText(filterOrRules.containsText);
+  const onlyFavorites = !!(filterOrRules.onlyFavorites ?? filterOrRules.favoriteOnly);
+  const tagContains = normalizeSearchText(filterOrRules.tagContains ?? filterOrRules.tag);
 
-  if (rules.onlyFavorite && !item.favorite) return false;
+  if (onlyFavorites && !link.favorite) return false;
+  if (types.length && !types.includes(link.type)) return false;
+  if (sources.length && !sources.includes(link.source)) return false;
 
-  if (Array.isArray(rules.types) && rules.types.length && !rules.types.includes(item.type)) return false;
-  if (Array.isArray(rules.sources) && rules.sources.length && !rules.sources.includes(item.source)) return false;
+  const tags = normalizeTags(link.tags || []);
+  if (requiredTags.length && !requiredTags.every((tag) => tags.includes(tag))) return false;
+  if (anyTags.length && !anyTags.some((tag) => tags.includes(tag))) return false;
 
-  const itemTags = (item.tags || []).map((t) => String(t).toLowerCase());
+  if (tagContains && !tags.some((tag) => tag.includes(tagContains))) return false;
 
-  if (Array.isArray(rules.tagsAll) && rules.tagsAll.length) {
-    const ok = rules.tagsAll.every((t) => itemTags.includes(String(t).toLowerCase()));
-    if (!ok) return false;
-  }
+  if (containsText) {
+    const haystack = [
+      String(link.title || ""),
+      String(link.url || ""),
+      String(link.note || ""),
+      tags.join(" ")
+    ].join(" ").toLowerCase();
 
-  if (Array.isArray(rules.tagsAny) && rules.tagsAny.length) {
-    const ok = rules.tagsAny.some((t) => itemTags.includes(String(t).toLowerCase()));
-    if (!ok) return false;
-  }
-
-  const q = String(rules.textContains || "").trim().toLowerCase();
-  if (q) {
-    const hay = `${item.title || ""} ${item.url || ""} ${item.note || ""} ${(item.tags || []).join(" ")}`.toLowerCase();
-    if (!hay.includes(q)) return false;
+    if (!haystack.includes(containsText)) return false;
   }
 
   return true;

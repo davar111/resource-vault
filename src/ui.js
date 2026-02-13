@@ -1,4 +1,4 @@
-﻿import { matchesCollectionRules, domainFromUrl, faviconUrl, previewFallbackUrl } from "./filter.js";
+import { matchesLink, domainFromUrl, faviconUrl, previewFallbackUrl } from "./filter.js";
 import { t } from "./i18n.js";
 
 export function render(state, els, onChange) {
@@ -33,9 +33,12 @@ function renderCollections(state, els, onChange, L) {
     btn.innerHTML = `
       <div class="collection__left">
         <div class="dot"></div>
-        <div>${escapeHtml(c.name)}</div>
+        <div class="collection__name">
+          <div>${escapeHtml(c.name)}</div>
+          ${c.kind === "smart" ? `<span class="badge badge--smart">${escapeHtml(t(L, "kindSmart"))}</span>` : ""}
+        </div>
       </div>
-        <div class="collection__right">
+      <div class="collection__right">
         <div class="badge">${count}</div>
         <div class="collection__menu">
           <button class="collection__menu-trigger" type="button" data-col-menu="1"><span class="collection__menu-dots">⋯</span></button>
@@ -73,6 +76,7 @@ function renderCollections(state, els, onChange, L) {
         const name = String(next).trim();
         if (!name) return;
         c.name = name;
+        c.updatedAt = Date.now();
         onChange?.();
         render(state, els, onChange);
       });
@@ -86,7 +90,7 @@ function renderCollections(state, els, onChange, L) {
         if (!confirm(t(L, "deleteCollectionConfirm"))) return;
         state.collections = state.collections.filter((x) => x.id !== c.id);
         for (const item of state.items) {
-          item.collections = (item.collections || []).filter((x) => x !== c.id);
+          item.collectionIds = (item.collectionIds || []).filter((x) => x !== c.id);
         }
         if (state.activeCollectionId === c.id) state.activeCollectionId = "all";
         onChange?.();
@@ -100,46 +104,47 @@ function renderCollections(state, els, onChange, L) {
 
 function renderHeader(state, els, L) {
   const active = getActiveCollection(state);
+  const list = filteredItems(state);
 
   if (!active || active.id === "all") {
     els.activeTitle.textContent = t(L, "all");
-    els.activeMeta.textContent = `${filteredItems(state).length} ${t(L, "items")}`;
+    els.activeMeta.textContent = `${list.length} ${t(L, "items")}`;
     return;
   }
 
   if (active.id === "fav") {
     els.activeTitle.textContent = t(L, "favorites");
-    els.activeMeta.textContent = `${filteredItems(state).length} ${t(L, "items")}`;
+    els.activeMeta.textContent = `${list.length} ${t(L, "items")}`;
     return;
   }
 
   els.activeTitle.textContent = `${t(L, "collectionSingle")}: ${active.name}`;
-  const mode = active.rulesEnabled ? t(L, "contextRules") : t(L, "contextManual");
-  els.activeMeta.textContent = `${filteredItems(state).length} ${t(L, "items")} • ${mode}`;
+  const mode = active.kind === "smart" ? t(L, "contextSmart") : t(L, "contextManual");
+  els.activeMeta.textContent = `${list.length} ${t(L, "items")} • ${mode}`;
 }
 
 function renderActiveFilters(state, els, onChange, L) {
   const bar = els.activeFilters;
   if (!bar) return;
   bar.innerHTML = "";
+  const chipsBar = bar.closest(".chipsbar");
 
   const chips = [];
   for (const type of state.filters.types || []) {
-    chips.push({ key: "type", value: type, label: `${t(L, "chipType")}: ${t(L, `type_${type}`)}` });
+    chips.push({ key: "type", value: type, label: `${t(L, "chipType")}: ${displayOptionLabel(type, "type", L)}` });
   }
   for (const src of state.filters.sources || []) {
-    chips.push({ key: "source", value: src, label: `${t(L, "chipSource")}: ${t(L, `source_${src}`)}` });
+    chips.push({ key: "source", value: src, label: `${t(L, "chipSource")}: ${displayOptionLabel(src, "source", L)}` });
   }
   if (state.filters.tag) chips.push({ key: "tag", value: state.filters.tag, label: `${t(L, "chipTag")}: ${state.filters.tag}` });
   if (state.filters.favoriteOnly) chips.push({ key: "fav", value: "1", label: t(L, "chipFav") });
 
   if (!chips.length && !state.search) {
-    const hint = document.createElement("div");
-    hint.className = "chip";
-    hint.textContent = t(L, "filters");
-    bar.appendChild(hint);
+    if (chipsBar) chipsBar.hidden = true;
     return;
   }
+
+  if (chipsBar) chipsBar.hidden = false;
 
   for (const c of chips) {
     const btn = document.createElement("button");
@@ -207,22 +212,22 @@ function renderGrid(state, els, onChange, L) {
         <div class="empty__text">${escapeHtml(t(L, "emptyFavText"))}</div>
         <div class="empty__actions"><button class="btn btn--primary" type="button" data-add-link="1">${escapeHtml(t(L, "quickAdd"))}</button></div>
       `;
+    } else if (active.kind === "smart") {
+      empty.innerHTML = `
+        <div class="empty__title">${escapeHtml(t(L, "emptyCollectionTitle"))}</div>
+        <div class="empty__text">${escapeHtml(t(L, "emptySmartText"))}</div>
+      `;
     } else {
-      const rulesAction = active.rulesEnabled ? `<button class="btn btn--ghost" type="button" data-edit-rules="1">${escapeHtml(t(L, "configureRules"))}</button>` : "";
       empty.innerHTML = `
         <div class="empty__title">${escapeHtml(t(L, "emptyCollectionTitle"))}</div>
         <div class="empty__text">${escapeHtml(t(L, "emptyCollectionText"))}</div>
         <div class="empty__actions">
           <button class="btn btn--primary" type="button" data-add-link="1">${escapeHtml(t(L, "quickAdd"))}</button>
-          ${rulesAction}
         </div>
       `;
     }
 
     wireQuickAdd(empty);
-    const editRules = empty.querySelector("[data-edit-rules]");
-    if (editRules) editRules.addEventListener("click", () => document.getElementById("btnNewCollection")?.click());
-
     els.grid.appendChild(empty);
     return;
   }
@@ -235,13 +240,12 @@ function renderGrid(state, els, onChange, L) {
     const domain = domainFromUrl(item.url);
     const tags = (item.tags || []).slice(0, 10);
     const icon = faviconUrl(item.url);
-    const fallbackPreview = previewFallbackUrl(item.url);
-    const previewSrc = item.previewImage || fallbackPreview;
+    const previewSrc = item.previewImage || previewFallbackUrl(item.url);
 
     card.innerHTML = `
       ${previewSrc ? `
       <a class="card__preview-wrap" href="${item.url}" target="_blank" rel="noreferrer">
-        <img class="card__preview" src="${escapeHtml(previewSrc)}" data-fallback="${escapeHtml(fallbackPreview)}" alt="${escapeHtml(item.title || "preview")}" loading="lazy" referrerpolicy="no-referrer" />
+        <img class="card__preview" src="${escapeHtml(previewSrc)}" data-fallback="${escapeHtml(previewFallbackUrl(item.url))}" alt="${escapeHtml(item.title || "preview")}" loading="lazy" referrerpolicy="no-referrer" />
       </a>` : ""}
 
       <div class="card__top">
@@ -249,14 +253,14 @@ function renderGrid(state, els, onChange, L) {
           ${icon ? `<img class="favicon" src="${icon}" alt="">` : `<div class="favicon"></div>`}
           <div>
             <div class="card__title">${escapeHtml(item.title || domain || "Untitled")}</div>
-            <div class="card__meta">${escapeHtml(domain)} • ${escapeHtml(item.type)} • ${escapeHtml(item.source)}</div>
+            <div class="card__meta">${escapeHtml(domain)} • ${escapeHtml(displayOptionLabel(item.type, "type", L))} • ${escapeHtml(displayOptionLabel(item.source, "source", L))}</div>
           </div>
         </div>
         <button class="fav ${item.favorite ? "fav--on" : ""}" type="button" title="${escapeHtml(t(L, "favorites"))}">★</button>
       </div>
 
       ${item.note ? `<div class="card__note">${escapeHtml(item.note)}</div>` : ""}
-      <div class="tags">${tags.map((tg, i) => `<span class="tag ${i === 0 ? "tag--accent" : ""}">${escapeHtml(tg)}</span>`).join("")}</div>
+      <div class="tags">${tags.map((tg, i) => `<span class="tag ${i === 0 ? "tag--accent" : ""}"><span class="tag__text">${escapeHtml(tg)}</span></span>`).join("")}</div>
 
       <div class="card__actions">
         <a class="btn btn--secondary" href="${item.url}" target="_blank" rel="noreferrer">${escapeHtml(t(L, "open"))}</a>
@@ -266,6 +270,7 @@ function renderGrid(state, els, onChange, L) {
 
     card.querySelector(".fav")?.addEventListener("click", () => {
       item.favorite = !item.favorite;
+      item.updatedAt = Date.now();
       onChange?.();
       render(state, els, onChange);
     });
@@ -308,7 +313,12 @@ function filteredItems(state) {
 
   return state.items
     .filter((item) => itemInActiveContext(item, active))
-    .filter((item) => applyActiveFilters(item, state.filters || {}))
+    .filter((item) => matchesLink(item, {
+      types: state.filters.types || [],
+      sources: state.filters.sources || [],
+      tagContains: state.filters.tag || "",
+      favoriteOnly: !!state.filters.favoriteOnly
+    }))
     .filter((item) => matchesSearch(item, state.search))
     .sort((a, b) => compareItems(a, b, state.sortBy || "newest"));
 }
@@ -332,24 +342,8 @@ function itemInActiveContext(item, active) {
 function itemInCollectionView(item, collection) {
   if (!collection || collection.id === "all") return true;
   if (collection.id === "fav") return !!item.favorite;
-
-  const manual = Array.isArray(item.collections) && item.collections.includes(collection.id);
-  if (!collection.rulesEnabled) return manual;
-  return manual || matchesCollectionRules(item, collection.rules);
-}
-
-function applyActiveFilters(item, filters) {
-  if (filters.favoriteOnly && !item.favorite) return false;
-  if (filters.types?.length && !filters.types.includes(item.type)) return false;
-  if (filters.sources?.length && !filters.sources.includes(item.source)) return false;
-
-  if (filters.tag) {
-    const k = String(filters.tag).toLowerCase();
-    const tags = (item.tags || []).map((x) => String(x).toLowerCase());
-    if (!tags.some((t) => t.includes(k))) return false;
-  }
-
-  return true;
+  if (collection.kind === "smart") return matchesLink(item, collection.rules || {});
+  return Array.isArray(item.collectionIds) && item.collectionIds.includes(collection.id);
 }
 
 function matchesSearch(item, search) {
@@ -360,10 +354,10 @@ function matchesSearch(item, search) {
 }
 
 function compareItems(a, b, sortBy) {
-  const titleA = String(a.title || "").toLowerCase();
-  const titleB = String(b.title || "").toLowerCase();
-  const sourceA = String(a.source || "").toLowerCase();
-  const sourceB = String(b.source || "").toLowerCase();
+  const titleA = String(a.title || a.url || "").toLowerCase();
+  const titleB = String(b.title || b.url || "").toLowerCase();
+  const sourceA = String(a.source || "Other").toLowerCase();
+  const sourceB = String(b.source || "Other").toLowerCase();
 
   switch (sortBy) {
     case "oldest":
@@ -378,6 +372,11 @@ function compareItems(a, b, sortBy) {
     default:
       return (b.createdAt || 0) - (a.createdAt || 0);
   }
+}
+
+function displayOptionLabel(value, kind, lang) {
+  if (!value) return t(lang, "anyOption");
+  return t(lang, `${kind}_${String(value).toLowerCase()}`);
 }
 
 function removeFilter(state, chip) {

@@ -1,12 +1,20 @@
-﻿import "./styles.css";
+import "./styles.css";
 import { state, uid } from "./state.js";
-import { load, save } from "./storage.js";
-import { normalizeTags, detectSource, domainFromUrl, tryFetchTitle, tryFetchPreview, previewFallbackUrl } from "./filter.js";
+import { load, save, migrateToV4 } from "./storage.js";
+import {
+  normalizeTags,
+  normalizeSearchText,
+  detectSource,
+  domainFromUrl,
+  tryFetchTitle,
+  tryFetchPreview,
+  previewFallbackUrl
+} from "./filter.js";
 import { render } from "./ui.js";
 import { t } from "./i18n.js";
 
-const TYPE_OPTIONS = ["project", "studio", "designer", "inspiration"];
-const SOURCE_OPTIONS = ["site", "behance", "awwwards", "pinterest", "dribbble", "other"];
+const TYPE_OPTIONS = ["Project", "Studio", "Designer", "Inspiration", "Source"];
+const SOURCE_OPTIONS = ["Site", "Behance", "Awwwards", "Pinterest", "Dribbble", "Other"];
 
 const els = {
   langRu: document.getElementById("langRu"),
@@ -18,6 +26,10 @@ const els = {
   labelNav: document.getElementById("labelNav"),
   labelCollections: document.getElementById("labelCollections"),
   collectionsList: document.getElementById("collectionsList"),
+  sidebar: document.getElementById("sidebar"),
+  btnMobileMenu: document.getElementById("btnMobileMenu"),
+  btnMobileClose: document.getElementById("btnMobileClose"),
+  mobileOverlay: document.getElementById("mobileOverlay"),
 
   activeTitle: document.getElementById("activeTitle"),
   activeMeta: document.getElementById("activeMeta"),
@@ -64,10 +76,15 @@ const els = {
   labelAddFavorite: document.getElementById("labelAddFavorite"),
   sectionAddClassify: document.getElementById("sectionAddClassify"),
   inputAddTitle: document.getElementById("inputAddTitle"),
+  inputAddUrl: document.querySelector('#formAddLink input[name="url"]'),
   inputAddTags: document.getElementById("inputAddTags"),
   inputAddNote: document.getElementById("inputAddNote"),
+  inputAddSource: document.getElementById("inputAddSource"),
+  addSourceField: document.getElementById("addSourceField"),
+  addSourceAuto: document.getElementById("addSourceAuto"),
   addCollectionsList: document.getElementById("addCollectionsList"),
   addFavorite: document.getElementById("addFavorite"),
+  addTagsSuggestions: document.getElementById("addTagsSuggestions"),
 
   modalCollection: document.getElementById("modalCollection"),
   formCollection: document.getElementById("formCollection"),
@@ -77,7 +94,10 @@ const els = {
   modalCollectionTitle: document.getElementById("modalCollectionTitle"),
   labelColName: document.getElementById("labelColName"),
   labelColDescription: document.getElementById("labelColDescription"),
-  labelRulesEnabled: document.getElementById("labelRulesEnabled"),
+  labelCollectionKind: document.getElementById("labelCollectionKind"),
+  labelKindManual: document.getElementById("labelKindManual"),
+  labelKindSmart: document.getElementById("labelKindSmart"),
+  smartHint: document.getElementById("smartHint"),
   sectionColRules: document.getElementById("sectionColRules"),
   labelColTypes: document.getElementById("labelColTypes"),
   labelColSources: document.getElementById("labelColSources"),
@@ -85,7 +105,8 @@ const els = {
   labelColAnyTags: document.getElementById("labelColAnyTags"),
   labelColQuery: document.getElementById("labelColQuery"),
   labelColFavOnly: document.getElementById("labelColFavOnly"),
-  rulesEnabled: document.getElementById("rulesEnabled"),
+  kindManual: document.getElementById("kindManual"),
+  kindSmart: document.getElementById("kindSmart"),
   collectionRules: document.getElementById("collectionRules"),
   colTypesChips: document.getElementById("colTypesChips"),
   colSourcesChips: document.getElementById("colSourcesChips")
@@ -101,49 +122,101 @@ function persist() {
 }
 
 function normalizeState(raw) {
-  state.lang = raw?.lang === "en" ? "en" : "ru";
-  state.sortBy = typeof raw?.sortBy === "string" ? raw.sortBy : "newest";
+  const data = migrateToV4(raw || {});
 
-  state.items = Array.isArray(raw?.items) ? raw.items.map((it) => ({
-    id: String(it.id || uid("item")),
-    url: String(it.url || ""),
-    title: String(it.title || ""),
-    previewImage: String(it.previewImage || ""),
-    tags: Array.isArray(it.tags) ? it.tags.map((x) => String(x)) : [],
-    type: String(it.type || "project"),
-    source: String(it.source || "site"),
-    note: String(it.note || ""),
-    favorite: !!it.favorite,
-    createdAt: Number(it.createdAt || Date.now()),
-    collections: Array.isArray(it.collections) ? [...new Set(it.collections.map((x) => String(x)))] : []
-  })).filter((it) => it.url) : [];
+  state.lang = data?.lang === "en" ? "en" : "ru";
+  state.sortBy = typeof data?.sortBy === "string" ? data.sortBy : "newest";
 
-  state.collections = Array.isArray(raw?.collections) ? raw.collections.map((c) => ({
-    id: String(c.id || uid("col")),
-    name: String(c.name || "Collection"),
-    description: String(c.description || ""),
-    manual: true,
-    rulesEnabled: !!c.rulesEnabled,
-    rules: {
-      types: Array.isArray(c.rules?.types) ? c.rules.types.map((x) => String(x)) : [],
-      sources: Array.isArray(c.rules?.sources) ? c.rules.sources.map((x) => String(x)) : [],
-      tagsAll: Array.isArray(c.rules?.tagsAll) ? c.rules.tagsAll.map((x) => String(x)) : [],
-      tagsAny: Array.isArray(c.rules?.tagsAny) ? c.rules.tagsAny.map((x) => String(x)) : [],
-      textContains: String(c.rules?.textContains || ""),
-      onlyFavorite: !!c.rules?.onlyFavorite
-    }
-  })) : [];
+  state.items = Array.isArray(data?.items) ? data.items.map(normalizeLink) : [];
+  state.collections = Array.isArray(data?.collections) ? data.collections.map(normalizeCollection) : [];
 
   state.activeCollectionId = "all";
   state.search = "";
   state.filters = { types: [], sources: [], tag: "", favoriteOnly: false };
-  state.ui = { filtersOpen: false };
+  state.ui = { filtersOpen: false, mobileMenuOpen: false };
+}
+
+function normalizeLink(item) {
+  const now = Date.now();
+  const createdAt = Number(item?.createdAt || now);
+  return {
+    id: String(item?.id || uid("item")),
+    url: String(item?.url || ""),
+    title: String(item?.title || ""),
+    previewImage: String(item?.previewImage || ""),
+    tags: normalizeTags(item?.tags || []),
+    type: normalizeType(item?.type),
+    source: normalizeSource(item?.source),
+    note: String(item?.note || ""),
+    favorite: !!item?.favorite,
+    createdAt,
+    updatedAt: Number(item?.updatedAt || createdAt),
+    collectionIds: Array.isArray(item?.collectionIds) ? [...new Set(item.collectionIds.map((x) => String(x)))] : []
+  };
+}
+
+function normalizeCollection(col) {
+  const now = Date.now();
+  const createdAt = Number(col?.createdAt || now);
+  const kind = col?.kind === "smart" ? "smart" : "manual";
+
+  return {
+    id: String(col?.id || uid("col")),
+    name: String(col?.name || "Collection"),
+    description: String(col?.description || ""),
+    kind,
+    rules: kind === "smart" ? normalizeRules(col?.rules) : undefined,
+    createdAt,
+    updatedAt: Number(col?.updatedAt || createdAt)
+  };
+}
+
+function normalizeRules(rules) {
+  return {
+    types: Array.isArray(rules?.types) ? [...new Set(rules.types.map(normalizeType).filter(Boolean))] : [],
+    sources: Array.isArray(rules?.sources) ? [...new Set(rules.sources.map(normalizeSource).filter(Boolean))] : [],
+    requiredTags: normalizeTags(rules?.requiredTags || []),
+    anyTags: normalizeTags(rules?.anyTags || []),
+    containsText: normalizeSearchText(rules?.containsText || ""),
+    onlyFavorites: !!rules?.onlyFavorites
+  };
+}
+
+function normalizeType(value) {
+  const map = {
+    project: "Project",
+    studio: "Studio",
+    designer: "Designer",
+    inspiration: "Inspiration",
+    source: "Source"
+  };
+  if (value == null || value === "") return null;
+  const normalized = map[String(value).trim().toLowerCase()] || String(value).trim();
+  return TYPE_OPTIONS.includes(normalized) ? normalized : null;
+}
+
+function normalizeSource(value) {
+  const map = {
+    site: "Site",
+    behance: "Behance",
+    awwwards: "Awwwards",
+    pinterest: "Pinterest",
+    dribbble: "Dribbble",
+    other: "Other"
+  };
+  if (value == null || value === "") return null;
+  const normalized = map[String(value).trim().toLowerCase()] || String(value).trim();
+  return SOURCE_OPTIONS.includes(normalized) ? normalized : null;
 }
 
 function updateLangButtons() {
   const L = state.lang;
   els.langRu?.classList.toggle("lang__btn--active", L === "ru");
   els.langEn?.classList.toggle("lang__btn--active", L === "en");
+}
+
+function optionKey(value) {
+  return String(value || "").toLowerCase();
 }
 
 function applyI18n() {
@@ -174,9 +247,7 @@ function applyI18n() {
       title_desc: t(L, "sortTitleDesc"),
       source_asc: t(L, "sortSource")
     };
-    for (const opt of els.sortSelect.options) {
-      opt.textContent = labels[opt.value] || opt.value;
-    }
+    for (const opt of els.sortSelect.options) opt.textContent = labels[opt.value] || opt.value;
   }
 
   if (els.labelFilterTypes) els.labelFilterTypes.textContent = t(L, "filterTypes");
@@ -201,7 +272,10 @@ function applyI18n() {
   if (els.modalCollectionTitle) els.modalCollectionTitle.textContent = t(L, "modalCollectionTitle");
   if (els.labelColName) els.labelColName.textContent = t(L, "name");
   if (els.labelColDescription) els.labelColDescription.textContent = t(L, "description");
-  if (els.labelRulesEnabled) els.labelRulesEnabled.textContent = t(L, "rulesEnabled");
+  if (els.labelCollectionKind) els.labelCollectionKind.textContent = t(L, "collectionKind");
+  if (els.labelKindManual) els.labelKindManual.textContent = t(L, "kindManual");
+  if (els.labelKindSmart) els.labelKindSmart.textContent = t(L, "kindSmart");
+  if (els.smartHint) els.smartHint.textContent = t(L, "smartHint");
   if (els.sectionColRules) els.sectionColRules.textContent = t(L, "rulesTitle");
   if (els.labelColTypes) els.labelColTypes.textContent = t(L, "types");
   if (els.labelColSources) els.labelColSources.textContent = t(L, "sources");
@@ -215,14 +289,71 @@ function applyI18n() {
   renderFilterChips();
   renderCollectionRuleChips();
   renderAddCollectionChoices();
+  renderTagSuggestions();
+  renderSelectLabels();
+  updateAddSourceUi();
+}
+
+function renderSelectLabels() {
+  const typeSelect = els.formAddLink?.querySelector('select[name="type"]');
+  const sourceSelect = els.formAddLink?.querySelector('select[name="source"]');
+
+  if (typeSelect) {
+    for (const option of typeSelect.options) {
+      if (option.value === "") option.textContent = t(state.lang, "anyOption");
+      else option.textContent = t(state.lang, `type_${optionKey(option.value)}`);
+    }
+  }
+
+  if (sourceSelect) {
+    for (const option of sourceSelect.options) {
+      option.textContent = t(state.lang, `source_${optionKey(option.value)}`);
+    }
+  }
+}
+
+function getDetectedSourceFromUrl(rawUrl) {
+  try {
+    new URL(String(rawUrl || "").trim());
+  } catch {
+    return null;
+  }
+  const detected = detectSource(rawUrl);
+  return detected === "Site" ? null : detected;
+}
+
+function updateAddSourceUi() {
+  const detected = getDetectedSourceFromUrl(els.inputAddUrl?.value || "");
+  const L = state.lang || "ru";
+
+  if (detected) {
+    if (els.addSourceField) els.addSourceField.hidden = true;
+    if (els.inputAddSource) els.inputAddSource.disabled = true;
+    if (els.inputAddSource) els.inputAddSource.value = detected;
+    if (els.addSourceAuto) {
+      els.addSourceAuto.hidden = false;
+      els.addSourceAuto.textContent = `${t(L, "sourceAutoDetected")}: ${t(L, `source_${optionKey(detected)}`)}`;
+    }
+    return;
+  }
+
+  if (els.addSourceField) els.addSourceField.hidden = false;
+  if (els.inputAddSource) {
+    els.inputAddSource.disabled = false;
+    if (!els.inputAddSource.value) els.inputAddSource.value = "Other";
+  }
+  if (els.addSourceAuto) {
+    els.addSourceAuto.hidden = false;
+    els.addSourceAuto.textContent = t(L, "sourceManualPrompt");
+  }
 }
 
 function renderFilterChips() {
   if (els.filterTypes) {
-    els.filterTypes.innerHTML = TYPE_OPTIONS.map((v) => chipCheckHtml("filterType", v, t(state.lang, `type_${v}`))).join("");
+    els.filterTypes.innerHTML = TYPE_OPTIONS.map((v) => chipCheckHtml("filterType", v, t(state.lang, `type_${optionKey(v)}`))).join("");
   }
   if (els.filterSources) {
-    els.filterSources.innerHTML = SOURCE_OPTIONS.map((v) => chipCheckHtml("filterSource", v, t(state.lang, `source_${v}`))).join("");
+    els.filterSources.innerHTML = SOURCE_OPTIONS.map((v) => chipCheckHtml("filterSource", v, t(state.lang, `source_${optionKey(v)}`))).join("");
   }
 
   els.filterTypes?.querySelectorAll("input").forEach((x) => {
@@ -244,21 +375,29 @@ function renderFilterChips() {
 
 function renderCollectionRuleChips() {
   if (els.colTypesChips) {
-    els.colTypesChips.innerHTML = TYPE_OPTIONS.map((v) => chipCheckHtml("types", v, t(state.lang, `type_${v}`))).join("");
+    els.colTypesChips.innerHTML = TYPE_OPTIONS.map((v) => chipCheckHtml("types", v, t(state.lang, `type_${optionKey(v)}`))).join("");
   }
   if (els.colSourcesChips) {
-    els.colSourcesChips.innerHTML = SOURCE_OPTIONS.map((v) => chipCheckHtml("sources", v, t(state.lang, `source_${v}`))).join("");
+    els.colSourcesChips.innerHTML = SOURCE_OPTIONS.map((v) => chipCheckHtml("sources", v, t(state.lang, `source_${optionKey(v)}`))).join("");
   }
 }
 
 function renderAddCollectionChoices() {
   if (!els.addCollectionsList) return;
-  const custom = state.collections;
+  const manualCollections = state.collections.filter((col) => col.kind === "manual");
   const activeId = state.activeCollectionId;
 
-  const inbox = chipCheckHtml("collections", "", t(state.lang, "addToInbox"), activeId === "all" || activeId === "fav");
-  const cols = custom.map((c) => chipCheckHtml("collections", c.id, c.name, activeId === c.id)).join("");
-  els.addCollectionsList.innerHTML = inbox + cols;
+  const chips = manualCollections.map((col) =>
+    chipCheckHtml("collections", col.id, col.name, activeId === col.id && col.kind === "manual")
+  );
+
+  els.addCollectionsList.innerHTML = chips.join("");
+}
+
+function renderTagSuggestions() {
+  if (!els.addTagsSuggestions) return;
+  const tags = [...new Set(state.items.flatMap((item) => normalizeTags(item.tags || [])))].sort((a, b) => a.localeCompare(b, state.lang));
+  els.addTagsSuggestions.innerHTML = tags.map((tag) => `<option value="${escapeHtml(tag)}"></option>`).join("");
 }
 
 function chipCheckHtml(name, value, label, checked = false) {
@@ -271,19 +410,35 @@ function toggleSettingsMenu(show) {
 }
 
 function updateRulesVisibility() {
-  if (!els.collectionRules || !els.rulesEnabled) return;
-  els.collectionRules.hidden = !els.rulesEnabled.checked;
+  if (!els.collectionRules) return;
+  const kind = els.kindSmart?.checked ? "smart" : "manual";
+  els.collectionRules.hidden = kind !== "smart";
 }
 
 function setupEvents() {
+  const mobileMq = window.matchMedia("(max-width: 700px)");
+
+  function setMobileMenu(open) {
+    state.ui.mobileMenuOpen = !!open;
+    document.body.classList.toggle("mobile-menu-open", !!open);
+    els.btnMobileMenu?.setAttribute("aria-expanded", open ? "true" : "false");
+  }
+
+  function closeMobileMenuIfNeeded() {
+    if (!mobileMq.matches) return;
+    setMobileMenu(false);
+  }
+
   els.navAll?.addEventListener("click", () => {
     state.activeCollectionId = "all";
     render(state, els, persist);
+    closeMobileMenuIfNeeded();
   });
 
   els.navFav?.addEventListener("click", () => {
     state.activeCollectionId = "fav";
     render(state, els, persist);
+    closeMobileMenuIfNeeded();
   });
 
   els.searchInput?.addEventListener("input", (e) => {
@@ -303,7 +458,7 @@ function setupEvents() {
   });
 
   els.filterTagInput?.addEventListener("input", (e) => {
-    state.filters.tag = String(e.target.value || "").trim().toLowerCase();
+    state.filters.tag = normalizeSearchText(e.target.value);
     render(state, els, persist);
   });
 
@@ -337,12 +492,40 @@ function setupEvents() {
     if (!e.target.closest(".settings")) toggleSettingsMenu(false);
   });
 
+  els.btnMobileMenu?.addEventListener("click", () => {
+    if (!mobileMq.matches) return;
+    setMobileMenu(!state.ui.mobileMenuOpen);
+  });
+
+  els.btnMobileClose?.addEventListener("click", () => setMobileMenu(false));
+  els.mobileOverlay?.addEventListener("click", () => setMobileMenu(false));
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") setMobileMenu(false);
+  });
+
+  els.sidebar?.addEventListener("click", (e) => {
+    const actionable = e.target.closest("#navAll, #navFav, .collection, #btnAddLink, #btnNewCollection");
+    if (!actionable) return;
+    closeMobileMenuIfNeeded();
+  });
+
+  mobileMq.addEventListener("change", (ev) => {
+    if (!ev.matches) setMobileMenu(false);
+  });
+
   els.btnAddLink?.addEventListener("click", () => {
     els.formAddLink?.reset();
     renderAddCollectionChoices();
+    renderTagSuggestions();
+    if (els.inputAddSource) els.inputAddSource.value = "Other";
+    updateAddSourceUi();
     if (els.addFavorite) els.addFavorite.checked = state.activeCollectionId === "fav";
     els.modalAddLink?.showModal();
+    closeMobileMenuIfNeeded();
   });
+
+  els.inputAddUrl?.addEventListener("input", updateAddSourceUi);
 
   els.formAddLink?.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -351,12 +534,15 @@ function setupEvents() {
     const url = String(fd.get("url") || "").trim();
     const titleRaw = String(fd.get("title") || "").trim();
     const tags = normalizeTags(fd.get("tags"));
-    const type = String(fd.get("type") || "project");
-    const sourcePick = String(fd.get("source") || "site");
+    const type = normalizeType(fd.get("type"));
+    const sourcePick = normalizeSource(fd.get("source"));
     const note = String(fd.get("note") || "").trim();
     const favorite = !!fd.get("favorite");
 
-    const selectedCollections = fd.getAll("collections").map((x) => String(x)).filter(Boolean);
+    const manualCollectionIds = new Set(state.collections.filter((col) => col.kind === "manual").map((col) => col.id));
+    const selectedCollections = fd.getAll("collections")
+      .map((x) => String(x))
+      .filter((id) => manualCollectionIds.has(id));
 
     try {
       new URL(url);
@@ -366,8 +552,8 @@ function setupEvents() {
     }
 
     const domain = domainFromUrl(url);
-    const source = sourcePick === "site" ? detectSource(url) : sourcePick;
-
+    const source = getDetectedSourceFromUrl(url) || sourcePick || "Other";
+    const now = Date.now();
     const itemId = uid("item");
     const fallbackPreview = previewFallbackUrl(url);
     const initialTitle = titleRaw || domain || url;
@@ -382,12 +568,14 @@ function setupEvents() {
       source,
       note,
       favorite,
-      createdAt: Date.now(),
-      collections: selectedCollections
+      createdAt: now,
+      updatedAt: now,
+      collectionIds: selectedCollections
     });
 
     persist();
     els.modalAddLink?.close();
+    renderTagSuggestions();
     render(state, els, persist);
 
     void (async () => {
@@ -413,6 +601,7 @@ function setupEvents() {
       }
 
       if (changed) {
+        item.updatedAt = Date.now();
         persist();
         render(state, els, persist);
       }
@@ -421,11 +610,14 @@ function setupEvents() {
 
   els.btnNewCollection?.addEventListener("click", () => {
     els.formCollection?.reset();
+    if (els.kindManual) els.kindManual.checked = true;
     updateRulesVisibility();
     els.modalCollection?.showModal();
+    closeMobileMenuIfNeeded();
   });
 
-  els.rulesEnabled?.addEventListener("change", updateRulesVisibility);
+  els.kindManual?.addEventListener("change", updateRulesVisibility);
+  els.kindSmart?.addEventListener("change", updateRulesVisibility);
 
   els.formCollection?.addEventListener("submit", (e) => {
     e.preventDefault();
@@ -435,41 +627,38 @@ function setupEvents() {
     if (!name) return;
 
     const description = String(fd.get("description") || "").trim();
-    const rulesEnabled = !!fd.get("rulesEnabled");
-
-    const types = fd.getAll("types").map((x) => String(x));
-    const sources = fd.getAll("sources").map((x) => String(x));
-    const tagsAll = normalizeTags(fd.get("allTags"));
-    const tagsAny = normalizeTags(fd.get("anyTags"));
-    const textContains = String(fd.get("query") || "").trim();
-    const onlyFavorite = !!fd.get("favoriteOnly");
-
+    const kind = fd.get("kind") === "smart" ? "smart" : "manual";
+    const now = Date.now();
     const id = uid("col");
-    state.collections.push({
+
+    const nextCollection = {
       id,
       name,
       description,
-      manual: true,
-      rulesEnabled,
-      rules: {
-        types,
-        sources,
-        tagsAll,
-        tagsAny,
-        textContains,
-        onlyFavorite
-      }
-    });
+      kind,
+      rules: kind === "smart" ? {
+        types: fd.getAll("types").map(normalizeType).filter(Boolean),
+        sources: fd.getAll("sources").map(normalizeSource).filter(Boolean),
+        requiredTags: normalizeTags(fd.get("requiredTags")),
+        anyTags: normalizeTags(fd.get("anyTags")),
+        containsText: normalizeSearchText(fd.get("containsText")),
+        onlyFavorites: !!fd.get("onlyFavorites")
+      } : undefined,
+      createdAt: now,
+      updatedAt: now
+    };
 
+    state.collections.push(nextCollection);
     state.activeCollectionId = id;
     persist();
     els.modalCollection?.close();
+    renderAddCollectionChoices();
     render(state, els, persist);
   });
 
   els.btnExport?.addEventListener("click", () => {
     const payload = {
-      version: 3,
+      version: 4,
       items: state.items,
       collections: state.collections,
       lang: state.lang,
@@ -526,6 +715,7 @@ normalizeState(saved || {});
 setupEvents();
 applyI18n();
 updateLangButtons();
+els.btnMobileMenu?.setAttribute("aria-expanded", "false");
 if (els.sortSelect) els.sortSelect.value = state.sortBy || "newest";
 if (els.filterTagInput) els.filterTagInput.value = state.filters.tag || "";
 if (els.filterFavoriteOnly) els.filterFavoriteOnly.checked = !!state.filters.favoriteOnly;

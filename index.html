@@ -7,7 +7,7 @@
   </head>
   <body>
     <div class="app">
-      <aside class="sidebar">
+      <aside id="sidebar" class="sidebar">
         <div class="sidebar__top">
           <div class="brand-row">
             <div id="brand" class="brand">Vault</div>
@@ -15,6 +15,7 @@
               <button id="langRu" class="lang__btn" type="button">RU</button>
               <button id="langEn" class="lang__btn" type="button">EN</button>
             </div>
+            <button id="btnMobileClose" class="btn btn--secondary btn--icon mobile-close-btn" type="button" aria-label="Close menu"><span class="btn-icon-cross">×</span></button>
           </div>
 
           <div class="sidebar__section">
@@ -53,6 +54,7 @@
       <main class="main">
         <header class="topbar">
           <div class="topbar__left">
+            <button id="btnMobileMenu" class="btn btn--secondary btn--icon mobile-menu-btn" type="button" aria-label="Open menu"><span class="mobile-menu-btn__icon"><span></span><span></span></span></button>
             <div id="activeTitle" class="title">All links</div>
             <div id="activeMeta" class="meta"></div>
           </div>
@@ -101,12 +103,13 @@
         <section id="grid" class="grid"></section>
       </main>
     </div>
+    <div id="mobileOverlay" class="mobile-overlay" aria-hidden="true"></div>
 
     <dialog id="modalAddLink" class="modal">
       <form method="dialog" class="modal__card" id="formAddLink">
         <div class="modal__header">
           <div id="modalAddTitle" class="modal__title">Add link</div>
-          <button id="addCloseX" class="btn btn--icon btn--ghost" type="button" aria-label="Close">×</button>
+          <button id="addCloseX" class="btn btn--icon btn--ghost" type="button" aria-label="Close"><span class="btn-icon-cross">×</span></button>
         </div>
 
         <div class="modal__section">
@@ -134,32 +137,36 @@
           <div id="sectionAddClassify" class="modal__section-title">Classification</div>
           <label class="field">
             <span id="labelAddTags">Tags (comma)</span>
-            <input id="inputAddTags" name="tags" placeholder="dark, fintech" />
+            <input id="inputAddTags" name="tags" list="addTagsSuggestions" placeholder="dark, fintech" />
+            <datalist id="addTagsSuggestions"></datalist>
           </label>
 
           <div class="row">
             <label class="field">
               <span id="labelAddType">Type</span>
               <select name="type">
-                <option value="project">Project</option>
-                <option value="studio">Studio</option>
-                <option value="designer">Designer</option>
-                <option value="inspiration">Inspiration</option>
+                <option value="">Any</option>
+                <option value="Project">Project</option>
+                <option value="Studio">Studio</option>
+                <option value="Designer">Designer</option>
+                <option value="Inspiration">Inspiration</option>
+                <option value="Source">Source</option>
               </select>
             </label>
 
-            <label class="field">
+            <label id="addSourceField" class="field">
               <span id="labelAddSource">Source</span>
-              <select name="source">
-                <option value="site">Site</option>
-                <option value="behance">Behance</option>
-                <option value="awwwards">Awwwards</option>
-                <option value="pinterest">Pinterest</option>
-                <option value="dribbble">Dribbble</option>
-                <option value="other">Other</option>
+              <select id="inputAddSource" name="source">
+                <option value="Other">Other</option>
+                <option value="Site">Site</option>
+                <option value="Behance">Behance</option>
+                <option value="Awwwards">Awwwards</option>
+                <option value="Pinterest">Pinterest</option>
+                <option value="Dribbble">Dribbble</option>
               </select>
             </label>
           </div>
+          <div id="addSourceAuto" class="hint" hidden></div>
         </div>
 
         <div class="modal__section">
@@ -180,7 +187,7 @@
       <form method="dialog" class="modal__card" id="formCollection">
         <div class="modal__header">
           <div id="modalCollectionTitle" class="modal__title">Create collection</div>
-          <button id="colCloseX" class="btn btn--icon btn--ghost" type="button" aria-label="Close">×</button>
+          <button id="colCloseX" class="btn btn--icon btn--ghost" type="button" aria-label="Close"><span class="btn-icon-cross">×</span></button>
         </div>
 
         <label class="field">
@@ -193,13 +200,23 @@
           <input name="description" placeholder="Optional short description" />
         </label>
 
-        <label class="check">
-          <input id="rulesEnabled" type="checkbox" name="rulesEnabled" />
-          <span id="labelRulesEnabled">Autofill (by rules)</span>
-        </label>
+        <div class="field">
+          <span id="labelCollectionKind">Collection type</span>
+          <div class="kind-toggle">
+            <label class="chip-check">
+              <input id="kindManual" type="radio" name="kind" value="manual" checked />
+              <span id="labelKindManual">Manual</span>
+            </label>
+            <label class="chip-check">
+              <input id="kindSmart" type="radio" name="kind" value="smart" />
+              <span id="labelKindSmart">Smart</span>
+            </label>
+          </div>
+        </div>
 
         <div id="collectionRules" class="modal__section" hidden>
           <div id="sectionColRules" class="modal__section-title">Collection rules</div>
+          <div id="smartHint" class="hint">This is a dynamic view based on rules.</div>
 
           <div class="row">
             <fieldset class="field multi">
@@ -215,7 +232,7 @@
 
           <label class="field">
             <span id="labelColAllTags">All tags (required)</span>
-            <input id="inputColAllTags" name="allTags" placeholder="dark, fintech" />
+            <input id="inputColAllTags" name="requiredTags" placeholder="dark, fintech" />
           </label>
 
           <label class="field">
@@ -225,11 +242,11 @@
 
           <label class="field">
             <span id="labelColQuery">Contains text</span>
-            <input id="inputColQuery" name="query" placeholder="saas, serif, motion" />
+            <input id="inputColQuery" name="containsText" placeholder="saas, serif, motion" />
           </label>
 
           <label class="check">
-            <input type="checkbox" name="favoriteOnly" />
+            <input type="checkbox" name="onlyFavorites" />
             <span id="labelColFavOnly">Only favorites</span>
           </label>
         </div>
