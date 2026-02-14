@@ -388,7 +388,14 @@ select option { background: #1b1b1b; color: var(--text-primary); }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.card__note { margin-top: var(--space-3); font-size: 12px; line-height: 1.45; color: var(--text-secondary); }
+.card__note {
+  margin-top: var(--space-3);
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
 .tags { margin-top: var(--space-3); display: flex; flex-wrap: wrap; gap: 8px; }
 .tag {
   font-size: 12px;
