@@ -96,6 +96,7 @@
     quickAdd: "Добавить ссылку",
     quickAddHint: "Быстрое добавление",
     configureRules: "Настроить правила",
+    expandNote: "Показать",
 
     chipType: "Тип",
     chipSource: "Источник",
@@ -213,6 +214,7 @@
     quickAdd: "Add link",
     quickAddHint: "Quick add",
     configureRules: "Configure rules",
+    expandNote: "Show",
 
     chipType: "Type",
     chipSource: "Source",

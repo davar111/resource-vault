@@ -298,6 +298,9 @@ function renderGrid(state, els, onChange, actions, L) {
     const tags = (item.tags || []).slice(0, 10);
     const icon = faviconUrl(item.url);
     const previewSrc = item.previewImage || previewFallbackUrl(item.url);
+    const noteText = String(item.note || "").trim();
+    const hasNote = !!noteText;
+    const noteNeedsExpand = noteText.length > 90 || /\r?\n/.test(noteText);
 
     card.innerHTML = `
       ${previewSrc ? `
@@ -325,7 +328,11 @@ function renderGrid(state, els, onChange, actions, L) {
         </div>
       </div>
 
-      ${item.note ? `<div class="card__note">${escapeHtml(item.note)}</div>` : ""}
+      ${hasNote ? `
+      <div class="card__note-wrap">
+        <div class="card__note">${escapeHtml(noteText)}</div>
+        ${noteNeedsExpand ? `<button class="card__note-more" type="button" data-note-expand="1">${escapeHtml(t(L, "expandNote"))}</button>` : ""}
+      </div>` : ""}
       <div class="tags">${tags.map((tg, i) => `<span class="tag ${i === 0 ? "tag--accent" : ""}"><span class="tag__text">${escapeHtml(tg)}</span></span>`).join("")}</div>
     `;
 
@@ -360,6 +367,10 @@ function renderGrid(state, els, onChange, actions, L) {
       state.items = state.items.filter((x) => x.id !== item.id);
       onChange?.();
       render(state, els, onChange);
+    });
+
+    card.querySelector("[data-note-expand]")?.addEventListener("click", () => {
+      alert(noteText);
     });
 
     const previewEl = card.querySelector(".card__preview");

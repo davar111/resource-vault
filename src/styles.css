@@ -335,11 +335,15 @@ select option { background: #1b1b1b; color: var(--text-primary); }
 .card {
   --stagger: 0ms;
   position: relative;
+  height: 430px;
   margin: 0;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   background: var(--bg-surface-1);
   padding: var(--space-4);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   animation: card-in 220ms ease both;
   animation-delay: var(--stagger);
 }
@@ -388,15 +392,36 @@ select option { background: #1b1b1b; color: var(--text-primary); }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.card__note {
+.card__note-wrap {
   margin-top: var(--space-3);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.card__note {
+  min-width: 0;
+  flex: 1 1 auto;
   font-size: 12px;
   line-height: 1.45;
   color: var(--text-secondary);
-  overflow-wrap: anywhere;
-  word-break: break-word;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.tags { margin-top: var(--space-3); display: flex; flex-wrap: wrap; gap: 8px; }
+.card__note-more {
+  border: 1px solid var(--border-default);
+  border-radius: 999px;
+  background: var(--bg-surface-2);
+  color: var(--text-secondary);
+  padding: 3px 8px 4px;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+.card__note-more:hover { background: var(--bg-surface-3); color: var(--text-primary); }
+.tags { margin-top: auto; display: flex; flex-wrap: wrap; gap: 8px; max-height: 56px; overflow: hidden; }
 .tag {
   font-size: 12px;
   line-height: 1.2;
@@ -436,7 +461,8 @@ select option { background: #1b1b1b; color: var(--text-primary); }
 
 .card--add {
   width: 100%;
-  min-height: 190px;
+  min-height: 430px;
+  height: 430px;
   border-style: dashed;
   border-color: var(--border-default);
   background: #1b1b1b;
