@@ -67,16 +67,23 @@ export function isSupabaseConfigured() {
   return Boolean(SUPABASE_URL && SUPABASE_PUBLISHABLE_KEY);
 }
 
+export function getSupabaseConfigError() {
+  if (!SUPABASE_URL) return "Missing VITE_SUPABASE_URL";
+  if (!SUPABASE_PUBLISHABLE_KEY) return "Missing VITE_SUPABASE_ANON_KEY";
+  return "";
+}
+
 function authRedirectUrl() {
   if (typeof window === "undefined") return "";
   return `${window.location.origin}${window.location.pathname}`;
 }
 
 export function signInWithGoogle() {
-  if (!isSupabaseConfigured() || typeof window === "undefined") return;
+  if (!isSupabaseConfigured() || typeof window === "undefined") return false;
   const redirectTo = encodeURIComponent(authRedirectUrl());
   const url = `${SUPABASE_URL}/auth/v1/authorize?provider=google&redirect_to=${redirectTo}`;
   window.location.assign(url);
+  return true;
 }
 
 export async function completeAuthFromUrl() {

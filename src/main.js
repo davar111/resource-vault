@@ -12,7 +12,7 @@ import {
 } from "./filter.js";
 import { render } from "./ui.js";
 import { t } from "./i18n.js";
-import { completeAuthFromUrl, getCurrentUser, signInWithGoogle, signOut } from "./supabase.js";
+import { completeAuthFromUrl, getCurrentUser, getSupabaseConfigError, signInWithGoogle, signOut } from "./supabase.js";
 
 const TYPE_OPTIONS = ["Project", "Studio", "Designer", "Inspiration", "Source"];
 const SOURCE_OPTIONS = ["Site", "Behance", "Awwwards", "Pinterest", "Dribbble", "Other"];
@@ -612,7 +612,14 @@ function setupEvents() {
       window.location.reload();
       return;
     }
-    signInWithGoogle();
+    if (els.authStatus) els.authStatus.textContent = "Opening Google sign-in...";
+    const err = getSupabaseConfigError();
+    if (err) {
+      if (els.authStatus) els.authStatus.textContent = `Auth error: ${err}`;
+      return;
+    }
+    const started = signInWithGoogle();
+    if (!started && els.authStatus) els.authStatus.textContent = "Auth error: OAuth did not start";
   });
 
   document.addEventListener("click", (e) => {
@@ -924,11 +931,17 @@ function escapeHtml(str) {
 }
 
 async function bootstrap() {
-  await completeAuthFromUrl();
-  currentUser = await getCurrentUser();
-
   const localData = load();
-  const cloudData = await loadFromCloud();
+  let cloudData = null;
+
+  try {
+    await completeAuthFromUrl();
+    currentUser = await getCurrentUser();
+    cloudData = await loadFromCloud();
+  } catch (err) {
+    console.warn("Bootstrap auth/cloud failed:", err?.message || err);
+  }
+
   const initial = cloudData || localData || {};
 
   // Keep local cache aligned with cloud state when cloud is available.
