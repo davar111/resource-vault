@@ -24,6 +24,7 @@ const els = {
 
   navAll: document.getElementById("navAll"),
   navFav: document.getElementById("navFav"),
+  navRecent: document.getElementById("navRecent"),
   labelNav: document.getElementById("labelNav"),
   labelCollections: document.getElementById("labelCollections"),
   collectionsList: document.getElementById("collectionsList"),
@@ -85,7 +86,6 @@ const els = {
   inputAddNote: document.getElementById("inputAddNote"),
   inputAddSource: document.getElementById("inputAddSource"),
   addSourceField: document.getElementById("addSourceField"),
-  addSourceAuto: document.getElementById("addSourceAuto"),
   addCollectionsList: document.getElementById("addCollectionsList"),
   addFavorite: document.getElementById("addFavorite"),
   addTagsMenu: document.getElementById("addTagsMenu"),
@@ -200,6 +200,7 @@ function persist() {
   save({
     items: state.items,
     collections: state.collections,
+    recentViewedIds: state.recentViewedIds,
     lang: state.lang,
     sortBy: state.sortBy
   });
@@ -222,6 +223,9 @@ function normalizeState(raw) {
 
   state.items = Array.isArray(data?.items) ? data.items.map(normalizeLink) : [];
   state.collections = Array.isArray(data?.collections) ? data.collections.map(normalizeCollection) : [];
+  state.recentViewedIds = Array.isArray(data?.recentViewedIds)
+    ? [...new Set(data.recentViewedIds.map((x) => String(x || "").trim()).filter(Boolean))].slice(0, 100)
+    : [];
 
   state.activeCollectionId = "all";
   state.search = "";
@@ -433,27 +437,26 @@ function getDetectedSourceFromUrl(rawUrl) {
 
 function updateAddSourceUi() {
   const detected = getDetectedSourceFromUrl(els.inputAddUrl?.value || "");
-  const L = state.lang || "ru";
 
-  if (detected) {
-    if (els.addSourceField) els.addSourceField.hidden = true;
-    if (els.inputAddSource) els.inputAddSource.disabled = true;
-    if (els.inputAddSource) els.inputAddSource.value = detected;
-    if (els.addSourceAuto) {
-      els.addSourceAuto.hidden = false;
-      els.addSourceAuto.textContent = `${t(L, "sourceAutoDetected")}: ${t(L, `source_${optionKey(detected)}`)}`;
-    }
+  if (detected && els.inputAddSource) {
+    els.inputAddSource.value = detected;
     return;
   }
 
-  if (els.addSourceField) els.addSourceField.hidden = false;
   if (els.inputAddSource) {
-    els.inputAddSource.disabled = false;
     if (!els.inputAddSource.value) els.inputAddSource.value = "Other";
   }
-  if (els.addSourceAuto) {
-    els.addSourceAuto.hidden = false;
-    els.addSourceAuto.textContent = t(L, "sourceManualPrompt");
+}
+
+function markItemViewed(itemId) {
+  const id = String(itemId || "").trim();
+  if (!id) return;
+
+  state.recentViewedIds = [id, ...(state.recentViewedIds || []).filter((x) => x !== id)].slice(0, 100);
+  persist();
+
+  if (state.activeCollectionId === "recent") {
+    render(state, els, persist);
   }
 }
 
@@ -633,6 +636,12 @@ function setupEvents() {
     closeMobileMenuIfNeeded();
   });
 
+  els.navRecent?.addEventListener("click", () => {
+    state.activeCollectionId = "recent";
+    render(state, els, persist);
+    closeMobileMenuIfNeeded();
+  });
+
   els.searchInput?.addEventListener("input", (e) => {
     state.search = String(e.target.value || "");
     render(state, els, persist);
@@ -709,7 +718,7 @@ function setupEvents() {
   });
 
   els.sidebar?.addEventListener("click", (e) => {
-    const actionable = e.target.closest("#navAll, #navFav, .collection, #btnAddLink, #btnNewCollection");
+    const actionable = e.target.closest("#navAll, #navFav, #navRecent, .collection, #btnAddLink, #btnNewCollection");
     if (!actionable) return;
     closeMobileMenuIfNeeded();
   });
@@ -1030,7 +1039,7 @@ async function bootstrap() {
   if (els.filterTagInput) els.filterTagInput.value = state.filters.tag || "";
   if (els.filterFavoriteOnly) els.filterFavoriteOnly.checked = !!state.filters.favoriteOnly;
   updateRulesVisibility();
-  render(state, els, persist, { onEditItem: openEditLinkModal });
+  render(state, els, persist, { onEditItem: openEditLinkModal, onOpenItem: markItemViewed });
 }
 
 void bootstrap();

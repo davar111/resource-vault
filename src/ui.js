@@ -22,6 +22,10 @@ function renderNav(state, els, L) {
     els.navFav.textContent = t(L, "navFav");
     els.navFav.classList.toggle("nav-item--active", state.activeCollectionId === "fav");
   }
+  if (els.navRecent) {
+    els.navRecent.textContent = t(L, "navRecent");
+    els.navRecent.classList.toggle("nav-item--active", state.activeCollectionId === "recent");
+  }
 }
 
 function renderCollections(state, els, onChange, L) {
@@ -33,6 +37,7 @@ function renderCollections(state, els, onChange, L) {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "collection" + (state.activeCollectionId === c.id ? " collection--active" : "");
+    btn.dataset.collectionId = c.id;
     btn.innerHTML = `
       <div class="collection__left">
         <div class="dot"></div>
@@ -57,6 +62,40 @@ function renderCollections(state, els, onChange, L) {
       state.activeCollectionId = c.id;
       render(state, els, onChange);
     });
+
+    if (c.kind === "manual") {
+      btn.addEventListener("dragover", (e) => {
+        e.preventDefault();
+      });
+
+      btn.addEventListener("dragenter", (e) => {
+        e.preventDefault();
+        btn.classList.add("collection--dragover");
+      });
+
+      btn.addEventListener("dragleave", () => {
+        btn.classList.remove("collection--dragover");
+      });
+
+      btn.addEventListener("drop", (e) => {
+        e.preventDefault();
+        btn.classList.remove("collection--dragover");
+
+        const itemId = String(e.dataTransfer?.getData("text/resource-vault-item-id") || "").trim();
+        if (!itemId) return;
+
+        const item = state.items.find((x) => x.id === itemId);
+        if (!item) return;
+
+        const ids = Array.isArray(item.collectionIds) ? item.collectionIds : [];
+        if (ids.includes(c.id)) return;
+
+        item.collectionIds = [...ids, c.id];
+        item.updatedAt = Date.now();
+        onChange?.();
+        render(state, els, onChange);
+      });
+    }
 
     const trigger = btn.querySelector("[data-col-menu]");
     const pop = btn.querySelector("[data-col-pop]");
@@ -117,6 +156,12 @@ function renderHeader(state, els, L) {
 
   if (active.id === "fav") {
     els.activeTitle.textContent = t(L, "favorites");
+    els.activeMeta.textContent = `${list.length} ${t(L, "items")}`;
+    return;
+  }
+
+  if (active.id === "recent") {
+    els.activeTitle.textContent = t(L, "recent");
     els.activeMeta.textContent = `${list.length} ${t(L, "items")}`;
     return;
   }
@@ -216,6 +261,11 @@ function renderGrid(state, els, onChange, actions, L) {
         <div class="empty__text">${escapeHtml(t(L, "emptyFavText"))}</div>
         <div class="empty__actions"><button class="btn btn--primary" type="button" data-add-link="1">${escapeHtml(t(L, "quickAdd"))}</button></div>
       `;
+    } else if (active.id === "recent") {
+      empty.innerHTML = `
+        <div class="empty__title">${escapeHtml(t(L, "emptyRecentTitle"))}</div>
+        <div class="empty__text">${escapeHtml(t(L, "emptyRecentText"))}</div>
+      `;
     } else if (active.kind === "smart") {
       empty.innerHTML = `
         <div class="empty__title">${escapeHtml(t(L, "emptyCollectionTitle"))}</div>
@@ -240,6 +290,8 @@ function renderGrid(state, els, onChange, actions, L) {
     const card = document.createElement("div");
     card.className = "card";
     card.style.setProperty("--stagger", `${Math.min(index, 14) * 20}ms`);
+    card.draggable = true;
+    card.dataset.itemId = item.id;
 
     const domain = domainFromUrl(item.url);
     const tags = (item.tags || []).slice(0, 10);
@@ -319,6 +371,24 @@ function renderGrid(state, els, onChange, actions, L) {
       });
     }
 
+    card.addEventListener("dragstart", (e) => {
+      if (!e.dataTransfer) return;
+      e.dataTransfer.setData("text/resource-vault-item-id", item.id);
+      e.dataTransfer.effectAllowed = "move";
+      card.classList.add("card--dragging");
+    });
+
+    card.addEventListener("dragend", () => {
+      card.classList.remove("card--dragging");
+      document.querySelectorAll(".collection--dragover").forEach((el) => el.classList.remove("collection--dragover"));
+    });
+
+    card.querySelectorAll('a[target="_blank"]').forEach((link) => {
+      link.addEventListener("click", () => {
+        actions?.onOpenItem?.(item.id);
+      });
+    });
+
     els.grid.appendChild(card);
   });
 
@@ -336,8 +406,9 @@ function renderGrid(state, els, onChange, actions, L) {
 
 function filteredItems(state) {
   const active = getActiveCollection(state);
+  const recentOrder = new Map((state.recentViewedIds || []).map((id, idx) => [id, idx]));
 
-  return state.items
+  const list = state.items
     .filter((item) => itemInActiveContext(item, active))
     .filter((item) => matchesLink(item, {
       types: state.filters.types || [],
@@ -345,8 +416,13 @@ function filteredItems(state) {
       tagContains: state.filters.tag || "",
       favoriteOnly: !!state.filters.favoriteOnly
     }))
-    .filter((item) => matchesSearch(item, state.search))
-    .sort((a, b) => compareItems(a, b, state.sortBy || "newest"));
+    .filter((item) => matchesSearch(item, state.search));
+
+  if (active?.id === "recent") {
+    return list.sort((a, b) => (recentOrder.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (recentOrder.get(b.id) ?? Number.MAX_SAFE_INTEGER));
+  }
+
+  return list.sort((a, b) => compareItems(a, b, state.sortBy || "newest"));
 }
 
 function visibleItems(state, collection) {
@@ -356,12 +432,14 @@ function visibleItems(state, collection) {
 function getActiveCollection(state) {
   if (state.activeCollectionId === "all") return { id: "all", name: "All" };
   if (state.activeCollectionId === "fav") return { id: "fav", name: "Favorites" };
+  if (state.activeCollectionId === "recent") return { id: "recent", name: "Recent", recentViewedIds: state.recentViewedIds || [] };
   return state.collections.find((c) => c.id === state.activeCollectionId) || { id: "all", name: "All" };
 }
 
 function itemInActiveContext(item, active) {
   if (!active || active.id === "all") return true;
   if (active.id === "fav") return !!item.favorite;
+  if (active.id === "recent") return Array.isArray(active.recentViewedIds) && active.recentViewedIds.includes(item.id);
   return itemInCollectionView(item, active);
 }
 

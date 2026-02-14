@@ -12,6 +12,7 @@
   ui: {
     filtersOpen: false
   },
+  recentViewedIds: [],
   items: [],
   collections: []
 };

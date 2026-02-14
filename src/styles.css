@@ -131,6 +131,12 @@ textarea:focus-visible,
   border-color: var(--border-default);
   color: var(--text-primary);
 }
+.collection--dragover {
+  border-color: #f0f0f0;
+  background: #2b2b2b;
+  color: var(--text-primary);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2) inset;
+}
 
 .collections { display: flex; flex-direction: column; gap: 6px; }
 .collection__left { display: inline-flex; align-items: center; gap: 10px; }
@@ -332,6 +338,7 @@ select option { background: #1b1b1b; color: var(--text-primary); }
   animation-delay: var(--stagger);
 }
 .card:hover { border-color: var(--border-default); background: var(--bg-surface-2); }
+.card--dragging { opacity: 0.62; }
 .card__preview-wrap {
   display: block;
   overflow: hidden;

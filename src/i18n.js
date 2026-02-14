@@ -4,6 +4,7 @@
     nav: "Навигация",
     navAll: "Все ссылки",
     navFav: "Избранное",
+    navRecent: "Недавние",
     collections: "Коллекции",
     collectionSingle: "Коллекция",
 
@@ -20,6 +21,7 @@
 
     all: "Все ссылки",
     favorites: "Избранное",
+    recent: "Недавние",
     items: "элементов",
     contextManual: "Ручная коллекция",
     contextSmart: "Умная коллекция",
@@ -88,6 +90,8 @@
     emptySmartText: "Ссылки появятся автоматически, если совпадут с правилами.",
     emptyFavTitle: "Нет избранного",
     emptyFavText: "Отмечайте ссылки звездой, чтобы видеть их здесь.",
+    emptyRecentTitle: "История пуста",
+    emptyRecentText: "Открывайте ссылки, и они появятся здесь.",
 
     quickAdd: "Добавить ссылку",
     quickAddHint: "Быстрое добавление",
@@ -117,6 +121,7 @@
     nav: "Navigation",
     navAll: "All links",
     navFav: "Favorites",
+    navRecent: "Recent",
     collections: "Collections",
     collectionSingle: "Collection",
 
@@ -133,6 +138,7 @@
 
     all: "All links",
     favorites: "Favorites",
+    recent: "Recent",
     items: "items",
     contextManual: "Manual collection",
     contextSmart: "Smart collection",
@@ -201,6 +207,8 @@
     emptySmartText: "Links appear automatically when they match rules.",
     emptyFavTitle: "No favorites",
     emptyFavText: "Mark links with a star to see them here.",
+    emptyRecentTitle: "History is empty",
+    emptyRecentText: "Open links and they will appear here.",
 
     quickAdd: "Add link",
     quickAddHint: "Quick add",

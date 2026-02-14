@@ -76,6 +76,7 @@ export function migrateToV4(raw) {
     version: 4,
     lang: raw?.lang === "en" ? "en" : "ru",
     sortBy: typeof raw?.sortBy === "string" ? raw.sortBy : "newest",
+    recentViewedIds: normalizeRecent(raw?.recentViewedIds ?? raw?.viewHistory ?? []),
     items,
     collections
   };
@@ -193,4 +194,9 @@ function normalizeSource(value) {
 function toTimestamp(value, fallback = Date.now()) {
   const n = Number(value);
   return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
+function normalizeRecent(input) {
+  if (!Array.isArray(input)) return [];
+  return [...new Set(input.map((x) => String(x || "").trim()).filter(Boolean))].slice(0, 100);
 }
