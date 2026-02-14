@@ -1,13 +1,16 @@
 import { matchesLink, domainFromUrl, faviconUrl, previewFallbackUrl } from "./filter.js";
 import { t } from "./i18n.js";
 
-export function render(state, els, onChange) {
+let activeActions = {};
+
+export function render(state, els, onChange, actions = activeActions) {
+  activeActions = actions || {};
   const L = state.lang || "ru";
   renderNav(state, els, L);
   renderCollections(state, els, onChange, L);
   renderHeader(state, els, L);
   renderActiveFilters(state, els, onChange, L);
-  renderGrid(state, els, onChange, L);
+  renderGrid(state, els, onChange, activeActions, L);
 }
 
 function renderNav(state, els, L) {
@@ -190,7 +193,8 @@ function renderActiveFilters(state, els, onChange, L) {
   bar.appendChild(clear);
 }
 
-function renderGrid(state, els, onChange, L) {
+function renderGrid(state, els, onChange, actions, L) {
+  ensureCardMenuOutsideClose();
   const list = filteredItems(state);
   els.grid.innerHTML = "";
   els.grid.classList.toggle("grid--empty", !list.length);
@@ -252,20 +256,24 @@ function renderGrid(state, els, onChange, L) {
         <div class="card__left">
           ${icon ? `<img class="favicon" src="${icon}" alt="">` : `<div class="favicon"></div>`}
           <div>
-            <div class="card__title">${escapeHtml(item.title || domain || "Untitled")}</div>
+            <a class="card__title-link" href="${item.url}" target="_blank" rel="noreferrer">${escapeHtml(item.title || domain || "Untitled")}</a>
             <div class="card__meta">${escapeHtml(domain)} • ${escapeHtml(displayOptionLabel(item.type, "type", L))} • ${escapeHtml(displayOptionLabel(item.source, "source", L))}</div>
           </div>
         </div>
-        <button class="fav ${item.favorite ? "fav--on" : ""}" type="button" title="${escapeHtml(t(L, "favorites"))}">★</button>
+        <div class="card__tools">
+          <button class="fav ${item.favorite ? "fav--on" : ""}" type="button" title="${escapeHtml(t(L, "favorites"))}">&#9733;</button>
+          <div class="card__menu">
+            <button class="card__menu-trigger" type="button" data-card-menu="1" aria-label="Actions"><span class="collection__menu-dots">&#8943;</span></button>
+            <div class="card__menu-pop" data-card-pop hidden>
+              <button class="card__menu-item" type="button" data-edit="1">${escapeHtml(t(L, "edit"))}</button>
+              <button class="card__menu-item card__menu-item--danger" type="button" data-del="1">${escapeHtml(t(L, "del"))}</button>
+            </div>
+          </div>
+        </div>
       </div>
 
       ${item.note ? `<div class="card__note">${escapeHtml(item.note)}</div>` : ""}
       <div class="tags">${tags.map((tg, i) => `<span class="tag ${i === 0 ? "tag--accent" : ""}"><span class="tag__text">${escapeHtml(tg)}</span></span>`).join("")}</div>
-
-      <div class="card__actions">
-        <a class="btn btn--secondary" href="${item.url}" target="_blank" rel="noreferrer">${escapeHtml(t(L, "open"))}</a>
-        <button class="btn btn--destructive" type="button" data-del="1">${escapeHtml(t(L, "del"))}</button>
-      </div>
     `;
 
     card.querySelector(".fav")?.addEventListener("click", () => {
@@ -275,7 +283,25 @@ function renderGrid(state, els, onChange, L) {
       render(state, els, onChange);
     });
 
+    const menuTrigger = card.querySelector("[data-card-menu]");
+    const menuPop = card.querySelector("[data-card-pop]");
+    if (menuTrigger && menuPop) {
+      menuTrigger.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const wasHidden = menuPop.hidden;
+        closeAllCardMenus();
+        menuPop.hidden = !wasHidden;
+      });
+    }
+
+    card.querySelector("[data-edit]")?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      closeAllCardMenus();
+      actions?.onEditItem?.(item.id);
+    });
+
     card.querySelector("[data-del]")?.addEventListener("click", () => {
+      closeAllCardMenus();
       state.items = state.items.filter((x) => x.id !== item.id);
       onChange?.();
       render(state, els, onChange);
@@ -422,6 +448,7 @@ function wireQuickAdd(root) {
 }
 
 let collectionMenuOutsideBound = false;
+let cardMenuOutsideBound = false;
 
 function closeAllCollectionMenus() {
   document.querySelectorAll("[data-col-pop]").forEach((el) => {
@@ -442,3 +469,24 @@ function ensureCollectionMenuOutsideClose() {
     if (e.key === "Escape") closeAllCollectionMenus();
   });
 }
+
+function closeAllCardMenus() {
+  document.querySelectorAll("[data-card-pop]").forEach((el) => {
+    el.hidden = true;
+  });
+}
+
+function ensureCardMenuOutsideClose() {
+  if (cardMenuOutsideBound) return;
+  cardMenuOutsideBound = true;
+
+  document.addEventListener("click", (e) => {
+    if (e.target.closest(".card__menu")) return;
+    closeAllCardMenus();
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeAllCardMenus();
+  });
+}
+

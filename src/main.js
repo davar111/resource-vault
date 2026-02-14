@@ -84,7 +84,7 @@ const els = {
   addSourceAuto: document.getElementById("addSourceAuto"),
   addCollectionsList: document.getElementById("addCollectionsList"),
   addFavorite: document.getElementById("addFavorite"),
-  addTagsSuggestions: document.getElementById("addTagsSuggestions"),
+  addTagsMenu: document.getElementById("addTagsMenu"),
 
   modalCollection: document.getElementById("modalCollection"),
   formCollection: document.getElementById("formCollection"),
@@ -112,6 +112,10 @@ const els = {
   colSourcesChips: document.getElementById("colSourcesChips")
 };
 
+let editingItemId = null;
+let knownTags = [];
+let activeTagMenuIndex = -1;
+
 function persist() {
   save({
     items: state.items,
@@ -121,8 +125,17 @@ function persist() {
   });
 }
 
+function closeAddModal() {
+  editingItemId = null;
+  activeTagMenuIndex = -1;
+  if (els.addTagsMenu) els.addTagsMenu.hidden = true;
+  updateAddModalModeTexts();
+  els.modalAddLink?.close();
+}
+
 function normalizeState(raw) {
   const data = migrateToV4(raw || {});
+  editingItemId = null;
 
   state.lang = data?.lang === "en" ? "en" : "ru";
   state.sortBy = typeof data?.sortBy === "string" ? data.sortBy : "newest";
@@ -255,7 +268,7 @@ function applyI18n() {
   if (els.labelFilterTag) els.labelFilterTag.textContent = t(L, "filterTag");
   if (els.labelFilterFavorite) els.labelFilterFavorite.textContent = t(L, "filterFavoriteOnly");
 
-  if (els.modalAddTitle) els.modalAddTitle.textContent = t(L, "modalAddTitle");
+  updateAddModalModeTexts();
   if (els.labelAddUrl) els.labelAddUrl.textContent = t(L, "modalUrl");
   if (els.labelAddTitle) els.labelAddTitle.textContent = t(L, "modalTitle");
   if (els.labelAddTags) els.labelAddTags.textContent = t(L, "modalTags");
@@ -267,7 +280,6 @@ function applyI18n() {
   if (els.sectionAddClassify) els.sectionAddClassify.textContent = t(L, "filters");
   if (els.inputAddTitle) els.inputAddTitle.placeholder = t(L, "modalTitleHint");
   if (els.addCancel) els.addCancel.textContent = t(L, "cancel");
-  if (els.addSave) els.addSave.textContent = t(L, "save");
 
   if (els.modalCollectionTitle) els.modalCollectionTitle.textContent = t(L, "modalCollectionTitle");
   if (els.labelColName) els.labelColName.textContent = t(L, "name");
@@ -348,6 +360,37 @@ function updateAddSourceUi() {
   }
 }
 
+function updateAddModalModeTexts() {
+  const L = state.lang || "ru";
+  const isEdit = !!editingItemId;
+  if (els.modalAddTitle) els.modalAddTitle.textContent = t(L, isEdit ? "modalEditTitle" : "modalAddTitle");
+  if (els.addSave) els.addSave.textContent = t(L, isEdit ? "saveChanges" : "save");
+}
+
+function openEditLinkModal(itemId) {
+  const item = state.items.find((x) => x.id === itemId);
+  if (!item || !els.formAddLink) return;
+
+  editingItemId = item.id;
+  els.formAddLink.reset();
+  renderTagSuggestions();
+  renderAddCollectionChoices(item.collectionIds || []);
+
+  if (els.inputAddUrl) els.inputAddUrl.value = item.url || "";
+  if (els.inputAddTitle) els.inputAddTitle.value = item.title || "";
+  if (els.inputAddTags) els.inputAddTags.value = (item.tags || []).join(", ");
+  if (els.inputAddNote) els.inputAddNote.value = item.note || "";
+  if (els.addFavorite) els.addFavorite.checked = !!item.favorite;
+
+  const typeSelect = els.formAddLink.querySelector('select[name="type"]');
+  if (typeSelect) typeSelect.value = item.type || "";
+
+  if (els.inputAddSource) els.inputAddSource.value = item.source || "Other";
+  updateAddSourceUi();
+  updateAddModalModeTexts();
+  els.modalAddLink?.showModal();
+}
+
 function renderFilterChips() {
   if (els.filterTypes) {
     els.filterTypes.innerHTML = TYPE_OPTIONS.map((v) => chipCheckHtml("filterType", v, t(state.lang, `type_${optionKey(v)}`))).join("");
@@ -382,22 +425,74 @@ function renderCollectionRuleChips() {
   }
 }
 
-function renderAddCollectionChoices() {
+function renderAddCollectionChoices(selectedIds = null) {
   if (!els.addCollectionsList) return;
   const manualCollections = state.collections.filter((col) => col.kind === "manual");
   const activeId = state.activeCollectionId;
+  const selectedSet = selectedIds ? new Set(selectedIds) : null;
 
-  const chips = manualCollections.map((col) =>
-    chipCheckHtml("collections", col.id, col.name, activeId === col.id && col.kind === "manual")
-  );
+  const chips = manualCollections.map((col) => {
+    const checked = selectedSet ? selectedSet.has(col.id) : activeId === col.id && col.kind === "manual";
+    return chipCheckHtml("collections", col.id, col.name, checked);
+  });
 
   els.addCollectionsList.innerHTML = chips.join("");
 }
 
 function renderTagSuggestions() {
-  if (!els.addTagsSuggestions) return;
-  const tags = [...new Set(state.items.flatMap((item) => normalizeTags(item.tags || [])))].sort((a, b) => a.localeCompare(b, state.lang));
-  els.addTagsSuggestions.innerHTML = tags.map((tag) => `<option value="${escapeHtml(tag)}"></option>`).join("");
+  knownTags = [...new Set(state.items.flatMap((item) => normalizeTags(item.tags || [])))].sort((a, b) => a.localeCompare(b, state.lang));
+  updateTagsMenu();
+}
+
+function getTagInputContext() {
+  const raw = String(els.inputAddTags?.value || "");
+  const chunks = raw.split(",");
+  const currentRaw = chunks.pop() ?? "";
+  const chosen = normalizeTags(chunks.join(","));
+  const query = normalizeSearchText(currentRaw);
+  return { chosen, query };
+}
+
+function updateTagsMenu() {
+  if (!els.addTagsMenu || !els.inputAddTags) return;
+  if (document.activeElement !== els.inputAddTags) {
+    els.addTagsMenu.hidden = true;
+    return;
+  }
+  const { chosen, query } = getTagInputContext();
+
+  const next = knownTags
+    .filter((tag) => !chosen.includes(tag))
+    .filter((tag) => !query || tag.includes(query))
+    .slice(0, 8);
+
+  if (!next.length) {
+    activeTagMenuIndex = -1;
+    els.addTagsMenu.hidden = true;
+    els.addTagsMenu.innerHTML = "";
+    return;
+  }
+
+  if (activeTagMenuIndex >= next.length) activeTagMenuIndex = next.length - 1;
+  if (activeTagMenuIndex < -1) activeTagMenuIndex = -1;
+
+  els.addTagsMenu.innerHTML = next
+    .map((tag, idx) => `<button type="button" class="add-tags-menu__item ${idx === activeTagMenuIndex ? "add-tags-menu__item--active" : ""}" data-tag-suggestion="${escapeHtml(tag)}">${escapeHtml(tag)}</button>`)
+    .join("");
+  els.addTagsMenu.hidden = false;
+}
+
+function applyTagSuggestion(tag) {
+  if (!els.inputAddTags) return;
+  const raw = String(els.inputAddTags.value || "");
+  const chunks = raw.split(",");
+  chunks.pop();
+  const chosen = normalizeTags(chunks.join(","));
+  if (!chosen.includes(tag)) chosen.push(tag);
+  els.inputAddTags.value = `${chosen.join(", ")}${chosen.length ? ", " : ""}`;
+  activeTagMenuIndex = -1;
+  updateTagsMenu();
+  els.inputAddTags.focus();
 }
 
 function chipCheckHtml(name, value, label, checked = false) {
@@ -515,17 +610,74 @@ function setupEvents() {
   });
 
   els.btnAddLink?.addEventListener("click", () => {
+    editingItemId = null;
     els.formAddLink?.reset();
     renderAddCollectionChoices();
     renderTagSuggestions();
     if (els.inputAddSource) els.inputAddSource.value = "Other";
     updateAddSourceUi();
+    updateAddModalModeTexts();
     if (els.addFavorite) els.addFavorite.checked = state.activeCollectionId === "fav";
     els.modalAddLink?.showModal();
     closeMobileMenuIfNeeded();
   });
 
   els.inputAddUrl?.addEventListener("input", updateAddSourceUi);
+  els.inputAddTags?.addEventListener("input", () => {
+    activeTagMenuIndex = -1;
+    updateTagsMenu();
+  });
+  els.inputAddTags?.addEventListener("focus", () => {
+    activeTagMenuIndex = -1;
+    updateTagsMenu();
+  });
+  els.inputAddTags?.addEventListener("keydown", (e) => {
+    if (!els.addTagsMenu || els.addTagsMenu.hidden) return;
+    const size = els.addTagsMenu.querySelectorAll("[data-tag-suggestion]").length;
+    if (!size) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      activeTagMenuIndex = (activeTagMenuIndex + 1 + size) % size;
+      updateTagsMenu();
+      return;
+    }
+
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      activeTagMenuIndex = (activeTagMenuIndex - 1 + size) % size;
+      updateTagsMenu();
+      return;
+    }
+
+    if (e.key === "Enter" && activeTagMenuIndex >= 0) {
+      e.preventDefault();
+      const btn = els.addTagsMenu.querySelectorAll("[data-tag-suggestion]")[activeTagMenuIndex];
+      const tag = btn?.dataset?.tagSuggestion;
+      if (tag) applyTagSuggestion(tag);
+      return;
+    }
+
+    if (e.key === "Escape") {
+      activeTagMenuIndex = -1;
+      els.addTagsMenu.hidden = true;
+    }
+  });
+
+  els.addTagsMenu?.addEventListener("mousedown", (e) => {
+    const btn = e.target.closest("[data-tag-suggestion]");
+    if (!btn) return;
+    e.preventDefault();
+    const tag = String(btn.dataset.tagSuggestion || "").trim();
+    if (tag) applyTagSuggestion(tag);
+  });
+
+  document.addEventListener("mousedown", (e) => {
+    if (!els.addTagsMenu || !els.inputAddTags) return;
+    if (e.target.closest("#addTagsMenu") || e.target === els.inputAddTags) return;
+    activeTagMenuIndex = -1;
+    els.addTagsMenu.hidden = true;
+  });
 
   els.formAddLink?.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -554,25 +706,47 @@ function setupEvents() {
     const domain = domainFromUrl(url);
     const source = getDetectedSourceFromUrl(url) || sourcePick || "Other";
     const now = Date.now();
-    const itemId = uid("item");
     const fallbackPreview = previewFallbackUrl(url);
     const initialTitle = titleRaw || domain || url;
+    const existing = editingItemId ? state.items.find((x) => x.id === editingItemId) : null;
+    const itemId = existing?.id || uid("item");
+    if (editingItemId && !existing) {
+      editingItemId = null;
+      updateAddModalModeTexts();
+      return;
+    }
 
-    state.items.push({
-      id: itemId,
-      url,
-      title: initialTitle,
-      previewImage: fallbackPreview,
-      tags,
-      type,
-      source,
-      note,
-      favorite,
-      createdAt: now,
-      updatedAt: now,
-      collectionIds: selectedCollections
-    });
+    if (existing) {
+      const urlChanged = existing.url !== url;
+      existing.url = url;
+      existing.title = initialTitle;
+      existing.tags = tags;
+      existing.type = type;
+      existing.source = source;
+      existing.note = note;
+      existing.favorite = favorite;
+      existing.collectionIds = selectedCollections;
+      if (urlChanged || !existing.previewImage) existing.previewImage = fallbackPreview;
+      existing.updatedAt = now;
+    } else {
+      state.items.push({
+        id: itemId,
+        url,
+        title: initialTitle,
+        previewImage: fallbackPreview,
+        tags,
+        type,
+        source,
+        note,
+        favorite,
+        createdAt: now,
+        updatedAt: now,
+        collectionIds: selectedCollections
+      });
+    }
 
+    editingItemId = null;
+    updateAddModalModeTexts();
     persist();
     els.modalAddLink?.close();
     renderTagSuggestions();
@@ -695,8 +869,15 @@ function setupEvents() {
     }
   });
 
-  els.addCloseX?.addEventListener("click", () => els.modalAddLink?.close());
-  els.addCancel?.addEventListener("click", () => els.modalAddLink?.close());
+  els.modalAddLink?.addEventListener("close", () => {
+    editingItemId = null;
+    activeTagMenuIndex = -1;
+    if (els.addTagsMenu) els.addTagsMenu.hidden = true;
+    updateAddModalModeTexts();
+  });
+
+  els.addCloseX?.addEventListener("click", closeAddModal);
+  els.addCancel?.addEventListener("click", closeAddModal);
   els.colCloseX?.addEventListener("click", () => els.modalCollection?.close());
   els.colCancel?.addEventListener("click", () => els.modalCollection?.close());
 }
@@ -720,4 +901,4 @@ if (els.sortSelect) els.sortSelect.value = state.sortBy || "newest";
 if (els.filterTagInput) els.filterTagInput.value = state.filters.tag || "";
 if (els.filterFavoriteOnly) els.filterFavoriteOnly.checked = !!state.filters.favoriteOnly;
 updateRulesVisibility();
-render(state, els, persist);
+render(state, els, persist, { onEditItem: openEditLinkModal });

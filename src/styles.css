@@ -343,6 +343,7 @@ select option { background: #1b1b1b; color: var(--text-primary); }
 .card__preview { width: 100%; display: block; aspect-ratio: 16 / 10; object-fit: cover; }
 .card__top { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); }
 .card__left { display: flex; gap: var(--space-3); align-items: flex-start; }
+.card__tools { display: inline-flex; align-items: center; gap: 6px; position: relative; }
 .favicon {
   width: 28px;
   height: 28px;
@@ -352,6 +353,14 @@ select option { background: #1b1b1b; color: var(--text-primary); }
   flex: 0 0 auto;
 }
 .card__title { font-size: 16px; font-weight: 700; line-height: 1.25; }
+.card__title-link {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--text-primary);
+  text-decoration: none;
+}
+.card__title-link:hover { text-decoration: underline; }
 .card__meta { margin-top: 6px; font-size: 12px; color: var(--text-muted); }
 .card__note { margin-top: var(--space-3); font-size: 12px; line-height: 1.45; color: var(--text-secondary); }
 .tags { margin-top: var(--space-3); display: flex; flex-wrap: wrap; gap: 8px; }
@@ -474,6 +483,49 @@ select option { background: #1b1b1b; color: var(--text-primary); }
 .fav:hover { background: var(--bg-surface-3); color: var(--text-primary); }
 .fav--on { background: #303030; border-color: var(--border-strong); color: var(--text-primary); }
 
+.card__menu { position: relative; }
+.card__menu-trigger {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  background: var(--bg-surface-2);
+  color: var(--text-secondary);
+  display: inline-grid;
+  place-items: center;
+  cursor: pointer;
+  line-height: 1;
+  font-size: 0;
+}
+.card__menu-trigger:hover { background: var(--bg-surface-3); color: var(--text-primary); }
+.card__menu-pop {
+  position: absolute;
+  top: 36px;
+  right: 0;
+  z-index: 20;
+  min-width: 160px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-default);
+  background: var(--bg-surface-2);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.card__menu-pop[hidden] { display: none !important; }
+.card__menu-item {
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: var(--bg-surface-1);
+  color: var(--text-primary);
+  text-align: left;
+  padding: 7px 10px 8px;
+  cursor: pointer;
+}
+.card__menu-item:hover { background: var(--bg-surface-3); }
+.card__menu-item--danger:hover { background: #303030; }
+
 .settings { position: relative; }
 .settings__menu {
   position: absolute;
@@ -528,6 +580,32 @@ select option { background: #1b1b1b; color: var(--text-primary); }
 
 .field { display: flex; flex-direction: column; gap: 6px; margin: 10px 0; }
 .field span, .field legend { margin: 0; font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+.add-tags-menu {
+  margin-top: 4px;
+  border: 1px solid var(--border-default);
+  border-radius: 10px;
+  background: var(--bg-surface-2);
+  padding: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.add-tags-menu[hidden] { display: none !important; }
+.add-tags-menu__item {
+  border: 1px solid var(--border-default);
+  border-radius: 999px;
+  background: var(--bg-surface-1);
+  color: var(--text-secondary);
+  padding: 5px 10px 6px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.add-tags-menu__item:hover,
+.add-tags-menu__item--active {
+  background: var(--bg-surface-3);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
 .kind-toggle { display: flex; flex-wrap: wrap; gap: 8px; }
 .row { display: flex; gap: var(--space-3); }
 .row > .field, .row > .multi { flex: 1; }
@@ -669,7 +747,6 @@ select option { background: #1b1b1b; color: var(--text-primary); }
   .grid { column-count: 1; padding: var(--space-3); column-gap: 0; }
   .row { flex-direction: column; }
   .row--end { align-items: stretch; }
-  .card__actions > .btn { flex: 1 1 auto; }
   .topbar__left {
     width: 100%;
     display: grid;
@@ -710,7 +787,12 @@ select option { background: #1b1b1b; color: var(--text-primary); }
   #btnFilters { flex: 1 1 calc(50% - 4px); min-width: 0; }
   .sort { width: auto; min-width: 0; flex: 1 1 calc(50% - 4px); }
   .btn { padding: 6px 14px 8px; font-size: 13px; }
-  .fav { width: 30px; height: 30px; border-radius: 8px; }
+  .fav,
+  .card__menu-trigger {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+  }
   .modal__card { width: calc(100vw - 16px); padding: 12px; border-radius: 14px; }
   .field { margin: 8px 0; }
 }

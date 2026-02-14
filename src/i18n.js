@@ -36,6 +36,7 @@
     clearFilters: "Сбросить всё",
 
     modalAddTitle: "Добавить ссылку",
+    modalEditTitle: "Редактировать ссылку",
     modalUrl: "URL",
     modalTitle: "Название",
     modalTitleHint: "Необязательно",
@@ -50,6 +51,7 @@
     markFavorite: "Отметить как избранное",
     cancel: "Отмена",
     save: "Сохранить",
+    saveChanges: "Сохранить изменения",
 
     modalCollectionTitle: "Создать коллекцию",
     name: "Название",
@@ -68,6 +70,7 @@
     create: "Создать",
 
     open: "Открыть",
+    edit: "Редактировать",
     del: "Удалить",
     deleteCollection: "Удалить коллекцию",
     renameCollection: "Переименовать",
@@ -142,6 +145,7 @@
     clearFilters: "Clear all",
 
     modalAddTitle: "Add link",
+    modalEditTitle: "Edit link",
     modalUrl: "URL",
     modalTitle: "Title",
     modalTitleHint: "Optional",
@@ -156,6 +160,7 @@
     markFavorite: "Mark as favorite",
     cancel: "Cancel",
     save: "Save",
+    saveChanges: "Save changes",
 
     modalCollectionTitle: "Create collection",
     name: "Name",
@@ -174,6 +179,7 @@
     create: "Create",
 
     open: "Open",
+    edit: "Edit",
     del: "Delete",
     deleteCollection: "Delete collection",
     renameCollection: "Rename",
