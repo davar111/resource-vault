@@ -1,6 +1,6 @@
 import "./styles.css";
 import { state, uid } from "./state.js";
-import { load, save, migrateToV4 } from "./storage.js";
+import { load, save, migrateToV4, loadFromCloud } from "./storage.js";
 import {
   normalizeTags,
   normalizeSearchText,
@@ -891,14 +891,24 @@ function escapeHtml(str) {
     .replaceAll("'", "&#039;");
 }
 
-const saved = load();
-normalizeState(saved || {});
-setupEvents();
-applyI18n();
-updateLangButtons();
-els.btnMobileMenu?.setAttribute("aria-expanded", "false");
-if (els.sortSelect) els.sortSelect.value = state.sortBy || "newest";
-if (els.filterTagInput) els.filterTagInput.value = state.filters.tag || "";
-if (els.filterFavoriteOnly) els.filterFavoriteOnly.checked = !!state.filters.favoriteOnly;
-updateRulesVisibility();
-render(state, els, persist, { onEditItem: openEditLinkModal });
+async function bootstrap() {
+  const localData = load();
+  const cloudData = await loadFromCloud();
+  const initial = cloudData || localData || {};
+
+  // Keep local cache aligned with cloud state when cloud is available.
+  if (cloudData) save(cloudData);
+
+  normalizeState(initial);
+  setupEvents();
+  applyI18n();
+  updateLangButtons();
+  els.btnMobileMenu?.setAttribute("aria-expanded", "false");
+  if (els.sortSelect) els.sortSelect.value = state.sortBy || "newest";
+  if (els.filterTagInput) els.filterTagInput.value = state.filters.tag || "";
+  if (els.filterFavoriteOnly) els.filterFavoriteOnly.checked = !!state.filters.favoriteOnly;
+  updateRulesVisibility();
+  render(state, els, persist, { onEditItem: openEditLinkModal });
+}
+
+void bootstrap();

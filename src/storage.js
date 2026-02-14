@@ -1,4 +1,5 @@
 import { normalizeSearchText, normalizeTags } from "./filter.js";
+import { loadCloudState, saveCloudState, isSupabaseConfigured } from "./supabase.js";
 
 const KEY_V4 = "resource_vault_v4";
 const LEGACY_KEYS = ["resource_vault_v3", "resource_vault_v2", "resource_vault_v1"];
@@ -26,7 +27,25 @@ export function load() {
 }
 
 export function save(data) {
-  localStorage.setItem(KEY_V4, JSON.stringify({ version: 4, ...data }));
+  const payload = { version: 4, ...data };
+  localStorage.setItem(KEY_V4, JSON.stringify(payload));
+
+  if (isSupabaseConfigured()) {
+    void saveCloudState(payload).catch((err) => {
+      console.warn("Supabase save skipped:", err?.message || err);
+    });
+  }
+}
+
+export async function loadFromCloud() {
+  if (!isSupabaseConfigured()) return null;
+
+  try {
+    return await loadCloudState();
+  } catch (err) {
+    console.warn("Supabase load skipped:", err?.message || err);
+    return null;
+  }
 }
 
 export function migrateToV4(raw) {
