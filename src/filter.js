@@ -1,3 +1,6 @@
+export const TAG_MIN_LEN = 2;
+export const TAG_MAX_LEN = 24;
+
 export function normalizeTags(input) {
   const rawList = Array.isArray(input)
     ? input
@@ -7,7 +10,8 @@ export function normalizeTags(input) {
   const out = [];
 
   for (const raw of rawList) {
-    const next = String(raw || "").trim().toLowerCase();
+    const next = String(raw || "").trim().toLowerCase().slice(0, TAG_MAX_LEN);
+    if (next.length < TAG_MIN_LEN) continue;
     if (!next || seen.has(next)) continue;
     seen.add(next);
     out.push(next);

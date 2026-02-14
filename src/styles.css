@@ -368,6 +368,11 @@ select option { background: #1b1b1b; color: var(--text-primary); }
 }
 .card__title { font-size: 16px; font-weight: 700; line-height: 1.25; }
 .card__title-link {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  word-break: break-word;
   font-size: 16px;
   font-weight: 700;
   line-height: 1.25;
@@ -375,7 +380,14 @@ select option { background: #1b1b1b; color: var(--text-primary); }
   text-decoration: none;
 }
 .card__title-link:hover { text-decoration: underline; }
-.card__meta { margin-top: 6px; font-size: 12px; color: var(--text-muted); }
+.card__meta {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .card__note { margin-top: var(--space-3); font-size: 12px; line-height: 1.45; color: var(--text-secondary); }
 .tags { margin-top: var(--space-3); display: flex; flex-wrap: wrap; gap: 8px; }
 .tag {
@@ -391,6 +403,10 @@ select option { background: #1b1b1b; color: var(--text-primary); }
 }
 .tag__text {
   display: block;
+  max-width: 12ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   line-height: 1.2;
   padding: 0 0 2px;
   margin: 0;

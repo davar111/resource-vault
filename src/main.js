@@ -3,6 +3,8 @@ import { state, uid } from "./state.js";
 import { load, save, migrateToV4, loadFromCloud } from "./storage.js";
 import {
   normalizeTags,
+  TAG_MAX_LEN,
+  TAG_MIN_LEN,
   normalizeSearchText,
   detectSource,
   domainFromUrl,
@@ -16,6 +18,8 @@ import { completeAuthFromUrl, getCurrentUser, signInWithGoogle, signOut } from "
 
 const TYPE_OPTIONS = ["Project", "Studio", "Designer", "Inspiration", "Source"];
 const SOURCE_OPTIONS = ["Site", "Behance", "Awwwards", "Pinterest", "Dribbble", "Other"];
+const TITLE_MIN_LEN = 2;
+const TITLE_MAX_LEN = 120;
 
 const els = {
   langRu: document.getElementById("langRu"),
@@ -301,7 +305,7 @@ function normalizeLink(item) {
   return {
     id: String(item?.id || uid("item")),
     url: String(item?.url || ""),
-    title: String(item?.title || ""),
+    title: String(item?.title || "").trim().slice(0, TITLE_MAX_LEN),
     previewImage: String(item?.previewImage || ""),
     tags: normalizeTags(item?.tags || []),
     type: normalizeType(item?.type),
@@ -366,6 +370,18 @@ function normalizeSource(value) {
   if (value == null || value === "") return null;
   const normalized = map[String(value).trim().toLowerCase()] || String(value).trim();
   return SOURCE_OPTIONS.includes(normalized) ? normalized : null;
+}
+
+function normalizeTitleInput(input) {
+  return String(input || "").trim().slice(0, TITLE_MAX_LEN);
+}
+
+function invalidTagChunks(rawInput) {
+  return String(rawInput || "")
+    .split(",")
+    .map((x) => String(x || "").trim().toLowerCase())
+    .filter(Boolean)
+    .filter((x) => x.length < TAG_MIN_LEN || x.length > TAG_MAX_LEN);
 }
 
 function updateLangButtons() {
@@ -674,6 +690,8 @@ function updateRulesVisibility() {
 
 function setupEvents() {
   const mobileMq = window.matchMedia("(max-width: 700px)");
+  if (els.inputAddTitle) els.inputAddTitle.maxLength = TITLE_MAX_LEN;
+  if (els.inputAddTags) els.inputAddTags.maxLength = 300;
 
   function setMobileMenu(open) {
     state.ui.mobileMenuOpen = !!open;
@@ -881,7 +899,18 @@ function setupEvents() {
     const fd = new FormData(els.formAddLink);
 
     const url = String(fd.get("url") || "").trim();
-    const titleRaw = String(fd.get("title") || "").trim();
+    const titleRaw = normalizeTitleInput(fd.get("title"));
+    if (titleRaw && titleRaw.length < TITLE_MIN_LEN) {
+      alert(`Title must be ${TITLE_MIN_LEN}-${TITLE_MAX_LEN} characters`);
+      return;
+    }
+
+    const invalidTags = invalidTagChunks(fd.get("tags"));
+    if (invalidTags.length) {
+      alert(`Each tag must be ${TAG_MIN_LEN}-${TAG_MAX_LEN} characters`);
+      return;
+    }
+
     const tags = normalizeTags(fd.get("tags"));
     const type = normalizeType(fd.get("type"));
     const sourcePick = normalizeSource(fd.get("source"));
@@ -904,7 +933,7 @@ function setupEvents() {
     const source = getDetectedSourceFromUrl(url) || sourcePick || "Other";
     const now = Date.now();
     const fallbackPreview = previewFallbackUrl(url);
-    const initialTitle = titleRaw || domain || url;
+    const initialTitle = titleRaw || normalizeTitleInput(domain || url);
     const existing = editingItemId ? state.items.find((x) => x.id === editingItemId) : null;
     const duplicate = findItemByUrl(url, editingItemId || null);
     if (editingItemId && duplicate) {
