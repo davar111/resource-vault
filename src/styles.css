@@ -524,10 +524,10 @@ select option { background: #1b1b1b; color: var(--text-primary); }
 }
 .card__menu-trigger:hover { background: var(--bg-surface-3); color: var(--text-primary); }
 .card__menu-pop {
-  position: absolute;
-  top: 36px;
-  right: 0;
-  z-index: 20;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1000;
   min-width: 160px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-default);
