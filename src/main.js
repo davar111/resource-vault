@@ -775,12 +775,16 @@ function setupEvents() {
   window.addEventListener("dragover", (e) => {
     const types = e.dataTransfer?.types;
     if (!types) return;
+    if (types.includes("text/resource-vault-item-id")) return;
     if (!types.includes("text/uri-list") && !types.includes("text/plain")) return;
     e.preventDefault();
     if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
   });
 
   window.addEventListener("drop", (e) => {
+    const types = e.dataTransfer?.types;
+    if (types?.includes("text/resource-vault-item-id")) return;
+
     const dropTarget = e.target instanceof Element ? e.target : null;
     if (dropTarget?.closest("input, textarea, select, [contenteditable='true']")) return;
 

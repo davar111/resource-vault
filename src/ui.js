@@ -79,6 +79,7 @@ function renderCollections(state, els, onChange, L) {
 
       btn.addEventListener("drop", (e) => {
         e.preventDefault();
+        e.stopPropagation();
         btn.classList.remove("collection--dragover");
 
         const itemId = String(e.dataTransfer?.getData("text/resource-vault-item-id") || "").trim();
@@ -384,6 +385,7 @@ function renderGrid(state, els, onChange, actions, L) {
     });
 
     card.querySelectorAll('a[target="_blank"]').forEach((link) => {
+      link.draggable = false;
       link.addEventListener("click", () => {
         actions?.onOpenItem?.(item.id);
       });
