@@ -214,6 +214,46 @@ function closeAddModal() {
   els.modalAddLink?.close();
 }
 
+function openNewLinkModal(preset = {}) {
+  editingItemId = null;
+  els.formAddLink?.reset();
+  renderAddCollectionChoices();
+  renderTagSuggestions();
+  if (els.inputAddSource) els.inputAddSource.value = "Other";
+  if (els.addFavorite) els.addFavorite.checked = state.activeCollectionId === "fav";
+
+  const url = String(preset?.url || "").trim();
+  const title = String(preset?.title || "").trim();
+  if (els.inputAddUrl) els.inputAddUrl.value = url;
+  if (els.inputAddTitle && title) els.inputAddTitle.value = title;
+
+  updateAddSourceUi();
+  updateAddModalModeTexts();
+  els.modalAddLink?.showModal();
+}
+
+function firstHttpUrl(input) {
+  const text = String(input || "").trim();
+  if (!text) return "";
+
+  const lines = text.split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
+  for (const line of lines) {
+    try {
+      const u = new URL(line);
+      if (u.protocol === "http:" || u.protocol === "https:") return u.toString();
+    } catch {}
+  }
+
+  const inline = text.match(/https?:\/\/[^\s<>"')]+/i)?.[0] || "";
+  if (!inline) return "";
+  try {
+    const u = new URL(inline);
+    return u.protocol === "http:" || u.protocol === "https:" ? u.toString() : "";
+  } catch {
+    return "";
+  }
+}
+
 function normalizeState(raw) {
   const data = migrateToV4(raw || {});
   editingItemId = null;
@@ -728,16 +768,29 @@ function setupEvents() {
   });
 
   els.btnAddLink?.addEventListener("click", () => {
-    editingItemId = null;
-    els.formAddLink?.reset();
-    renderAddCollectionChoices();
-    renderTagSuggestions();
-    if (els.inputAddSource) els.inputAddSource.value = "Other";
-    updateAddSourceUi();
-    updateAddModalModeTexts();
-    if (els.addFavorite) els.addFavorite.checked = state.activeCollectionId === "fav";
-    els.modalAddLink?.showModal();
+    openNewLinkModal();
     closeMobileMenuIfNeeded();
+  });
+
+  window.addEventListener("dragover", (e) => {
+    const types = e.dataTransfer?.types;
+    if (!types) return;
+    if (!types.includes("text/uri-list") && !types.includes("text/plain")) return;
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+  });
+
+  window.addEventListener("drop", (e) => {
+    const dropTarget = e.target instanceof Element ? e.target : null;
+    if (dropTarget?.closest("input, textarea, select, [contenteditable='true']")) return;
+
+    const uriList = e.dataTransfer?.getData("text/uri-list") || "";
+    const plain = e.dataTransfer?.getData("text/plain") || "";
+    const url = firstHttpUrl(uriList) || firstHttpUrl(plain);
+    if (!url) return;
+
+    e.preventDefault();
+    openNewLinkModal({ url });
   });
 
   els.inputAddUrl?.addEventListener("input", updateAddSourceUi);
