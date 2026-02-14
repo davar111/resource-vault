@@ -12,7 +12,7 @@ import {
 } from "./filter.js";
 import { render } from "./ui.js";
 import { t } from "./i18n.js";
-import { completeAuthFromUrl, getCurrentUser, getSupabaseConfigError, signInWithGoogle, signOut } from "./supabase.js";
+import { completeAuthFromUrl, getCurrentUser, signInWithGoogle, signOut } from "./supabase.js";
 
 const TYPE_OPTIONS = ["Project", "Studio", "Designer", "Inspiration", "Source"];
 const SOURCE_OPTIONS = ["Site", "Behance", "Awwwards", "Pinterest", "Dribbble", "Other"];
@@ -120,6 +120,81 @@ let editingItemId = null;
 let knownTags = [];
 let activeTagMenuIndex = -1;
 let currentUser = null;
+
+function hasVaultData(data) {
+  return Boolean(Array.isArray(data?.items) && data.items.length) || Boolean(Array.isArray(data?.collections) && data.collections.length);
+}
+
+function toComparableTimestamp(value) {
+  const n = Number(value || 0);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+function mergeEntities(localList, cloudList) {
+  const byId = new Map();
+
+  const push = (entity, source) => {
+    const id = String(entity?.id || "").trim();
+    if (!id) return;
+
+    const next = { ...entity };
+    const prev = byId.get(id);
+    if (!prev) {
+      byId.set(id, next);
+      return;
+    }
+
+    const prevTs = toComparableTimestamp(prev.updatedAt || prev.createdAt);
+    const nextTs = toComparableTimestamp(next.updatedAt || next.createdAt);
+
+    if (nextTs > prevTs) byId.set(id, next);
+    if (nextTs === prevTs && source === "local") byId.set(id, next);
+  };
+
+  for (const entity of Array.isArray(cloudList) ? cloudList : []) push(entity, "cloud");
+  for (const entity of Array.isArray(localList) ? localList : []) push(entity, "local");
+
+  return [...byId.values()];
+}
+
+function mergeVaultData(localRaw, cloudRaw) {
+  const local = migrateToV4(localRaw || {});
+  const cloud = migrateToV4(cloudRaw || {});
+  const cloudHasData = hasVaultData(cloud);
+
+  return {
+    version: 4,
+    lang: cloudHasData ? cloud.lang : local.lang,
+    sortBy: cloudHasData ? cloud.sortBy : local.sortBy,
+    items: mergeEntities(local.items, cloud.items),
+    collections: mergeEntities(local.collections, cloud.collections)
+  };
+}
+
+function hasLocalChangesVsCloud(localRaw, cloudRaw) {
+  const local = migrateToV4(localRaw || {});
+  const cloud = migrateToV4(cloudRaw || {});
+
+  const check = (localList, cloudList) => {
+    const cloudById = new Map((Array.isArray(cloudList) ? cloudList : []).map((x) => [String(x?.id || ""), x]));
+
+    for (const localEntity of Array.isArray(localList) ? localList : []) {
+      const localId = String(localEntity?.id || "");
+      if (!localId) continue;
+
+      const cloudEntity = cloudById.get(localId);
+      if (!cloudEntity) return true;
+
+      const localTs = toComparableTimestamp(localEntity.updatedAt || localEntity.createdAt);
+      const cloudTs = toComparableTimestamp(cloudEntity.updatedAt || cloudEntity.createdAt);
+      if (localTs > cloudTs) return true;
+    }
+
+    return false;
+  };
+
+  return check(local.items, cloud.items) || check(local.collections, cloud.collections);
+}
 
 function persist() {
   save({
@@ -612,14 +687,9 @@ function setupEvents() {
       window.location.reload();
       return;
     }
-    if (els.authStatus) els.authStatus.textContent = "Opening Google sign-in...";
-    const err = getSupabaseConfigError();
-    if (err) {
-      if (els.authStatus) els.authStatus.textContent = `Auth error: ${err}`;
-      return;
-    }
+
     const started = signInWithGoogle();
-    if (!started && els.authStatus) els.authStatus.textContent = "Auth error: OAuth did not start";
+    if (!started) console.warn("Google sign-in did not start");
   });
 
   document.addEventListener("click", (e) => {
@@ -933,19 +1003,23 @@ function escapeHtml(str) {
 async function bootstrap() {
   const localData = load();
   let cloudData = null;
+  let hasAuthSession = false;
 
   try {
     await completeAuthFromUrl();
     currentUser = await getCurrentUser();
+    hasAuthSession = !!authEmail(currentUser);
     cloudData = await loadFromCloud();
   } catch (err) {
     console.warn("Bootstrap auth/cloud failed:", err?.message || err);
   }
 
-  const initial = cloudData || localData || {};
+  const shouldMergeLocalIntoCloud = hasAuthSession && hasLocalChangesVsCloud(localData, cloudData);
+  const merged = hasAuthSession ? mergeVaultData(localData, cloudData) : null;
+  const initial = merged || cloudData || localData || {};
 
-  // Keep local cache aligned with cloud state when cloud is available.
-  if (cloudData) save(cloudData);
+  if (hasAuthSession && merged && shouldMergeLocalIntoCloud) save(merged);
+  else if (cloudData) save(cloudData);
 
   normalizeState(initial);
   setupEvents();
