@@ -344,11 +344,8 @@ function renderGrid(state, els, onChange, actions, L) {
         const wasHidden = menuPop.hidden;
         closeAllCardMenus();
         card.classList.remove("card--menu-open");
-        if (!wasHidden) return;
-
-        menuPop.hidden = false;
-        card.classList.add("card--menu-open");
-        positionCardMenu(menuPop, menuTrigger);
+        menuPop.hidden = !wasHidden;
+        if (!menuPop.hidden) card.classList.add("card--menu-open");
       });
     }
 
@@ -558,34 +555,10 @@ function ensureCollectionMenuOutsideClose() {
 function closeAllCardMenus() {
   document.querySelectorAll("[data-card-pop]").forEach((el) => {
     el.hidden = true;
-    el.style.top = "";
-    el.style.left = "";
   });
   document.querySelectorAll(".card--menu-open").forEach((el) => {
     el.classList.remove("card--menu-open");
   });
-}
-
-function positionCardMenu(menuPop, trigger) {
-  if (!menuPop || !trigger) return;
-
-  const triggerRect = trigger.getBoundingClientRect();
-  const menuRect = menuPop.getBoundingClientRect();
-  const gap = 6;
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
-
-  let left = triggerRect.right - menuRect.width;
-  if (left < 8) left = 8;
-  if (left + menuRect.width > vw - 8) left = Math.max(8, vw - menuRect.width - 8);
-
-  let top = triggerRect.bottom + gap;
-  if (top + menuRect.height > vh - 8) {
-    top = Math.max(8, triggerRect.top - menuRect.height - gap);
-  }
-
-  menuPop.style.left = `${Math.round(left)}px`;
-  menuPop.style.top = `${Math.round(top)}px`;
 }
 
 function ensureCardMenuOutsideClose() {
@@ -600,8 +573,5 @@ function ensureCardMenuOutsideClose() {
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") closeAllCardMenus();
   });
-
-  window.addEventListener("resize", closeAllCardMenus);
-  window.addEventListener("scroll", closeAllCardMenus, true);
 }
 

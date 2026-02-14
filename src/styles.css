@@ -317,9 +317,15 @@ select option { background: #1b1b1b; color: var(--text-primary); }
 .chip:hover { background: var(--bg-surface-2); color: var(--text-primary); }
 .chip--on { background: #303030; border-color: var(--border-strong); color: var(--text-primary); }
 
-.grid { padding: var(--space-5); column-count: 4; column-gap: var(--space-3); }
+.grid {
+  padding: var(--space-5);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+  align-items: start;
+}
 .grid--empty {
-  column-count: 1;
+  grid-template-columns: 1fr;
   min-height: calc(100vh - 182px);
   display: flex;
   align-items: center;
@@ -328,9 +334,8 @@ select option { background: #1b1b1b; color: var(--text-primary); }
 
 .card {
   --stagger: 0ms;
-  break-inside: avoid;
   position: relative;
-  margin: 0 0 var(--space-3);
+  margin: 0;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   background: var(--bg-surface-1);
@@ -524,10 +529,10 @@ select option { background: #1b1b1b; color: var(--text-primary); }
 }
 .card__menu-trigger:hover { background: var(--bg-surface-3); color: var(--text-primary); }
 .card__menu-pop {
-  position: fixed;
-  top: 0;
-  left: 0;
-  z-index: 1000;
+  position: absolute;
+  top: 36px;
+  right: 0;
+  z-index: 50;
   min-width: 160px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-default);
@@ -717,11 +722,11 @@ select option { background: #1b1b1b; color: var(--text-primary); }
 }
 
 @media (max-width: 1200px) {
-  .grid { column-count: 3; }
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 900px) {
-  .grid { column-count: 2; }
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .sidebar { width: 252px; flex-basis: 252px; }
   .topbar { flex-wrap: wrap; }
   .topbar__right { width: 100%; margin-left: 0; }
@@ -768,7 +773,7 @@ select option { background: #1b1b1b; color: var(--text-primary); }
   }
   body.mobile-menu-open { overflow: hidden; }
   .brand-row { align-items: center; }
-  .grid { column-count: 1; padding: var(--space-3); column-gap: 0; }
+  .grid { grid-template-columns: 1fr; padding: var(--space-3); }
   .row { flex-direction: column; }
   .row--end { align-items: stretch; }
   .topbar__left {
