@@ -329,6 +329,7 @@ select option { background: #1b1b1b; color: var(--text-primary); }
 .card {
   --stagger: 0ms;
   break-inside: avoid;
+  position: relative;
   margin: 0 0 var(--space-3);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
@@ -339,6 +340,7 @@ select option { background: #1b1b1b; color: var(--text-primary); }
 }
 .card:hover { border-color: var(--border-default); background: var(--bg-surface-2); }
 .card--dragging { opacity: 0.62; }
+.card--menu-open { z-index: 30; }
 .card__preview-wrap {
   display: block;
   overflow: hidden;
@@ -349,8 +351,8 @@ select option { background: #1b1b1b; color: var(--text-primary); }
 }
 .card__preview { width: 100%; display: block; aspect-ratio: 16 / 10; object-fit: cover; }
 .card__top { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); }
-.card__left { display: flex; gap: var(--space-3); align-items: flex-start; }
-.card__tools { display: inline-flex; align-items: center; gap: 6px; position: relative; }
+.card__left { display: flex; gap: var(--space-3); align-items: flex-start; min-width: 0; }
+.card__tools { display: inline-flex; align-items: center; gap: 6px; position: relative; flex: 0 0 auto; }
 .favicon {
   width: 28px;
   height: 28px;

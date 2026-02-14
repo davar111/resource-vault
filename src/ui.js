@@ -343,7 +343,9 @@ function renderGrid(state, els, onChange, actions, L) {
         e.stopPropagation();
         const wasHidden = menuPop.hidden;
         closeAllCardMenus();
+        card.classList.remove("card--menu-open");
         menuPop.hidden = !wasHidden;
+        if (!menuPop.hidden) card.classList.add("card--menu-open");
       });
     }
 
@@ -553,6 +555,9 @@ function ensureCollectionMenuOutsideClose() {
 function closeAllCardMenus() {
   document.querySelectorAll("[data-card-pop]").forEach((el) => {
     el.hidden = true;
+  });
+  document.querySelectorAll(".card--menu-open").forEach((el) => {
+    el.classList.remove("card--menu-open");
   });
 }
 

@@ -254,6 +254,28 @@ function firstHttpUrl(input) {
   }
 }
 
+function normalizeUrlForCompare(rawUrl) {
+  try {
+    const u = new URL(String(rawUrl || "").trim());
+    u.hash = "";
+    if (u.pathname.length > 1) u.pathname = u.pathname.replace(/\/+$/, "");
+    return u.toString();
+  } catch {
+    return String(rawUrl || "").trim();
+  }
+}
+
+function findItemByUrl(url, excludeId = null) {
+  const target = normalizeUrlForCompare(url);
+  if (!target) return null;
+  const excluded = excludeId ? String(excludeId) : null;
+
+  return state.items.find((item) => {
+    if (excluded && item.id === excluded) return false;
+    return normalizeUrlForCompare(item.url) === target;
+  }) || null;
+}
+
 function normalizeState(raw) {
   const data = migrateToV4(raw || {});
   editingItemId = null;
@@ -884,25 +906,32 @@ function setupEvents() {
     const fallbackPreview = previewFallbackUrl(url);
     const initialTitle = titleRaw || domain || url;
     const existing = editingItemId ? state.items.find((x) => x.id === editingItemId) : null;
-    const itemId = existing?.id || uid("item");
+    const duplicate = findItemByUrl(url, editingItemId || null);
+    if (editingItemId && duplicate) {
+      alert("This link already exists");
+      return;
+    }
+
+    const target = existing || duplicate;
+    const itemId = target?.id || uid("item");
     if (editingItemId && !existing) {
       editingItemId = null;
       updateAddModalModeTexts();
       return;
     }
 
-    if (existing) {
-      const urlChanged = existing.url !== url;
-      existing.url = url;
-      existing.title = initialTitle;
-      existing.tags = tags;
-      existing.type = type;
-      existing.source = source;
-      existing.note = note;
-      existing.favorite = favorite;
-      existing.collectionIds = selectedCollections;
-      if (urlChanged || !existing.previewImage) existing.previewImage = fallbackPreview;
-      existing.updatedAt = now;
+    if (target) {
+      const urlChanged = target.url !== url;
+      target.url = url;
+      target.title = initialTitle;
+      target.tags = tags;
+      target.type = type;
+      target.source = source;
+      target.note = note;
+      target.favorite = favorite;
+      target.collectionIds = selectedCollections;
+      if (urlChanged || !target.previewImage) target.previewImage = fallbackPreview;
+      target.updatedAt = now;
     } else {
       state.items.push({
         id: itemId,
