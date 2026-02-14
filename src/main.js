@@ -20,6 +20,7 @@ const TYPE_OPTIONS = ["Project", "Studio", "Designer", "Inspiration", "Source"];
 const SOURCE_OPTIONS = ["Site", "Behance", "Awwwards", "Pinterest", "Dribbble", "Other"];
 const TITLE_MIN_LEN = 2;
 const TITLE_MAX_LEN = 120;
+const NOTE_MAX_LEN = 500;
 
 const els = {
   langRu: document.getElementById("langRu"),
@@ -692,6 +693,7 @@ function setupEvents() {
   const mobileMq = window.matchMedia("(max-width: 700px)");
   if (els.inputAddTitle) els.inputAddTitle.maxLength = TITLE_MAX_LEN;
   if (els.inputAddTags) els.inputAddTags.maxLength = 300;
+  if (els.inputAddNote) els.inputAddNote.maxLength = NOTE_MAX_LEN;
 
   function setMobileMenu(open) {
     state.ui.mobileMenuOpen = !!open;
@@ -914,7 +916,12 @@ function setupEvents() {
     const tags = normalizeTags(fd.get("tags"));
     const type = normalizeType(fd.get("type"));
     const sourcePick = normalizeSource(fd.get("source"));
-    const note = String(fd.get("note") || "").trim();
+    const rawNote = String(fd.get("note") || "").trim();
+    if (rawNote.length > NOTE_MAX_LEN) {
+      alert(`Note must be up to ${NOTE_MAX_LEN} characters`);
+      return;
+    }
+    const note = rawNote;
     const favorite = !!fd.get("favorite");
 
     const manualCollectionIds = new Set(state.collections.filter((col) => col.kind === "manual").map((col) => col.id));
