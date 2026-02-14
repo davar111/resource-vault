@@ -12,6 +12,7 @@ import {
 } from "./filter.js";
 import { render } from "./ui.js";
 import { t } from "./i18n.js";
+import { completeAuthFromUrl, getCurrentUser, signInWithGoogle, signOut } from "./supabase.js";
 
 const TYPE_OPTIONS = ["Project", "Studio", "Designer", "Inspiration", "Source"];
 const SOURCE_OPTIONS = ["Site", "Behance", "Awwwards", "Pinterest", "Dribbble", "Other"];
@@ -57,6 +58,9 @@ const els = {
   settingsMenu: document.getElementById("settingsMenu"),
   btnExport: document.getElementById("btnExport"),
   btnImport: document.getElementById("btnImport"),
+  btnAuth: document.getElementById("btnAuth"),
+  btnAuthLabel: document.getElementById("btnAuthLabel"),
+  authStatus: document.getElementById("authStatus"),
   fileImport: document.getElementById("fileImport"),
   localHint: document.getElementById("localHint"),
 
@@ -115,6 +119,7 @@ const els = {
 let editingItemId = null;
 let knownTags = [];
 let activeTagMenuIndex = -1;
+let currentUser = null;
 
 function persist() {
   save({
@@ -304,6 +309,23 @@ function applyI18n() {
   renderTagSuggestions();
   renderSelectLabels();
   updateAddSourceUi();
+  renderAuthStatus();
+}
+
+function authEmail(user) {
+  return String(user?.email || user?.user_metadata?.email || "").trim();
+}
+
+function renderAuthStatus() {
+  const email = authEmail(currentUser);
+  const signedIn = !!email;
+
+  if (els.btnAuthLabel) els.btnAuthLabel.textContent = signedIn ? t(state.lang, "signOut") : t(state.lang, "signInGoogle");
+  if (els.authStatus) {
+    els.authStatus.textContent = signedIn
+      ? `${t(state.lang, "authSignedInAs")}: ${email}`
+      : t(state.lang, "authSignedOut");
+  }
 }
 
 function renderSelectLabels() {
@@ -581,6 +603,16 @@ function setupEvents() {
   els.btnSettings?.addEventListener("click", (e) => {
     e.stopPropagation();
     toggleSettingsMenu(els.settingsMenu.hidden);
+  });
+
+  els.btnAuth?.addEventListener("click", async () => {
+    const email = authEmail(currentUser);
+    if (email) {
+      await signOut();
+      window.location.reload();
+      return;
+    }
+    signInWithGoogle();
   });
 
   document.addEventListener("click", (e) => {
@@ -892,6 +924,9 @@ function escapeHtml(str) {
 }
 
 async function bootstrap() {
+  await completeAuthFromUrl();
+  currentUser = await getCurrentUser();
+
   const localData = load();
   const cloudData = await loadFromCloud();
   const initial = cloudData || localData || {};

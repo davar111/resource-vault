@@ -443,6 +443,21 @@ select option { background: #1b1b1b; color: var(--text-primary); }
 .btn--secondary:hover { background: var(--bg-surface-3); }
 .btn--ghost { background: var(--bg-surface-1); border-color: var(--border-subtle); color: var(--text-secondary); }
 .btn--ghost:hover { background: #262626; color: var(--text-primary); }
+.btn-auth { justify-content: center; }
+.btn-auth__icon {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-primary);
+  opacity: 0.9;
+}
+.btn-auth__icon svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
 .btn--destructive {
   background: transparent;
   border-color: var(--border-default);

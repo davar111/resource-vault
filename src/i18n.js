@@ -13,6 +13,10 @@
     importJson: "Импорт JSON",
     settings: "Настройки",
     localHint: "Данные хранятся локально в браузере (localStorage).",
+    signInGoogle: "Войти через Google",
+    signOut: "Выйти",
+    authSignedOut: "Вход не выполнен",
+    authSignedInAs: "Вошли как",
 
     all: "Все ссылки",
     favorites: "Избранное",
@@ -122,6 +126,10 @@
     importJson: "Import JSON",
     settings: "Settings",
     localHint: "Data is stored locally in your browser (localStorage).",
+    signInGoogle: "Sign in with Google",
+    signOut: "Sign out",
+    authSignedOut: "Not signed in",
+    authSignedInAs: "Signed in as",
 
     all: "All links",
     favorites: "Favorites",

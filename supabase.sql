@@ -7,23 +7,27 @@ create table if not exists public.vault_states (
 alter table public.vault_states enable row level security;
 
 drop policy if exists "anon can read vault states" on public.vault_states;
-create policy "anon can read vault states"
+drop policy if exists "anon can write vault states" on public.vault_states;
+drop policy if exists "anon can update vault states" on public.vault_states;
+drop policy if exists "users can read own vault states" on public.vault_states;
+drop policy if exists "users can insert own vault states" on public.vault_states;
+drop policy if exists "users can update own vault states" on public.vault_states;
+
+create policy "users can read own vault states"
 on public.vault_states
 for select
-to anon
-using (true);
+to authenticated
+using (id = ('user_' || auth.uid()::text));
 
-drop policy if exists "anon can write vault states" on public.vault_states;
-create policy "anon can write vault states"
+create policy "users can insert own vault states"
 on public.vault_states
 for insert
-to anon
-with check (true);
+to authenticated
+with check (id = ('user_' || auth.uid()::text));
 
-drop policy if exists "anon can update vault states" on public.vault_states;
-create policy "anon can update vault states"
+create policy "users can update own vault states"
 on public.vault_states
 for update
-to anon
-using (true)
-with check (true);
+to authenticated
+using (id = ('user_' || auth.uid()::text))
+with check (id = ('user_' || auth.uid()::text));
