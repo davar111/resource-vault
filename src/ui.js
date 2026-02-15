@@ -11,7 +11,17 @@ export function render(state, els, onChange, actions = activeActions) {
   renderSavedFilters(state, els, onChange, activeActions, L);
   renderHeader(state, els, L);
   renderActiveFilters(state, els, onChange, L);
+  renderDemoHint(state, els, L);
   renderGrid(state, els, onChange, activeActions, L);
+}
+
+function renderDemoHint(state, els, L) {
+  if (!els.demoHint || !els.demoHintText || !els.demoHintAdd) return;
+  const show = !!state.isUsingDemoData;
+  els.demoHint.hidden = !show;
+  if (!show) return;
+  els.demoHintText.textContent = t(L, "demoHintText");
+  els.demoHintAdd.textContent = t(L, "demoHintAction");
 }
 
 function renderNav(state, els, L) {
@@ -333,7 +343,7 @@ function renderGrid(state, els, onChange, actions, L) {
   for (let index = 0; index < list.length; index += 1) {
     const item = list[index];
     const card = document.createElement("div");
-    card.className = "card";
+    card.className = `card${item.isDemo ? " card--demo" : ""}`;
     card.style.setProperty("--stagger", `${Math.min(index, 14) * 20}ms`);
     card.draggable = true;
     card.dataset.itemId = item.id;
@@ -349,6 +359,7 @@ function renderGrid(state, els, onChange, actions, L) {
 
     card.innerHTML = `
       <div class="card__preview-wrap">
+        ${item.isDemo ? `<span class="demo-badge">${escapeHtml(t(L, "demoBadge"))}</span>` : ""}
         <a class="card__preview-link" href="${item.url}" target="_blank" rel="noreferrer">
           <img class="card__preview" src="${escapeHtml(previewSrc)}" data-fallback="${escapeHtml(previewFallbackUrl(item.url))}" alt="${escapeHtml(item.title || "preview")}" loading="lazy" referrerpolicy="no-referrer" />
         </a>
@@ -360,13 +371,12 @@ function renderGrid(state, els, onChange, actions, L) {
           ${icon ? `<img class="favicon" src="${icon}" alt="">` : `<div class="favicon"></div>`}
           <div>
             <a class="card__title-link" href="${item.url}" target="_blank" rel="noreferrer">${escapeHtml(item.title || domain || "Untitled")}</a>
-            <div class="card__meta">${escapeHtml(domain)} | ${escapeHtml(displayOptionLabel(item.type, "type", L))} | ${escapeHtml(displayOptionLabel(item.source, "source", L))}</div>
           </div>
         </div>
         <div class="card__tools">
-          <button class="card__delete" type="button" data-del="1" aria-label="${escapeHtml(t(L, "del"))}" title="${escapeHtml(t(L, "del"))}">
+          ${item.isDemo ? "" : `<button class="card__delete" type="button" data-del="1" aria-label="${escapeHtml(t(L, "del"))}" title="${escapeHtml(t(L, "del"))}">
             <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h16"/><path d="M9 7V5h6v2"/><path d="M8 7l1 12h6l1-12"/><path d="M10 10v7"/><path d="M14 10v7"/></svg>
-          </button>
+          </button>`}
         </div>
       </div>
 
@@ -383,11 +393,13 @@ function renderGrid(state, els, onChange, actions, L) {
       await actions?.onToggleFavorite?.(item.id, !item.favorite);
     });
 
-    card.querySelector("[data-del]")?.addEventListener("click", async () => {
-      const confirmed = await confirmDelete(els, L);
-      if (!confirmed) return;
-      await actions?.onDeleteItem?.(item.id);
-    });
+    if (!item.isDemo) {
+      card.querySelector("[data-del]")?.addEventListener("click", async () => {
+        const confirmed = await confirmDelete(els, L);
+        if (!confirmed) return;
+        await actions?.onDeleteItem?.(item.id);
+      });
+    }
 
     card.querySelector("[data-note-expand]")?.addEventListener("click", async () => {
       await confirmAction(els, L, {

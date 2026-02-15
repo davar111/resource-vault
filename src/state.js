@@ -1,6 +1,8 @@
 export const state = {
   isAuthenticated: false,
+  isGuestMode: false,
   currentUserId: "",
+  isUsingDemoData: false,
   lang: "ru",
   themeMode: "system",
   theme: "dark",

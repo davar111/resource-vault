@@ -5,6 +5,7 @@ import { TAG_MAX_LEN, TAG_MIN_LEN, detectSourceFromUrl, domainFromUrl, normalize
 import { t } from "./i18n.js";
 import { render } from "./ui.js";
 import { SOURCE_CODES, TYPE_CODES } from "./domain.js";
+import { makeDemoLinks } from "./demo-data.js";
 import { initAuth, loginWithGoogle, logout } from "./useAuth.js";
 import { createLink, deleteLink, listLinks, updateLink } from "./useLinks.js";
 import { addLinkCollections, createCollection, createCollectionInvite, deleteCollection, listCollections, listLinkCollections, replaceLinkCollections, updateCollection } from "./useCollections.js";
@@ -20,6 +21,12 @@ const HIDDEN_PASSWORD_KEY = "resource_vault_hidden_password_v1";
 const els = {
   langSelect: document.getElementById("langSelect"),
   btnTheme: document.getElementById("btnTheme"),
+  appRoot: document.getElementById("appRoot"),
+  authGate: document.getElementById("authGate"),
+  authGateTitle: document.getElementById("authGateTitle"),
+  authGateText: document.getElementById("authGateText"),
+  authGateBtn: document.getElementById("authGateBtn"),
+  authGateGuestBtn: document.getElementById("authGateGuestBtn"),
   brand: document.getElementById("brand"),
   navAll: document.getElementById("navAll"),
   navFav: document.getElementById("navFav"),
@@ -42,6 +49,9 @@ const els = {
   btnFilters: document.getElementById("btnFilters"),
   filtersPanel: document.getElementById("filtersPanel"),
   activeFilters: document.getElementById("activeFilters"),
+  demoHint: document.getElementById("demoHint"),
+  demoHintText: document.getElementById("demoHintText"),
+  demoHintAdd: document.getElementById("demoHintAdd"),
   filterTypes: document.getElementById("filterTypes"),
   filterSources: document.getElementById("filterSources"),
   filterTagInput: document.getElementById("filterTagInput"),
@@ -113,13 +123,14 @@ let currentUser = null;
 let knownTags = [];
 let activeTagMenuIndex = -1;
 let sourceAutofillEnabled = true;
+let prevGateVisible = null;
 const pendingLinkOps = new Set();
 const pendingCollectionOps = new Set();
 const pendingSavedFilterOps = new Set();
 
 function ensureAuth() {
   if (currentUser?.id) return true;
-  alert(t(state.lang, "authRequired"));
+  alert(t(state.lang, state.isGuestMode ? "authRequiredGuest" : "authRequired"));
   return false;
 }
 
@@ -138,10 +149,35 @@ function syncSavedFiltersSection() {
   els.savedFiltersSection.hidden = !state.isAuthenticated || !hasSaved;
 }
 
+function syncAuthGate() {
+  const showGate = !state.isAuthenticated && !state.isGuestMode;
+  const wasGateVisible = prevGateVisible;
+  prevGateVisible = showGate;
+  if (els.appRoot) els.appRoot.hidden = showGate;
+  if (els.authGate) els.authGate.hidden = !showGate;
+  if (els.appRoot && wasGateVisible === true && showGate === false) {
+    els.appRoot.classList.remove("app--enter");
+    // Force reflow so repeated login transitions replay animation.
+    void els.appRoot.offsetWidth;
+    els.appRoot.classList.add("app--enter");
+  }
+}
+
+function syncGuestModeUi() {
+  const guestReadOnly = !!(state.isGuestMode && !state.isAuthenticated);
+  if (els.btnAddLink) els.btnAddLink.disabled = guestReadOnly;
+  if (els.btnNewCollection) els.btnNewCollection.disabled = guestReadOnly;
+  if (els.btnSaveFilterInline) els.btnSaveFilterInline.disabled = guestReadOnly;
+  if (els.navHidden) els.navHidden.disabled = guestReadOnly;
+  if (els.localHint && guestReadOnly) els.localHint.textContent = t(state.lang, "guestModeHint");
+}
+
 function renderApp() {
   persistUiSettings();
   syncSaveFilterButton();
   syncSavedFiltersSection();
+  syncAuthGate();
+  syncGuestModeUi();
   render(state, els, persistUiSettings, actions);
 }
 
@@ -181,6 +217,11 @@ function syncThemeToggle() {
 
 function renderAuthStatus() {
   const email = authEmail(currentUser);
+  if (!email && state.isGuestMode && !state.isAuthenticated) {
+    if (els.btnAuthLabel) els.btnAuthLabel.textContent = t(state.lang, "signInGoogle");
+    if (els.authStatus) els.authStatus.textContent = t(state.lang, "guestModeStatus");
+    return;
+  }
   if (els.btnAuthLabel) els.btnAuthLabel.textContent = email ? t(state.lang, "signOut") : t(state.lang, "signInGoogle");
   if (els.authStatus) {
     els.authStatus.textContent = email ? `${t(state.lang, "authSignedInAs")}: ${email}` : t(state.lang, "authSignedOut");
@@ -238,7 +279,8 @@ function normalizeUrlForCompare(rawUrl) {
 
 function findDuplicateLink(url) {
   const target = normalizeUrlForCompare(url);
-  return state.items.find((item) => normalizeUrlForCompare(item.url) === target) || null;
+  const pool = state.isUsingDemoData ? state.items.filter((item) => !item.isDemo) : state.items;
+  return pool.find((item) => normalizeUrlForCompare(item.url) === target) || null;
 }
 
 function invalidTagChunks(rawInput) {
@@ -336,6 +378,10 @@ function applyI18n() {
     els.btnSaveFilterInline.textContent = t(L, "saveFilter");
   }
   if (els.localHint) els.localHint.textContent = t(L, "localHint");
+  if (els.authGateTitle) els.authGateTitle.textContent = t(L, "authGateTitle");
+  if (els.authGateText) els.authGateText.textContent = t(L, "authGateText");
+  if (els.authGateBtn) els.authGateBtn.textContent = t(L, "authGateBtn");
+  if (els.authGateGuestBtn) els.authGateGuestBtn.textContent = t(L, "authGateGuestBtn");
   if (els.langSelect) els.langSelect.value = L === "en" ? "en" : "ru";
   if (els.searchInput) els.searchInput.placeholder = t(L, "searchPlaceholder");
   if (els.btnFilters) els.btnFilters.textContent = t(L, "filters");
@@ -545,7 +591,7 @@ async function loadData() {
     if (!list.includes(colId)) list.push(colId);
     relMap.set(linkId, list);
   }
-  state.items = links.map((x) => ({ ...x, previewImage: previewFallbackUrl(x.url), collectionIds: relMap.get(x.id) || [] }));
+  state.items = links.map((x) => ({ ...x, isDemo: false, previewImage: previewFallbackUrl(x.url), collectionIds: relMap.get(x.id) || [] }));
   state.collections = collections;
   state.savedFilters = savedFilters;
 }
@@ -605,6 +651,12 @@ const actions = {
       pendingLinkOps.delete(id);
       return;
     }
+    if (item.isDemo) {
+      item.favorite = !!next;
+      pendingLinkOps.delete(id);
+      renderApp();
+      return;
+    }
     const updated = await updateLink(id, { ...item, favorite: !!next });
     if (updated) item.favorite = updated.favorite;
     pendingLinkOps.delete(id);
@@ -614,6 +666,14 @@ const actions = {
     if (!ensureAuth()) return;
     if (pendingLinkOps.has(id)) return;
     pendingLinkOps.add(id);
+    const item = state.items.find((x) => x.id === id);
+    if (item?.isDemo) {
+      state.items = state.items.filter((x) => x.id !== id);
+      pendingLinkOps.delete(id);
+      renderTagSuggestions();
+      renderApp();
+      return;
+    }
     await deleteLink(id);
     state.items = state.items.filter((x) => x.id !== id);
     renderTagSuggestions();
@@ -781,8 +841,14 @@ function setupEvents() {
     }
     loginWithGoogle();
   });
+  els.authGateBtn?.addEventListener("click", () => loginWithGoogle());
+  els.authGateGuestBtn?.addEventListener("click", () => {
+    state.isGuestMode = true;
+    renderApp();
+  });
 
   els.btnAddLink?.addEventListener("click", () => { openNewLinkModal(); closeMobileMenuIfNeeded(); });
+  els.demoHintAdd?.addEventListener("click", () => { openNewLinkModal(); });
   els.btnNewCollection?.addEventListener("click", () => { els.formCollection?.reset(); els.modalCollection?.showModal(); closeMobileMenuIfNeeded(); });
   els.btnSaveFilterInline?.addEventListener("click", async () => {
     if (!ensureAuth()) return;
@@ -858,9 +924,13 @@ function setupEvents() {
         hidden: inHiddenContext
       }, currentUser.id);
       if (created) {
+        if (state.isUsingDemoData) {
+          state.items = [];
+          state.isUsingDemoData = false;
+        }
         // For newly created links we only need INSERT into relation table.
         await addLinkCollections(created.id, selectedCollections, currentUser.id);
-        state.items.unshift({ ...created, previewImage: previewFallbackUrl(created.url), collectionIds: selectedCollections });
+        state.items.unshift({ ...created, isDemo: false, previewImage: previewFallbackUrl(created.url), collectionIds: selectedCollections });
         closeAddModal();
         renderTagSuggestions();
       }
@@ -961,12 +1031,21 @@ async function bootstrap() {
         await migrateLegacyIfNeeded();
         await loadData();
       }
+      if (!state.items.length) {
+        state.items = makeDemoLinks();
+        state.isUsingDemoData = true;
+      } else {
+        state.isUsingDemoData = false;
+      }
     } catch (err) {
       console.warn("Load failed", err?.message || err);
+      state.items = makeDemoLinks();
+      state.isUsingDemoData = true;
     }
   } else {
     state.currentUserId = "";
-    state.items = [];
+    state.items = makeDemoLinks();
+    state.isUsingDemoData = true;
     state.collections = [];
     state.savedFilters = [];
     state.activeSavedFilterId = null;

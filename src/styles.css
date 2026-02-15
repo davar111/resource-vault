@@ -60,6 +60,7 @@ body {
   color: var(--text-primary);
   font-family: Manrope, "Segoe UI", Roboto, Arial, sans-serif;
   font-size: 14px;
+  overflow: hidden;
 }
 
 button, input, select, textarea { font: inherit; }
@@ -76,7 +77,39 @@ textarea:focus-visible,
   border-color: var(--accent) !important;
 }
 
-.app { display: flex; min-height: 100vh; }
+.app { display: flex; height: 100vh; }
+.app--enter {
+  animation: app-enter 280ms ease both;
+}
+.auth-gate {
+  min-height: 100vh;
+  padding: 24px;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 20% 0%, var(--bg-surface-2), var(--bg-canvas) 45%);
+}
+.auth-gate__card {
+  width: min(420px, 100%);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface-1);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: center;
+  align-items: center;
+}
+.auth-gate__title { font-size: 24px; font-weight: 700; line-height: 1.2; }
+.auth-gate__text { margin: 0; color: var(--text-secondary); line-height: 1.45; text-align: center; }
+.auth-gate__actions {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 2px;
+}
+.auth-gate .btn { width: 100%; margin-top: 0; }
 
 .sidebar {
   width: 304px;
@@ -247,7 +280,14 @@ textarea:focus-visible,
 .collection__menu-item:hover { background: var(--bg-surface-3); }
 .collection__menu-item--danger:hover { background: var(--bg-surface-3); }
 
-.main { flex: 1; display: flex; flex-direction: column; background: var(--bg-canvas); }
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-canvas);
+  min-height: 0;
+  overflow: hidden;
+}
 
 .topbar {
   display: flex;
@@ -355,12 +395,29 @@ select option { background: var(--bg-surface-1); color: var(--text-primary); }
 .chip:hover { background: var(--bg-surface-2); color: var(--text-primary); }
 .chip--on { background: var(--bg-surface-3); border-color: var(--border-strong); color: var(--text-primary); }
 
+.demo-hint {
+  margin: 8px var(--space-5) 12px;
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  border: 1px solid var(--border-default);
+  background: linear-gradient(135deg, var(--bg-surface-2), var(--bg-surface-1));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.demo-hint .btn { min-height: 34px; padding: 5px 12px 7px; }
+
 .grid {
+  flex: 1 1 auto;
+  min-height: 0;
   padding: var(--space-5);
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-3);
   align-items: start;
+  overflow-y: auto;
 }
 .grid--empty {
   grid-template-columns: 1fr;
@@ -386,6 +443,25 @@ select option { background: var(--bg-surface-1); color: var(--text-primary); }
   animation-delay: var(--stagger);
 }
 .card:hover { border-color: var(--border-default); background: var(--bg-surface-2); }
+.card--demo {
+  border-style: dashed;
+  border-color: var(--border-strong);
+}
+.card--demo:hover { border-color: var(--accent); }
+.demo-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 3;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 3px 7px 4px;
+}
 .card--dragging { opacity: 0.62; }
 .card__preview-wrap {
   position: relative;
@@ -428,7 +504,8 @@ select option { background: var(--bg-surface-1); color: var(--text-primary); }
   border-color: rgba(255, 107, 122, 0.7);
 }
 .card__top { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); }
-.card__left { display: flex; gap: var(--space-3); align-items: flex-start; min-width: 0; }
+.card__left { display: flex; gap: var(--space-3); align-items: center; min-width: 0; }
+.card__left > div { min-width: 0; flex: 1 1 auto; }
 .card__tools { display: inline-flex; align-items: center; gap: 6px; position: relative; flex: 0 0 auto; }
 .favicon {
   width: 28px;
@@ -440,11 +517,10 @@ select option { background: var(--bg-surface-1); color: var(--text-primary); }
 }
 .card__title { font-size: 16px; font-weight: 700; line-height: 1.25; }
 .card__title-link {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  display: block;
   overflow: hidden;
-  word-break: break-word;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 16px;
   font-weight: 700;
   line-height: 1.25;
@@ -453,12 +529,7 @@ select option { background: var(--bg-surface-1); color: var(--text-primary); }
 }
 .card__title-link:hover { text-decoration: underline; }
 .card__meta {
-  margin-top: 6px;
-  font-size: 12px;
-  color: var(--text-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: none;
 }
 .card__note-wrap {
   margin-top: var(--space-3);
@@ -466,6 +537,7 @@ select option { background: var(--bg-surface-1); color: var(--text-primary); }
   align-items: center;
   gap: 8px;
   min-width: 0;
+  min-height: 26px;
 }
 .card__note {
   min-width: 0;
@@ -862,6 +934,11 @@ select option { background: var(--bg-surface-1); color: var(--text-primary); }
 
 @keyframes card-in {
   from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes app-enter {
+  from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
 

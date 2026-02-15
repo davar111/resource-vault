@@ -22,6 +22,12 @@
     signOut: "Выйти",
     authSignedOut: "Вход не выполнен",
     authSignedInAs: "Вошли как",
+    authGateTitle: "Войдите в аккаунт",
+    authGateText: "Чтобы управлять ссылками и коллекциями, войдите через Google.",
+    authGateBtn: "Войти через Google",
+    authGateGuestBtn: "Продолжить как гость",
+    guestModeStatus: "Гостевой режим",
+    guestModeHint: "Гостевой режим: доступен просмотр, создание и изменение отключены.",
 
     all: "Все ссылки",
     favorites: "Избранное",
@@ -118,6 +124,9 @@
     hiddenAuthUnlockText: "Введите пароль, чтобы открыть раздел Скрытые.",
     hiddenAuthPasswordLabel: "Пароль",
     hiddenAuthConfirmLabel: "Повтор пароля",
+    demoHintText: "✨ Это примеры ссылок. Добавь свою первую, чтобы начать коллекцию.",
+    demoHintAction: "Добавить ссылку",
+    demoBadge: "пример",
 
     quickAdd: "Добавить ссылку",
     quickAddHint: "Быстрое добавление",
@@ -143,6 +152,8 @@
     source_other: "Другое"
     ,
     authRequired: "Сначала войдите через Google."
+    ,
+    authRequiredGuest: "В гостевом режиме создание и изменение недоступны. Войдите через Google."
   },
 
   en: {
@@ -168,6 +179,12 @@
     signOut: "Sign out",
     authSignedOut: "Not signed in",
     authSignedInAs: "Signed in as",
+    authGateTitle: "Sign in to continue",
+    authGateText: "Sign in with Google to manage links and collections.",
+    authGateBtn: "Sign in with Google",
+    authGateGuestBtn: "Continue as guest",
+    guestModeStatus: "Guest mode",
+    guestModeHint: "Guest mode: browsing is available, creating and editing are disabled.",
 
     all: "All links",
     favorites: "Favorites",
@@ -264,6 +281,9 @@
     hiddenAuthUnlockText: "Enter password to open Hidden section.",
     hiddenAuthPasswordLabel: "Password",
     hiddenAuthConfirmLabel: "Confirm password",
+    demoHintText: "✨ These are sample links. Add your first one to start your own vault.",
+    demoHintAction: "Add link",
+    demoBadge: "demo",
 
     quickAdd: "Add link",
     quickAddHint: "Quick add",
@@ -287,7 +307,8 @@
     source_pinterest: "Pinterest",
     source_dribbble: "Dribbble",
     source_other: "Other",
-    authRequired: "Sign in with Google first."
+    authRequired: "Sign in with Google first.",
+    authRequiredGuest: "Guest mode is read-only. Sign in with Google to create or edit."
   }
 };
 

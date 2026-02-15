@@ -7,7 +7,7 @@
     <title>Resource Vault</title>
   </head>
   <body>
-    <div class="app">
+    <div id="appRoot" class="app">
       <aside id="sidebar" class="sidebar">
         <div class="sidebar__top">
           <div class="brand-row">
@@ -116,9 +116,24 @@
           <div id="activeFilters" class="chips"></div>
         </section>
 
+        <section id="demoHint" class="demo-hint" hidden>
+          <span id="demoHintText"></span>
+          <button id="demoHintAdd" class="btn btn--primary" type="button"></button>
+        </section>
+
         <section id="grid" class="grid"></section>
       </main>
     </div>
+    <section id="authGate" class="auth-gate" hidden>
+      <div class="auth-gate__card">
+        <div id="authGateTitle" class="auth-gate__title">Войдите в аккаунт</div>
+        <p id="authGateText" class="auth-gate__text">Чтобы управлять ссылками и коллекциями, войдите через Google.</p>
+        <div class="auth-gate__actions">
+          <button id="authGateBtn" class="btn btn--primary" type="button">Войти через Google</button>
+          <button id="authGateGuestBtn" class="btn btn--secondary" type="button">Продолжить как гость</button>
+        </div>
+      </div>
+    </section>
     <div id="mobileOverlay" class="mobile-overlay" aria-hidden="true"></div>
 
     <dialog id="modalAddLink" class="modal">
