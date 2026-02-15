@@ -3,6 +3,7 @@ const SUPABASE_URL = String(ENV.VITE_SUPABASE_URL || "").trim();
 const SUPABASE_PUBLISHABLE_KEY = String(ENV.VITE_SUPABASE_ANON_KEY || "").trim();
 const TABLE = "vault_states";
 const AUTH_SESSION_KEY = "resource_vault_auth_session";
+const API_PREFIX = "/rest/v1/";
 
 function canUseBrowserStorage() {
   return typeof localStorage !== "undefined";
@@ -61,6 +62,16 @@ function supabaseHeaders() {
     Authorization: `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
     "Content-Type": "application/json"
   };
+}
+
+function toQueryString(query = {}) {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query || {})) {
+    if (value == null) continue;
+    params.set(key, String(value));
+  }
+  const s = params.toString();
+  return s ? `?${s}` : "";
 }
 
 export function isSupabaseConfigured() {
@@ -164,6 +175,61 @@ export async function getCurrentUser() {
   }
 
   return await res.json();
+}
+
+export async function getSessionAccessToken() {
+  const session = await ensureValidSession();
+  return session?.access_token || "";
+}
+
+export async function getSessionUserId() {
+  const session = await ensureValidSession();
+  return getUserIdFromAccessToken(session?.access_token) || "";
+}
+
+export async function supabaseRequest(path, options = {}) {
+  if (!isSupabaseConfigured()) throw new Error("Supabase is not configured");
+
+  const {
+    method = "GET",
+    query = {},
+    body = undefined,
+    prefer = "",
+    allowAnonymous = false
+  } = options;
+
+  let token = "";
+  if (!allowAnonymous) {
+    token = await getSessionAccessToken();
+    if (!token) throw new Error("Not authenticated");
+  }
+
+  const url = `${SUPABASE_URL}${path}${toQueryString(query)}`;
+  const headers = {
+    ...supabaseHeaders(),
+    ...(allowAnonymous ? {} : { Authorization: `Bearer ${token}` }),
+    ...(prefer ? { Prefer: prefer } : {})
+  };
+
+  const res = await fetch(url, {
+    method,
+    headers,
+    body: body == null ? undefined : JSON.stringify(body)
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Supabase ${method} ${path} failed (${res.status}): ${text || "Unknown error"}`);
+  }
+
+  if (res.status === 204) return null;
+  const ctype = res.headers.get("content-type") || "";
+  if (!ctype.includes("application/json")) return null;
+  return await res.json();
+}
+
+export function restPath(tableName) {
+  return `${API_PREFIX}${tableName}`;
 }
 
 export async function signOut() {

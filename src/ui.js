@@ -8,6 +8,7 @@ export function render(state, els, onChange, actions = activeActions) {
   const L = state.lang || "ru";
   renderNav(state, els, L);
   renderCollections(state, els, onChange, L);
+  renderSavedFilters(state, els, onChange, activeActions, L);
   renderHeader(state, els, L);
   renderActiveFilters(state, els, onChange, L);
   renderGrid(state, els, onChange, activeActions, L);
@@ -16,7 +17,7 @@ export function render(state, els, onChange, actions = activeActions) {
 function renderNav(state, els, L) {
   if (els.navAll) {
     els.navAll.textContent = t(L, "navAll");
-    els.navAll.classList.toggle("nav-item--active", state.activeCollectionId === "all");
+    els.navAll.classList.toggle("nav-item--active", state.activeCollectionId === "all" && !state.activeSavedFilterId);
   }
   if (els.navFav) {
     els.navFav.textContent = t(L, "navFav");
@@ -30,9 +31,10 @@ function renderNav(state, els, L) {
 
 function renderCollections(state, els, onChange, L) {
   ensureCollectionMenuOutsideClose();
+  if (!els.collectionsList) return;
   els.collectionsList.innerHTML = "";
 
-  for (const c of state.collections) {
+  for (const c of state.collections || []) {
     const count = visibleItems(state, c).length;
     const btn = document.createElement("button");
     btn.type = "button";
@@ -41,15 +43,12 @@ function renderCollections(state, els, onChange, L) {
     btn.innerHTML = `
       <div class="collection__left">
         <div class="dot"></div>
-        <div class="collection__name">
-          <div>${escapeHtml(c.name)}</div>
-          ${c.kind === "smart" ? `<span class="badge badge--smart">${escapeHtml(t(L, "kindSmart"))}</span>` : ""}
-        </div>
+        <div class="collection__name"><div>${escapeHtml(c.name)}</div></div>
       </div>
       <div class="collection__right">
         <div class="badge">${count}</div>
         <div class="collection__menu">
-          <button class="collection__menu-trigger" type="button" data-col-menu="1"><span class="collection__menu-dots">⋯</span></button>
+          <button class="collection__menu-trigger" type="button" data-col-menu="1"><span class="collection__menu-dots">&#8943;</span></button>
           <div class="collection__menu-pop" data-col-pop hidden>
             <button class="collection__menu-item" type="button" data-col-rename="1">${escapeHtml(t(L, "renameCollection"))}</button>
             <button class="collection__menu-item collection__menu-item--danger" type="button" data-col-del="1">${escapeHtml(t(L, "deleteCollection"))}</button>
@@ -59,44 +58,25 @@ function renderCollections(state, els, onChange, L) {
     `;
 
     btn.addEventListener("click", () => {
+      state.activeSavedFilterId = null;
       state.activeCollectionId = c.id;
-      render(state, els, onChange);
+      render(state, els, onChange, activeActions);
     });
 
-    if (c.kind === "manual") {
-      btn.addEventListener("dragover", (e) => {
-        e.preventDefault();
-      });
-
-      btn.addEventListener("dragenter", (e) => {
-        e.preventDefault();
-        btn.classList.add("collection--dragover");
-      });
-
-      btn.addEventListener("dragleave", () => {
-        btn.classList.remove("collection--dragover");
-      });
-
-      btn.addEventListener("drop", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        btn.classList.remove("collection--dragover");
-
-        const itemId = String(e.dataTransfer?.getData("text/resource-vault-item-id") || "").trim();
-        if (!itemId) return;
-
-        const item = state.items.find((x) => x.id === itemId);
-        if (!item) return;
-
-        const ids = Array.isArray(item.collectionIds) ? item.collectionIds : [];
-        if (ids.includes(c.id)) return;
-
-        item.collectionIds = [...ids, c.id];
-        item.updatedAt = Date.now();
-        onChange?.();
-        render(state, els, onChange);
-      });
-    }
+    btn.addEventListener("dragover", (e) => e.preventDefault());
+    btn.addEventListener("dragenter", (e) => {
+      e.preventDefault();
+      btn.classList.add("collection--dragover");
+    });
+    btn.addEventListener("dragleave", () => btn.classList.remove("collection--dragover"));
+    btn.addEventListener("drop", async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      btn.classList.remove("collection--dragover");
+      const itemId = String(e.dataTransfer?.getData("text/resource-vault-item-id") || "").trim();
+      if (!itemId) return;
+      await activeActions?.onAssignToCollection?.(itemId, c.id);
+    });
 
     const trigger = btn.querySelector("[data-col-menu]");
     const pop = btn.querySelector("[data-col-pop]");
@@ -109,45 +89,99 @@ function renderCollections(state, els, onChange, L) {
       });
     }
 
-    const rename = btn.querySelector("[data-col-rename]");
-    if (rename) {
-      rename.addEventListener("click", (e) => {
-        e.stopPropagation();
-        closeAllCollectionMenus();
-        const next = prompt(t(L, "renameCollectionPrompt"), c.name || "");
-        if (!next) return;
-        const name = String(next).trim();
-        if (!name) return;
-        c.name = name;
-        c.updatedAt = Date.now();
-        onChange?.();
-        render(state, els, onChange);
-      });
-    }
+    btn.querySelector("[data-col-rename]")?.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      closeAllCollectionMenus();
+      const next = prompt(t(L, "renameCollectionPrompt"), c.name || "");
+      if (!next) return;
+      const name = String(next).trim();
+      if (!name) return;
+      await activeActions?.onRenameCollection?.(c.id, name);
+    });
 
-    const del = btn.querySelector("[data-col-del]");
-    if (del) {
-      del.addEventListener("click", (e) => {
-        e.stopPropagation();
-        closeAllCollectionMenus();
-        if (!confirm(t(L, "deleteCollectionConfirm"))) return;
-        state.collections = state.collections.filter((x) => x.id !== c.id);
-        for (const item of state.items) {
-          item.collectionIds = (item.collectionIds || []).filter((x) => x !== c.id);
-        }
-        if (state.activeCollectionId === c.id) state.activeCollectionId = "all";
-        onChange?.();
-        render(state, els, onChange);
-      });
-    }
+    btn.querySelector("[data-col-del]")?.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      closeAllCollectionMenus();
+      if (!confirm(t(L, "deleteCollectionConfirm"))) return;
+      await activeActions?.onDeleteCollection?.(c.id);
+    });
 
     els.collectionsList.appendChild(btn);
+  }
+}
+
+function renderSavedFilters(state, els, onChange, actions, L) {
+  if (!els.savedFiltersList) return;
+  els.savedFiltersList.innerHTML = "";
+
+  for (const f of state.savedFilters || []) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "collection" + (state.activeSavedFilterId === f.id ? " collection--active" : "");
+    btn.innerHTML = `
+      <div class="collection__left">
+        <div class="dot"></div>
+        <div class="collection__name"><div>${escapeHtml(f.name)}</div></div>
+      </div>
+      <div class="collection__right">
+        <div class="collection__menu">
+          <button class="collection__menu-trigger" type="button" data-filter-menu="1"><span class="collection__menu-dots">&#8943;</span></button>
+          <div class="collection__menu-pop" data-filter-pop hidden>
+            <button class="collection__menu-item collection__menu-item--danger" type="button" data-filter-del="1">${escapeHtml(t(L, "del"))}</button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    btn.addEventListener("click", () => {
+      state.activeSavedFilterId = f.id;
+      state.activeCollectionId = "all";
+      const filter = f.filter || {};
+      state.filters.types = Array.isArray(filter.types) ? [...filter.types] : [];
+      state.filters.sources = Array.isArray(filter.sources) ? [...filter.sources] : [];
+      state.filters.tag = String(filter.tag || "");
+      state.filters.favoriteOnly = !!filter.favoriteOnly;
+      state.search = String(filter.search || "");
+      state.sortBy = String(filter.sortBy || state.sortBy || "newest");
+      syncFilterInputs(state, els);
+      if (els.searchInput) els.searchInput.value = state.search;
+      if (els.sortSelect) els.sortSelect.value = state.sortBy;
+      onChange?.();
+      render(state, els, onChange, actions);
+    });
+
+    const trigger = btn.querySelector("[data-filter-menu]");
+    const pop = btn.querySelector("[data-filter-pop]");
+    if (trigger && pop) {
+      trigger.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const wasHidden = pop.hidden;
+        closeAllCollectionMenus();
+        pop.hidden = !wasHidden;
+      });
+    }
+
+    btn.querySelector("[data-filter-del]")?.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      closeAllCollectionMenus();
+      if (!confirm(t(L, "deleteLinkText"))) return;
+      await actions?.onDeleteSavedFilter?.(f.id);
+    });
+
+    els.savedFiltersList.appendChild(btn);
   }
 }
 
 function renderHeader(state, els, L) {
   const active = getActiveCollection(state);
   const list = filteredItems(state);
+
+  if (state.activeSavedFilterId) {
+    const sf = (state.savedFilters || []).find((x) => x.id === state.activeSavedFilterId);
+    els.activeTitle.textContent = sf ? sf.name : t(L, "all");
+    els.activeMeta.textContent = `${list.length} ${t(L, "items")}`;
+    return;
+  }
 
   if (!active || active.id === "all") {
     els.activeTitle.textContent = t(L, "all");
@@ -168,8 +202,7 @@ function renderHeader(state, els, L) {
   }
 
   els.activeTitle.textContent = `${t(L, "collectionSingle")}: ${active.name}`;
-  const mode = active.kind === "smart" ? t(L, "contextSmart") : t(L, "contextManual");
-  els.activeMeta.textContent = `${list.length} ${t(L, "items")} • ${mode}`;
+  els.activeMeta.textContent = `${list.length} ${t(L, "items")} | ${t(L, "contextManual")}`;
 }
 
 function renderActiveFilters(state, els, onChange, L) {
@@ -179,12 +212,8 @@ function renderActiveFilters(state, els, onChange, L) {
   const chipsBar = bar.closest(".chipsbar");
 
   const chips = [];
-  for (const type of state.filters.types || []) {
-    chips.push({ key: "type", value: type, label: `${t(L, "chipType")}: ${displayOptionLabel(type, "type", L)}` });
-  }
-  for (const src of state.filters.sources || []) {
-    chips.push({ key: "source", value: src, label: `${t(L, "chipSource")}: ${displayOptionLabel(src, "source", L)}` });
-  }
+  for (const type of state.filters.types || []) chips.push({ key: "type", value: type, label: `${t(L, "chipType")}: ${displayOptionLabel(type, "type", L)}` });
+  for (const src of state.filters.sources || []) chips.push({ key: "source", value: src, label: `${t(L, "chipSource")}: ${displayOptionLabel(src, "source", L)}` });
   if (state.filters.tag) chips.push({ key: "tag", value: state.filters.tag, label: `${t(L, "chipTag")}: ${state.filters.tag}` });
   if (state.filters.favoriteOnly) chips.push({ key: "fav", value: "1", label: t(L, "chipFav") });
 
@@ -192,19 +221,18 @@ function renderActiveFilters(state, els, onChange, L) {
     if (chipsBar) chipsBar.hidden = true;
     return;
   }
-
   if (chipsBar) chipsBar.hidden = false;
 
   for (const c of chips) {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "chip chip--on";
-    btn.textContent = `${c.label} ×`;
+    btn.textContent = `${c.label} x`;
     btn.addEventListener("click", () => {
       removeFilter(state, c);
       syncFilterInputs(state, els);
       onChange?.();
-      render(state, els, onChange);
+      render(state, els, onChange, activeActions);
     });
     bar.appendChild(btn);
   }
@@ -213,13 +241,13 @@ function renderActiveFilters(state, els, onChange, L) {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "chip chip--on";
-    btn.textContent = `Search: ${state.search} ×`;
+    btn.textContent = `Search: ${state.search} x`;
     btn.addEventListener("click", () => {
       state.search = "";
       if (els.searchInput) els.searchInput.value = "";
       syncFilterInputs(state, els);
       onChange?.();
-      render(state, els, onChange);
+      render(state, els, onChange, activeActions);
     });
     bar.appendChild(btn);
   }
@@ -234,13 +262,12 @@ function renderActiveFilters(state, els, onChange, L) {
     if (els.searchInput) els.searchInput.value = "";
     syncFilterInputs(state, els);
     onChange?.();
-    render(state, els, onChange);
+    render(state, els, onChange, activeActions);
   });
   bar.appendChild(clear);
 }
 
 function renderGrid(state, els, onChange, actions, L) {
-  ensureCardMenuOutsideClose();
   const list = filteredItems(state);
   els.grid.innerHTML = "";
   els.grid.classList.toggle("grid--empty", !list.length);
@@ -251,35 +278,13 @@ function renderGrid(state, els, onChange, actions, L) {
     empty.className = "empty";
 
     if (!active || active.id === "all") {
-      empty.innerHTML = `
-        <div class="empty__title">${escapeHtml(t(L, "emptyAllTitle"))}</div>
-        <div class="empty__text">${escapeHtml(t(L, "emptyAllText"))}</div>
-        <div class="empty__actions"><button class="btn btn--primary" type="button" data-add-link="1">${escapeHtml(t(L, "quickAdd"))}</button></div>
-      `;
+      empty.innerHTML = `<div class="empty__title">${escapeHtml(t(L, "emptyAllTitle"))}</div><div class="empty__text">${escapeHtml(t(L, "emptyAllText"))}</div><div class="empty__actions"><button class="btn btn--primary" type="button" data-add-link="1">${escapeHtml(t(L, "quickAdd"))}</button></div>`;
     } else if (active.id === "fav") {
-      empty.innerHTML = `
-        <div class="empty__title">${escapeHtml(t(L, "emptyFavTitle"))}</div>
-        <div class="empty__text">${escapeHtml(t(L, "emptyFavText"))}</div>
-        <div class="empty__actions"><button class="btn btn--primary" type="button" data-add-link="1">${escapeHtml(t(L, "quickAdd"))}</button></div>
-      `;
+      empty.innerHTML = `<div class="empty__title">${escapeHtml(t(L, "emptyFavTitle"))}</div><div class="empty__text">${escapeHtml(t(L, "emptyFavText"))}</div><div class="empty__actions"><button class="btn btn--primary" type="button" data-add-link="1">${escapeHtml(t(L, "quickAdd"))}</button></div>`;
     } else if (active.id === "recent") {
-      empty.innerHTML = `
-        <div class="empty__title">${escapeHtml(t(L, "emptyRecentTitle"))}</div>
-        <div class="empty__text">${escapeHtml(t(L, "emptyRecentText"))}</div>
-      `;
-    } else if (active.kind === "smart") {
-      empty.innerHTML = `
-        <div class="empty__title">${escapeHtml(t(L, "emptyCollectionTitle"))}</div>
-        <div class="empty__text">${escapeHtml(t(L, "emptySmartText"))}</div>
-      `;
+      empty.innerHTML = `<div class="empty__title">${escapeHtml(t(L, "emptyRecentTitle"))}</div><div class="empty__text">${escapeHtml(t(L, "emptyRecentText"))}</div>`;
     } else {
-      empty.innerHTML = `
-        <div class="empty__title">${escapeHtml(t(L, "emptyCollectionTitle"))}</div>
-        <div class="empty__text">${escapeHtml(t(L, "emptyCollectionText"))}</div>
-        <div class="empty__actions">
-          <button class="btn btn--primary" type="button" data-add-link="1">${escapeHtml(t(L, "quickAdd"))}</button>
-        </div>
-      `;
+      empty.innerHTML = `<div class="empty__title">${escapeHtml(t(L, "emptyCollectionTitle"))}</div><div class="empty__text">${escapeHtml(t(L, "emptyCollectionText"))}</div><div class="empty__actions"><button class="btn btn--primary" type="button" data-add-link="1">${escapeHtml(t(L, "quickAdd"))}</button></div>`;
     }
 
     wireQuickAdd(empty);
@@ -287,7 +292,8 @@ function renderGrid(state, els, onChange, actions, L) {
     return;
   }
 
-  list.forEach((item, index) => {
+  for (let index = 0; index < list.length; index += 1) {
+    const item = list[index];
     const card = document.createElement("div");
     card.className = "card";
     card.style.setProperty("--stagger", `${Math.min(index, 14) * 20}ms`);
@@ -300,78 +306,52 @@ function renderGrid(state, els, onChange, actions, L) {
     const previewSrc = item.previewImage || previewFallbackUrl(item.url);
     const noteText = String(item.note || "").trim();
     const hasNote = !!noteText;
-    const noteNeedsExpand = noteText.length > 90 || /\r?\n/.test(noteText);
+    const noteNeedsExpand = hasNote && (noteText.length > 90 || /\r?\n/.test(noteText));
+    const notePreview = hasNote ? noteText : t(L, "noteEmpty");
 
     card.innerHTML = `
-      ${previewSrc ? `
-      <a class="card__preview-wrap" href="${item.url}" target="_blank" rel="noreferrer">
-        <img class="card__preview" src="${escapeHtml(previewSrc)}" data-fallback="${escapeHtml(previewFallbackUrl(item.url))}" alt="${escapeHtml(item.title || "preview")}" loading="lazy" referrerpolicy="no-referrer" />
-      </a>` : ""}
+      <div class="card__preview-wrap">
+        <a class="card__preview-link" href="${item.url}" target="_blank" rel="noreferrer">
+          <img class="card__preview" src="${escapeHtml(previewSrc)}" data-fallback="${escapeHtml(previewFallbackUrl(item.url))}" alt="${escapeHtml(item.title || "preview")}" loading="lazy" referrerpolicy="no-referrer" />
+        </a>
+        <button class="card__fav-preview ${item.favorite ? "card__fav-preview--on" : ""}" type="button" title="${escapeHtml(t(L, "favorites"))}">&#10084;</button>
+      </div>
 
       <div class="card__top">
         <div class="card__left">
           ${icon ? `<img class="favicon" src="${icon}" alt="">` : `<div class="favicon"></div>`}
           <div>
             <a class="card__title-link" href="${item.url}" target="_blank" rel="noreferrer">${escapeHtml(item.title || domain || "Untitled")}</a>
-            <div class="card__meta">${escapeHtml(domain)} • ${escapeHtml(displayOptionLabel(item.type, "type", L))} • ${escapeHtml(displayOptionLabel(item.source, "source", L))}</div>
+            <div class="card__meta">${escapeHtml(domain)} | ${escapeHtml(displayOptionLabel(item.type, "type", L))} | ${escapeHtml(displayOptionLabel(item.source, "source", L))}</div>
           </div>
         </div>
         <div class="card__tools">
-          <button class="fav ${item.favorite ? "fav--on" : ""}" type="button" title="${escapeHtml(t(L, "favorites"))}">&#9733;</button>
-          <div class="card__menu">
-            <button class="card__menu-trigger" type="button" data-card-menu="1" aria-label="Actions"><span class="collection__menu-dots">&#8943;</span></button>
-            <div class="card__menu-pop" data-card-pop hidden>
-              <button class="card__menu-item" type="button" data-edit="1">${escapeHtml(t(L, "edit"))}</button>
-              <button class="card__menu-item card__menu-item--danger" type="button" data-del="1">${escapeHtml(t(L, "del"))}</button>
-            </div>
-          </div>
+          <button class="card__delete" type="button" data-del="1" aria-label="${escapeHtml(t(L, "del"))}" title="${escapeHtml(t(L, "del"))}">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h16"/><path d="M9 7V5h6v2"/><path d="M8 7l1 12h6l1-12"/><path d="M10 10v7"/><path d="M14 10v7"/></svg>
+          </button>
         </div>
       </div>
 
-      ${hasNote ? `
       <div class="card__note-wrap">
-        <div class="card__note">${escapeHtml(noteText)}</div>
+        <div class="card__note ${hasNote ? "" : "card__note--empty"}">${escapeHtml(notePreview)}</div>
         ${noteNeedsExpand ? `<button class="card__note-more" type="button" data-note-expand="1">${escapeHtml(t(L, "expandNote"))}</button>` : ""}
-      </div>` : ""}
+      </div>
       <div class="tags">${tags.map((tg, i) => `<span class="tag ${i === 0 ? "tag--accent" : ""}"><span class="tag__text">${escapeHtml(tg)}</span></span>`).join("")}</div>
     `;
 
-    card.querySelector(".fav")?.addEventListener("click", () => {
-      item.favorite = !item.favorite;
-      item.updatedAt = Date.now();
-      onChange?.();
-      render(state, els, onChange);
-    });
-
-    const menuTrigger = card.querySelector("[data-card-menu]");
-    const menuPop = card.querySelector("[data-card-pop]");
-    if (menuTrigger && menuPop) {
-      menuTrigger.addEventListener("click", (e) => {
-        e.stopPropagation();
-        const wasHidden = menuPop.hidden;
-        closeAllCardMenus();
-        card.classList.remove("card--menu-open");
-        menuPop.hidden = !wasHidden;
-        if (!menuPop.hidden) card.classList.add("card--menu-open");
-      });
-    }
-
-    card.querySelector("[data-edit]")?.addEventListener("click", (e) => {
+    card.querySelector(".card__fav-preview")?.addEventListener("click", async (e) => {
+      e.preventDefault();
       e.stopPropagation();
-      closeAllCardMenus();
-      actions?.onEditItem?.(item.id);
+      await actions?.onToggleFavorite?.(item.id, !item.favorite);
     });
 
-    card.querySelector("[data-del]")?.addEventListener("click", () => {
-      closeAllCardMenus();
-      state.items = state.items.filter((x) => x.id !== item.id);
-      onChange?.();
-      render(state, els, onChange);
+    card.querySelector("[data-del]")?.addEventListener("click", async () => {
+      const confirmed = await confirmDelete(els, L);
+      if (!confirmed) return;
+      await actions?.onDeleteItem?.(item.id);
     });
 
-    card.querySelector("[data-note-expand]")?.addEventListener("click", () => {
-      alert(noteText);
-    });
+    card.querySelector("[data-note-expand]")?.addEventListener("click", () => alert(noteText));
 
     const previewEl = card.querySelector(".card__preview");
     if (previewEl) {
@@ -399,22 +379,17 @@ function renderGrid(state, els, onChange, actions, L) {
 
     card.querySelectorAll('a[target="_blank"]').forEach((link) => {
       link.draggable = false;
-      link.addEventListener("click", () => {
-        actions?.onOpenItem?.(item.id);
-      });
+      link.addEventListener("click", () => actions?.onOpenItem?.(item.id));
     });
 
     els.grid.appendChild(card);
-  });
+  }
 
   const addCard = document.createElement("button");
   addCard.type = "button";
   addCard.className = "card card--add";
   addCard.style.setProperty("--stagger", `${Math.min(list.length, 14) * 20}ms`);
-  addCard.innerHTML = `
-    <span class="card__add-plus">+</span>
-    <span class="card__add-text">${escapeHtml(t(L, "quickAddHint"))}</span>
-  `;
+  addCard.innerHTML = `<span class="card__add-plus">+</span><span class="card__add-text">${escapeHtml(t(L, "quickAddHint"))}</span>`;
   addCard.addEventListener("click", openAddModal);
   els.grid.appendChild(addCard);
 }
@@ -433,10 +408,7 @@ function filteredItems(state) {
     }))
     .filter((item) => matchesSearch(item, state.search));
 
-  if (active?.id === "recent") {
-    return list.sort((a, b) => (recentOrder.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (recentOrder.get(b.id) ?? Number.MAX_SAFE_INTEGER));
-  }
-
+  if (active?.id === "recent") return list.sort((a, b) => (recentOrder.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (recentOrder.get(b.id) ?? Number.MAX_SAFE_INTEGER));
   return list.sort((a, b) => compareItems(a, b, state.sortBy || "newest"));
 }
 
@@ -461,7 +433,6 @@ function itemInActiveContext(item, active) {
 function itemInCollectionView(item, collection) {
   if (!collection || collection.id === "all") return true;
   if (collection.id === "fav") return !!item.favorite;
-  if (collection.kind === "smart") return matchesLink(item, collection.rules || {});
   return Array.isArray(item.collectionIds) && item.collectionIds.includes(collection.id);
 }
 
@@ -475,21 +446,16 @@ function matchesSearch(item, search) {
 function compareItems(a, b, sortBy) {
   const titleA = String(a.title || a.url || "").toLowerCase();
   const titleB = String(b.title || b.url || "").toLowerCase();
-  const sourceA = String(a.source || "Other").toLowerCase();
-  const sourceB = String(b.source || "Other").toLowerCase();
+  const sourceA = String(a.source || "other").toLowerCase();
+  const sourceB = String(b.source || "other").toLowerCase();
 
   switch (sortBy) {
-    case "oldest":
-      return (a.createdAt || 0) - (b.createdAt || 0);
-    case "title_asc":
-      return titleA.localeCompare(titleB, "ru");
-    case "title_desc":
-      return titleB.localeCompare(titleA, "ru");
-    case "source_asc":
-      return sourceA.localeCompare(sourceB, "ru") || titleA.localeCompare(titleB, "ru");
+    case "oldest": return (a.createdAt || 0) - (b.createdAt || 0);
+    case "title_asc": return titleA.localeCompare(titleB, "ru");
+    case "title_desc": return titleB.localeCompare(titleA, "ru");
+    case "source_asc": return sourceA.localeCompare(sourceB, "ru") || titleA.localeCompare(titleB, "ru");
     case "newest":
-    default:
-      return (b.createdAt || 0) - (a.createdAt || 0);
+    default: return (b.createdAt || 0) - (a.createdAt || 0);
   }
 }
 
@@ -512,7 +478,6 @@ function syncFilterInputs(state, els) {
   els.filterTypes?.querySelectorAll('input[name="filterType"]').forEach((input) => {
     input.checked = selectedTypes.has(input.value);
   });
-
   els.filterSources?.querySelectorAll('input[name="filterSource"]').forEach((input) => {
     input.checked = selectedSources.has(input.value);
   });
@@ -535,16 +500,13 @@ function openAddModal() {
 }
 
 function wireQuickAdd(root) {
-  root.querySelectorAll("[data-add-link]").forEach((el) => {
-    el.addEventListener("click", openAddModal);
-  });
+  root.querySelectorAll("[data-add-link]").forEach((el) => el.addEventListener("click", openAddModal));
 }
 
 let collectionMenuOutsideBound = false;
-let cardMenuOutsideBound = false;
 
 function closeAllCollectionMenus() {
-  document.querySelectorAll("[data-col-pop]").forEach((el) => {
+  document.querySelectorAll("[data-col-pop], [data-filter-pop]").forEach((el) => {
     el.hidden = true;
   });
 }
@@ -563,26 +525,40 @@ function ensureCollectionMenuOutsideClose() {
   });
 }
 
-function closeAllCardMenus() {
-  document.querySelectorAll("[data-card-pop]").forEach((el) => {
-    el.hidden = true;
-  });
-  document.querySelectorAll(".card--menu-open").forEach((el) => {
-    el.classList.remove("card--menu-open");
+function confirmDelete(els, L) {
+  const dialog = els.modalDeleteLink;
+  if (!dialog || !els.deleteCancel || !els.deleteConfirm) return Promise.resolve(confirm(t(L, "deleteLinkText")));
+
+  return new Promise((resolve) => {
+    const cleanup = () => {
+      els.deleteCancel.removeEventListener("click", onCancel);
+      els.deleteConfirm.removeEventListener("click", onConfirm);
+      dialog.removeEventListener("cancel", onCancel);
+      dialog.removeEventListener("close", onClose);
+    };
+
+    const onCancel = (e) => {
+      if (e) e.preventDefault();
+      cleanup();
+      dialog.close();
+      resolve(false);
+    };
+
+    const onConfirm = () => {
+      cleanup();
+      dialog.close();
+      resolve(true);
+    };
+
+    const onClose = () => {
+      cleanup();
+      resolve(false);
+    };
+
+    els.deleteCancel.addEventListener("click", onCancel);
+    els.deleteConfirm.addEventListener("click", onConfirm);
+    dialog.addEventListener("cancel", onCancel);
+    dialog.addEventListener("close", onClose, { once: true });
+    dialog.showModal();
   });
 }
-
-function ensureCardMenuOutsideClose() {
-  if (cardMenuOutsideBound) return;
-  cardMenuOutsideBound = true;
-
-  document.addEventListener("click", (e) => {
-    if (e.target.closest(".card__menu")) return;
-    closeAllCardMenus();
-  });
-
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") closeAllCardMenus();
-  });
-}
-

@@ -1,51 +1,42 @@
 import { normalizeSearchText, normalizeTags } from "./filter.js";
-import { loadCloudState, saveCloudState, isSupabaseConfigured } from "./supabase.js";
 
-const KEY_V4 = "resource_vault_v4";
-const LEGACY_KEYS = ["resource_vault_v3", "resource_vault_v2", "resource_vault_v1"];
+const UI_SETTINGS_KEY = "resource_vault_ui_v1";
 
-const TYPE_VALUES = ["Project", "Studio", "Designer", "Inspiration", "Source"];
-const SOURCE_VALUES = ["Site", "Behance", "Awwwards", "Pinterest", "Dribbble", "Other"];
+const LEGACY_KEYS = ["resource_vault_v4", "resource_vault_v3", "resource_vault_v2", "resource_vault_v1"];
+const TYPE_VALUES = ["case", "inspiration", "article", "tool", "asset"];
+const SOURCE_VALUES = ["site", "behance", "awwwards", "pinterest", "dribbble", "other"];
 
-export function load() {
+export function loadUiSettings() {
   try {
-    const raw4 = localStorage.getItem(KEY_V4);
-    if (raw4) return JSON.parse(raw4);
-  } catch {}
+    const raw = localStorage.getItem(UI_SETTINGS_KEY);
+    if (!raw) return { lang: "ru", sortBy: "newest" };
+    const parsed = JSON.parse(raw);
+    return {
+      lang: parsed?.lang === "en" ? "en" : "ru",
+      sortBy: typeof parsed?.sortBy === "string" ? parsed.sortBy : "newest"
+    };
+  } catch {
+    return { lang: "ru", sortBy: "newest" };
+  }
+}
 
+export function saveUiSettings(settings) {
+  const payload = {
+    lang: settings?.lang === "en" ? "en" : "ru",
+    sortBy: typeof settings?.sortBy === "string" ? settings.sortBy : "newest"
+  };
+  localStorage.setItem(UI_SETTINGS_KEY, JSON.stringify(payload));
+}
+
+export function loadLegacyVault() {
   for (const key of LEGACY_KEYS) {
     try {
       const raw = localStorage.getItem(key);
       if (!raw) continue;
-      const migrated = migrateToV4(JSON.parse(raw));
-      localStorage.setItem(KEY_V4, JSON.stringify(migrated));
-      return migrated;
+      return migrateToV4(JSON.parse(raw));
     } catch {}
   }
-
   return null;
-}
-
-export function save(data) {
-  const payload = { version: 4, ...data };
-  localStorage.setItem(KEY_V4, JSON.stringify(payload));
-
-  if (isSupabaseConfigured()) {
-    void saveCloudState(payload).catch((err) => {
-      console.warn("Supabase save skipped:", err?.message || err);
-    });
-  }
-}
-
-export async function loadFromCloud() {
-  if (!isSupabaseConfigured()) return null;
-
-  try {
-    return await loadCloudState();
-  } catch (err) {
-    console.warn("Supabase load skipped:", err?.message || err);
-    return null;
-  }
 }
 
 export function migrateToV4(raw) {
@@ -78,7 +69,8 @@ export function migrateToV4(raw) {
     sortBy: typeof raw?.sortBy === "string" ? raw.sortBy : "newest",
     recentViewedIds: normalizeRecent(raw?.recentViewedIds ?? raw?.viewHistory ?? []),
     items,
-    collections
+    collections,
+    savedFilters: []
   };
 }
 
@@ -91,17 +83,11 @@ function normalizeCollection(col) {
   const createdAt = toTimestamp(col?.createdAt);
   const updatedAt = toTimestamp(col?.updatedAt ?? col?.createdAt);
 
-  const rules = normalizeRules(col?.rules);
-  const legacyRulesEnabled = !!(col?.rulesEnabled ?? col?.mode === "smart" ?? false);
-  const hasRules = hasRuleCriteria(rules);
-  const kind = String(col?.kind || "").toLowerCase() === "smart" || legacyRulesEnabled || hasRules ? "smart" : "manual";
-
   return {
     id,
     name,
     description,
-    kind,
-    rules: kind === "smart" ? rules : undefined,
+    kind: "manual",
     createdAt,
     updatedAt
   };
@@ -135,59 +121,36 @@ function normalizeLink(item, validCollectionIds) {
   };
 }
 
-function normalizeRules(rules) {
-  return {
-    types: normalizeRuleList(rules?.types, normalizeType),
-    sources: normalizeRuleList(rules?.sources, normalizeSource),
-    requiredTags: normalizeTags(rules?.requiredTags ?? rules?.tagsAll ?? rules?.allTags ?? []),
-    anyTags: normalizeTags(rules?.anyTags ?? rules?.tagsAny ?? []),
-    containsText: normalizeSearchText(rules?.containsText ?? rules?.textContains ?? rules?.query ?? ""),
-    onlyFavorites: !!(rules?.onlyFavorites ?? rules?.onlyFavorite ?? rules?.favoriteOnly)
-  };
-}
-
-function normalizeRuleList(input, mapper) {
-  if (!Array.isArray(input)) return [];
-  return [...new Set(input.map(mapper).filter(Boolean))];
-}
-
-function hasRuleCriteria(rules) {
-  return Boolean(
-    rules.onlyFavorites ||
-    rules.containsText ||
-    rules.types.length ||
-    rules.sources.length ||
-    rules.requiredTags.length ||
-    rules.anyTags.length
-  );
-}
-
 function normalizeType(value) {
   const map = {
-    project: "Project",
-    studio: "Studio",
-    designer: "Designer",
-    inspiration: "Inspiration",
-    source: "Source"
+    project: "case",
+    studio: "case",
+    designer: "case",
+    inspiration: "inspiration",
+    source: "case",
+    case: "case",
+    article: "article",
+    tool: "tool",
+    asset: "asset"
   };
 
   if (value == null || value === "") return null;
-  const normalized = map[String(value).trim().toLowerCase()] || String(value).trim();
+  const normalized = map[String(value).trim().toLowerCase()] || String(value).trim().toLowerCase();
   return TYPE_VALUES.includes(normalized) ? normalized : null;
 }
 
 function normalizeSource(value) {
   const map = {
-    site: "Site",
-    behance: "Behance",
-    awwwards: "Awwwards",
-    pinterest: "Pinterest",
-    dribbble: "Dribbble",
-    other: "Other"
+    site: "site",
+    behance: "behance",
+    awwwards: "awwwards",
+    pinterest: "pinterest",
+    dribbble: "dribbble",
+    other: "other"
   };
 
   if (value == null || value === "") return null;
-  const normalized = map[String(value).trim().toLowerCase()] || String(value).trim();
+  const normalized = map[String(value).trim().toLowerCase()] || String(value).trim().toLowerCase();
   return SOURCE_VALUES.includes(normalized) ? normalized : null;
 }
 
@@ -200,3 +163,5 @@ function normalizeRecent(input) {
   if (!Array.isArray(input)) return [];
   return [...new Set(input.map((x) => String(x || "").trim()).filter(Boolean))].slice(0, 100);
 }
+
+export { normalizeSearchText };

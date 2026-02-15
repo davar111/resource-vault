@@ -25,7 +25,7 @@ test("migrateToV4 converts single collectionId into collectionIds array", () => 
   assert.deepEqual(migrated.items[0].tags, ["design"]);
 });
 
-test("migrateToV4 marks collections as smart only when rules are present", () => {
+test("migrateToV4 converts legacy collections to manual folders", () => {
   const raw = {
     version: 3,
     items: [],
@@ -41,6 +41,6 @@ test("migrateToV4 marks collections as smart only when rules are present", () =>
 
   assert.equal(c1.kind, "manual");
   assert.equal(c1.rules, undefined);
-  assert.equal(c2.kind, "smart");
-  assert.deepEqual(c2.rules.requiredTags, ["fintech"]);
+  assert.equal(c2.kind, "manual");
+  assert.equal(c2.rules, undefined);
 });

@@ -1,6 +1,7 @@
-﻿export const state = {
+export const state = {
   lang: "ru",
   activeCollectionId: "all",
+  activeSavedFilterId: null,
   sortBy: "newest",
   search: "",
   filters: {
@@ -14,7 +15,8 @@
   },
   recentViewedIds: [],
   items: [],
-  collections: []
+  collections: [],
+  savedFilters: []
 };
 
 export function uid(prefix = "id") {

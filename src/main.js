@@ -1,43 +1,36 @@
 import "./styles.css";
-import { state, uid } from "./state.js";
-import { load, save, migrateToV4, loadFromCloud } from "./storage.js";
-import {
-  normalizeTags,
-  TAG_MAX_LEN,
-  TAG_MIN_LEN,
-  normalizeSearchText,
-  detectSource,
-  domainFromUrl,
-  tryFetchTitle,
-  tryFetchPreview,
-  previewFallbackUrl
-} from "./filter.js";
-import { render } from "./ui.js";
+import { state } from "./state.js";
+import { loadLegacyVault, loadUiSettings, saveUiSettings } from "./storage.js";
+import { TAG_MAX_LEN, TAG_MIN_LEN, detectSourceFromUrl, domainFromUrl, normalizeSearchText, normalizeTags, previewFallbackUrl } from "./filter.js";
 import { t } from "./i18n.js";
-import { completeAuthFromUrl, getCurrentUser, signInWithGoogle, signOut } from "./supabase.js";
+import { render } from "./ui.js";
+import { SOURCE_CODES, TYPE_CODES } from "./domain.js";
+import { initAuth, loginWithGoogle, logout } from "./useAuth.js";
+import { createLink, deleteLink, listLinks, updateLink } from "./useLinks.js";
+import { createCollection, deleteCollection, listCollections, listLinkCollections, replaceLinkCollections, updateCollection } from "./useCollections.js";
+import { createSavedFilter, deleteSavedFilter, listSavedFilters } from "./useSavedFilters.js";
 
-const TYPE_OPTIONS = ["Project", "Studio", "Designer", "Inspiration", "Source"];
-const SOURCE_OPTIONS = ["Site", "Behance", "Awwwards", "Pinterest", "Dribbble", "Other"];
 const TITLE_MIN_LEN = 2;
 const TITLE_MAX_LEN = 120;
 const NOTE_MAX_LEN = 500;
+const FILTER_SORTS = new Set(["newest", "oldest", "title_asc", "title_desc", "source_asc"]);
 
 const els = {
   langRu: document.getElementById("langRu"),
   langEn: document.getElementById("langEn"),
   brand: document.getElementById("brand"),
-
   navAll: document.getElementById("navAll"),
   navFav: document.getElementById("navFav"),
   navRecent: document.getElementById("navRecent"),
   labelNav: document.getElementById("labelNav"),
   labelCollections: document.getElementById("labelCollections"),
+  labelSavedFilters: document.getElementById("labelSavedFilters"),
   collectionsList: document.getElementById("collectionsList"),
+  savedFiltersList: document.getElementById("savedFiltersList"),
   sidebar: document.getElementById("sidebar"),
   btnMobileMenu: document.getElementById("btnMobileMenu"),
   btnMobileClose: document.getElementById("btnMobileClose"),
   mobileOverlay: document.getElementById("mobileOverlay"),
-
   activeTitle: document.getElementById("activeTitle"),
   activeMeta: document.getElementById("activeMeta"),
   searchInput: document.getElementById("searchInput"),
@@ -45,7 +38,6 @@ const els = {
   btnFilters: document.getElementById("btnFilters"),
   filtersPanel: document.getElementById("filtersPanel"),
   activeFilters: document.getElementById("activeFilters"),
-
   filterTypes: document.getElementById("filterTypes"),
   filterSources: document.getElementById("filterSources"),
   filterTagInput: document.getElementById("filterTagInput"),
@@ -54,12 +46,10 @@ const els = {
   labelFilterSources: document.getElementById("labelFilterSources"),
   labelFilterTag: document.getElementById("labelFilterTag"),
   labelFilterFavorite: document.getElementById("labelFilterFavorite"),
-
   grid: document.getElementById("grid"),
-
   btnAddLink: document.getElementById("btnAddLink"),
   btnNewCollection: document.getElementById("btnNewCollection"),
-
+  btnSaveFilter: document.getElementById("btnSaveFilter"),
   btnSettings: document.getElementById("btnSettings"),
   settingsMenu: document.getElementById("settingsMenu"),
   btnExport: document.getElementById("btnExport"),
@@ -69,7 +59,6 @@ const els = {
   authStatus: document.getElementById("authStatus"),
   fileImport: document.getElementById("fileImport"),
   localHint: document.getElementById("localHint"),
-
   modalAddLink: document.getElementById("modalAddLink"),
   formAddLink: document.getElementById("formAddLink"),
   addCloseX: document.getElementById("addCloseX"),
@@ -84,17 +73,14 @@ const els = {
   labelAddNote: document.getElementById("labelAddNote"),
   labelAddTo: document.getElementById("labelAddTo"),
   labelAddFavorite: document.getElementById("labelAddFavorite"),
-  sectionAddClassify: document.getElementById("sectionAddClassify"),
-  inputAddTitle: document.getElementById("inputAddTitle"),
   inputAddUrl: document.querySelector('#formAddLink input[name="url"]'),
+  inputAddTitle: document.getElementById("inputAddTitle"),
   inputAddTags: document.getElementById("inputAddTags"),
   inputAddNote: document.getElementById("inputAddNote"),
   inputAddSource: document.getElementById("inputAddSource"),
-  addSourceField: document.getElementById("addSourceField"),
-  addCollectionsList: document.getElementById("addCollectionsList"),
   addFavorite: document.getElementById("addFavorite"),
+  addCollectionsList: document.getElementById("addCollectionsList"),
   addTagsMenu: document.getElementById("addTagsMenu"),
-
   modalCollection: document.getElementById("modalCollection"),
   formCollection: document.getElementById("formCollection"),
   colCloseX: document.getElementById("colCloseX"),
@@ -103,160 +89,80 @@ const els = {
   modalCollectionTitle: document.getElementById("modalCollectionTitle"),
   labelColName: document.getElementById("labelColName"),
   labelColDescription: document.getElementById("labelColDescription"),
-  labelCollectionKind: document.getElementById("labelCollectionKind"),
-  labelKindManual: document.getElementById("labelKindManual"),
-  labelKindSmart: document.getElementById("labelKindSmart"),
-  smartHint: document.getElementById("smartHint"),
-  sectionColRules: document.getElementById("sectionColRules"),
-  labelColTypes: document.getElementById("labelColTypes"),
-  labelColSources: document.getElementById("labelColSources"),
-  labelColAllTags: document.getElementById("labelColAllTags"),
-  labelColAnyTags: document.getElementById("labelColAnyTags"),
-  labelColQuery: document.getElementById("labelColQuery"),
-  labelColFavOnly: document.getElementById("labelColFavOnly"),
-  kindManual: document.getElementById("kindManual"),
-  kindSmart: document.getElementById("kindSmart"),
-  collectionRules: document.getElementById("collectionRules"),
-  colTypesChips: document.getElementById("colTypesChips"),
-  colSourcesChips: document.getElementById("colSourcesChips")
+  modalDeleteLink: document.getElementById("modalDeleteLink"),
+  modalDeleteTitle: document.getElementById("modalDeleteTitle"),
+  modalDeleteText: document.getElementById("modalDeleteText"),
+  deleteCancel: document.getElementById("deleteCancel"),
+  deleteConfirm: document.getElementById("deleteConfirm")
 };
 
-let editingItemId = null;
+let currentUser = null;
 let knownTags = [];
 let activeTagMenuIndex = -1;
-let currentUser = null;
+let sourceAutofillEnabled = true;
 
-function hasVaultData(data) {
-  return Boolean(Array.isArray(data?.items) && data.items.length) || Boolean(Array.isArray(data?.collections) && data.collections.length);
+function persistUiSettings() {
+  saveUiSettings({ lang: state.lang, sortBy: state.sortBy });
 }
 
-function toComparableTimestamp(value) {
-  const n = Number(value || 0);
-  return Number.isFinite(n) && n > 0 ? n : 0;
+function renderApp() {
+  persistUiSettings();
+  render(state, els, persistUiSettings, actions);
 }
 
-function mergeEntities(localList, cloudList) {
-  const byId = new Map();
-
-  const push = (entity, source) => {
-    const id = String(entity?.id || "").trim();
-    if (!id) return;
-
-    const next = { ...entity };
-    const prev = byId.get(id);
-    if (!prev) {
-      byId.set(id, next);
-      return;
-    }
-
-    const prevTs = toComparableTimestamp(prev.updatedAt || prev.createdAt);
-    const nextTs = toComparableTimestamp(next.updatedAt || next.createdAt);
-
-    if (nextTs > prevTs) byId.set(id, next);
-    if (nextTs === prevTs && source === "local") byId.set(id, next);
-  };
-
-  for (const entity of Array.isArray(cloudList) ? cloudList : []) push(entity, "cloud");
-  for (const entity of Array.isArray(localList) ? localList : []) push(entity, "local");
-
-  return [...byId.values()];
+function authEmail(user) {
+  return String(user?.email || user?.user_metadata?.email || "").trim();
 }
 
-function mergeVaultData(localRaw, cloudRaw) {
-  const local = migrateToV4(localRaw || {});
-  const cloud = migrateToV4(cloudRaw || {});
-  const cloudHasData = hasVaultData(cloud);
-
-  return {
-    version: 4,
-    lang: cloudHasData ? cloud.lang : local.lang,
-    sortBy: cloudHasData ? cloud.sortBy : local.sortBy,
-    items: mergeEntities(local.items, cloud.items),
-    collections: mergeEntities(local.collections, cloud.collections)
-  };
+function updateLangButtons() {
+  els.langRu?.classList.toggle("lang__btn--active", state.lang === "ru");
+  els.langEn?.classList.toggle("lang__btn--active", state.lang === "en");
 }
 
-function hasLocalChangesVsCloud(localRaw, cloudRaw) {
-  const local = migrateToV4(localRaw || {});
-  const cloud = migrateToV4(cloudRaw || {});
-
-  const check = (localList, cloudList) => {
-    const cloudById = new Map((Array.isArray(cloudList) ? cloudList : []).map((x) => [String(x?.id || ""), x]));
-
-    for (const localEntity of Array.isArray(localList) ? localList : []) {
-      const localId = String(localEntity?.id || "");
-      if (!localId) continue;
-
-      const cloudEntity = cloudById.get(localId);
-      if (!cloudEntity) return true;
-
-      const localTs = toComparableTimestamp(localEntity.updatedAt || localEntity.createdAt);
-      const cloudTs = toComparableTimestamp(cloudEntity.updatedAt || cloudEntity.createdAt);
-      if (localTs > cloudTs) return true;
-    }
-
-    return false;
-  };
-
-  return check(local.items, cloud.items) || check(local.collections, cloud.collections);
+function renderAuthStatus() {
+  const email = authEmail(currentUser);
+  if (els.btnAuthLabel) els.btnAuthLabel.textContent = email ? t(state.lang, "signOut") : t(state.lang, "signInGoogle");
+  if (els.authStatus) {
+    els.authStatus.textContent = email ? `${t(state.lang, "authSignedInAs")}: ${email}` : t(state.lang, "authSignedOut");
+  }
 }
 
-function persist() {
-  save({
-    items: state.items,
-    collections: state.collections,
-    recentViewedIds: state.recentViewedIds,
-    lang: state.lang,
-    sortBy: state.sortBy
+function optionKey(value) {
+  return String(value || "").toLowerCase();
+}
+
+function chipCheckHtml(name, value, label, checked = false) {
+  return `<label class="chip-check"><input type="checkbox" name="${escapeHtml(name)}" value="${escapeHtml(value)}" ${checked ? "checked" : ""}/><span>${escapeHtml(label)}</span></label>`;
+}
+
+function renderFilterChips() {
+  if (els.filterTypes) els.filterTypes.innerHTML = TYPE_CODES.map((x) => chipCheckHtml("filterType", x, t(state.lang, `type_${x}`))).join("");
+  if (els.filterSources) els.filterSources.innerHTML = SOURCE_CODES.map((x) => chipCheckHtml("filterSource", x, t(state.lang, `source_${x}`))).join("");
+
+  els.filterTypes?.querySelectorAll("input").forEach((input) => {
+    input.checked = state.filters.types.includes(input.value);
+    input.addEventListener("change", () => {
+      state.activeSavedFilterId = null;
+      state.filters.types = [...els.filterTypes.querySelectorAll("input:checked")].map((x) => x.value);
+      renderApp();
+    });
+  });
+  els.filterSources?.querySelectorAll("input").forEach((input) => {
+    input.checked = state.filters.sources.includes(input.value);
+    input.addEventListener("change", () => {
+      state.activeSavedFilterId = null;
+      state.filters.sources = [...els.filterSources.querySelectorAll("input:checked")].map((x) => x.value);
+      renderApp();
+    });
   });
 }
 
-function closeAddModal() {
-  editingItemId = null;
-  activeTagMenuIndex = -1;
-  if (els.addTagsMenu) els.addTagsMenu.hidden = true;
-  updateAddModalModeTexts();
-  els.modalAddLink?.close();
-}
-
-function openNewLinkModal(preset = {}) {
-  editingItemId = null;
-  els.formAddLink?.reset();
-  renderAddCollectionChoices();
-  renderTagSuggestions();
-  if (els.inputAddSource) els.inputAddSource.value = "Other";
-  if (els.addFavorite) els.addFavorite.checked = state.activeCollectionId === "fav";
-
-  const url = String(preset?.url || "").trim();
-  const title = String(preset?.title || "").trim();
-  if (els.inputAddUrl) els.inputAddUrl.value = url;
-  if (els.inputAddTitle && title) els.inputAddTitle.value = title;
-
-  updateAddSourceUi();
-  updateAddModalModeTexts();
-  els.modalAddLink?.showModal();
-}
-
-function firstHttpUrl(input) {
-  const text = String(input || "").trim();
-  if (!text) return "";
-
-  const lines = text.split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
-  for (const line of lines) {
-    try {
-      const u = new URL(line);
-      if (u.protocol === "http:" || u.protocol === "https:") return u.toString();
-    } catch {}
-  }
-
-  const inline = text.match(/https?:\/\/[^\s<>"')]+/i)?.[0] || "";
-  if (!inline) return "";
-  try {
-    const u = new URL(inline);
-    return u.protocol === "http:" || u.protocol === "https:" ? u.toString() : "";
-  } catch {
-    return "";
-  }
+function renderAddCollectionChoices(selectedIds = []) {
+  if (!els.addCollectionsList) return;
+  const set = new Set(selectedIds);
+  const chips = [`<span class="chip">${escapeHtml(t(state.lang, "addToInbox"))}</span>`];
+  for (const col of state.collections) chips.push(chipCheckHtml("collections", col.id, col.name, set.has(col.id)));
+  els.addCollectionsList.innerHTML = chips.join("");
 }
 
 function normalizeUrlForCompare(rawUrl) {
@@ -270,366 +176,40 @@ function normalizeUrlForCompare(rawUrl) {
   }
 }
 
-function findItemByUrl(url, excludeId = null) {
+function findDuplicateLink(url) {
   const target = normalizeUrlForCompare(url);
-  if (!target) return null;
-  const excluded = excludeId ? String(excludeId) : null;
-
-  return state.items.find((item) => {
-    if (excluded && item.id === excluded) return false;
-    return normalizeUrlForCompare(item.url) === target;
-  }) || null;
-}
-
-function normalizeState(raw) {
-  const data = migrateToV4(raw || {});
-  editingItemId = null;
-
-  state.lang = data?.lang === "en" ? "en" : "ru";
-  state.sortBy = typeof data?.sortBy === "string" ? data.sortBy : "newest";
-
-  state.items = Array.isArray(data?.items) ? data.items.map(normalizeLink) : [];
-  state.collections = Array.isArray(data?.collections) ? data.collections.map(normalizeCollection) : [];
-  state.recentViewedIds = Array.isArray(data?.recentViewedIds)
-    ? [...new Set(data.recentViewedIds.map((x) => String(x || "").trim()).filter(Boolean))].slice(0, 100)
-    : [];
-
-  state.activeCollectionId = "all";
-  state.search = "";
-  state.filters = { types: [], sources: [], tag: "", favoriteOnly: false };
-  state.ui = { filtersOpen: false, mobileMenuOpen: false };
-}
-
-function normalizeLink(item) {
-  const now = Date.now();
-  const createdAt = Number(item?.createdAt || now);
-  return {
-    id: String(item?.id || uid("item")),
-    url: String(item?.url || ""),
-    title: String(item?.title || "").trim().slice(0, TITLE_MAX_LEN),
-    previewImage: String(item?.previewImage || ""),
-    tags: normalizeTags(item?.tags || []),
-    type: normalizeType(item?.type),
-    source: normalizeSource(item?.source),
-    note: String(item?.note || ""),
-    favorite: !!item?.favorite,
-    createdAt,
-    updatedAt: Number(item?.updatedAt || createdAt),
-    collectionIds: Array.isArray(item?.collectionIds) ? [...new Set(item.collectionIds.map((x) => String(x)))] : []
-  };
-}
-
-function normalizeCollection(col) {
-  const now = Date.now();
-  const createdAt = Number(col?.createdAt || now);
-  const kind = col?.kind === "smart" ? "smart" : "manual";
-
-  return {
-    id: String(col?.id || uid("col")),
-    name: String(col?.name || "Collection"),
-    description: String(col?.description || ""),
-    kind,
-    rules: kind === "smart" ? normalizeRules(col?.rules) : undefined,
-    createdAt,
-    updatedAt: Number(col?.updatedAt || createdAt)
-  };
-}
-
-function normalizeRules(rules) {
-  return {
-    types: Array.isArray(rules?.types) ? [...new Set(rules.types.map(normalizeType).filter(Boolean))] : [],
-    sources: Array.isArray(rules?.sources) ? [...new Set(rules.sources.map(normalizeSource).filter(Boolean))] : [],
-    requiredTags: normalizeTags(rules?.requiredTags || []),
-    anyTags: normalizeTags(rules?.anyTags || []),
-    containsText: normalizeSearchText(rules?.containsText || ""),
-    onlyFavorites: !!rules?.onlyFavorites
-  };
-}
-
-function normalizeType(value) {
-  const map = {
-    project: "Project",
-    studio: "Studio",
-    designer: "Designer",
-    inspiration: "Inspiration",
-    source: "Source"
-  };
-  if (value == null || value === "") return null;
-  const normalized = map[String(value).trim().toLowerCase()] || String(value).trim();
-  return TYPE_OPTIONS.includes(normalized) ? normalized : null;
-}
-
-function normalizeSource(value) {
-  const map = {
-    site: "Site",
-    behance: "Behance",
-    awwwards: "Awwwards",
-    pinterest: "Pinterest",
-    dribbble: "Dribbble",
-    other: "Other"
-  };
-  if (value == null || value === "") return null;
-  const normalized = map[String(value).trim().toLowerCase()] || String(value).trim();
-  return SOURCE_OPTIONS.includes(normalized) ? normalized : null;
-}
-
-function normalizeTitleInput(input) {
-  return String(input || "").trim().slice(0, TITLE_MAX_LEN);
+  return state.items.find((item) => normalizeUrlForCompare(item.url) === target) || null;
 }
 
 function invalidTagChunks(rawInput) {
-  return String(rawInput || "")
-    .split(",")
-    .map((x) => String(x || "").trim().toLowerCase())
-    .filter(Boolean)
-    .filter((x) => x.length < TAG_MIN_LEN || x.length > TAG_MAX_LEN);
-}
-
-function updateLangButtons() {
-  const L = state.lang;
-  els.langRu?.classList.toggle("lang__btn--active", L === "ru");
-  els.langEn?.classList.toggle("lang__btn--active", L === "en");
-}
-
-function optionKey(value) {
-  return String(value || "").toLowerCase();
-}
-
-function applyI18n() {
-  const L = state.lang;
-
-  if (els.brand) els.brand.textContent = t(L, "brand");
-  if (els.labelNav) els.labelNav.textContent = t(L, "nav");
-  if (els.labelCollections) els.labelCollections.textContent = t(L, "collections");
-
-  if (els.btnAddLink) els.btnAddLink.textContent = t(L, "addLink");
-  if (els.btnNewCollection) {
-    els.btnNewCollection.textContent = "+";
-    els.btnNewCollection.setAttribute("aria-label", t(L, "newCollection"));
-    els.btnNewCollection.setAttribute("title", t(L, "newCollection"));
-  }
-  if (els.btnSettings) els.btnSettings.textContent = t(L, "settings");
-  if (els.btnExport) els.btnExport.textContent = t(L, "exportJson");
-  if (els.btnImport) els.btnImport.textContent = t(L, "importJson");
-  if (els.localHint) els.localHint.textContent = t(L, "localHint");
-
-  if (els.searchInput) els.searchInput.placeholder = t(L, "searchPlaceholder");
-  if (els.btnFilters) els.btnFilters.textContent = t(L, "filters");
-  if (els.sortSelect) {
-    const labels = {
-      newest: t(L, "sortNewest"),
-      oldest: t(L, "sortOldest"),
-      title_asc: t(L, "sortTitleAsc"),
-      title_desc: t(L, "sortTitleDesc"),
-      source_asc: t(L, "sortSource")
-    };
-    for (const opt of els.sortSelect.options) opt.textContent = labels[opt.value] || opt.value;
-  }
-
-  if (els.labelFilterTypes) els.labelFilterTypes.textContent = t(L, "filterTypes");
-  if (els.labelFilterSources) els.labelFilterSources.textContent = t(L, "filterSources");
-  if (els.labelFilterTag) els.labelFilterTag.textContent = t(L, "filterTag");
-  if (els.labelFilterFavorite) els.labelFilterFavorite.textContent = t(L, "filterFavoriteOnly");
-
-  updateAddModalModeTexts();
-  if (els.labelAddUrl) els.labelAddUrl.textContent = t(L, "modalUrl");
-  if (els.labelAddTitle) els.labelAddTitle.textContent = t(L, "modalTitle");
-  if (els.labelAddTags) els.labelAddTags.textContent = t(L, "modalTags");
-  if (els.labelAddType) els.labelAddType.textContent = t(L, "modalType");
-  if (els.labelAddSource) els.labelAddSource.textContent = t(L, "modalSource");
-  if (els.labelAddNote) els.labelAddNote.textContent = t(L, "modalNote");
-  if (els.labelAddTo) els.labelAddTo.textContent = t(L, "addTo");
-  if (els.labelAddFavorite) els.labelAddFavorite.textContent = t(L, "markFavorite");
-  if (els.sectionAddClassify) els.sectionAddClassify.textContent = t(L, "filters");
-  if (els.inputAddTitle) els.inputAddTitle.placeholder = t(L, "modalTitleHint");
-  if (els.addCancel) els.addCancel.textContent = t(L, "cancel");
-
-  if (els.modalCollectionTitle) els.modalCollectionTitle.textContent = t(L, "modalCollectionTitle");
-  if (els.labelColName) els.labelColName.textContent = t(L, "name");
-  if (els.labelColDescription) els.labelColDescription.textContent = t(L, "description");
-  if (els.labelCollectionKind) els.labelCollectionKind.textContent = t(L, "collectionKind");
-  if (els.labelKindManual) els.labelKindManual.textContent = t(L, "kindManual");
-  if (els.labelKindSmart) els.labelKindSmart.textContent = t(L, "kindSmart");
-  if (els.smartHint) els.smartHint.textContent = t(L, "smartHint");
-  if (els.sectionColRules) els.sectionColRules.textContent = t(L, "rulesTitle");
-  if (els.labelColTypes) els.labelColTypes.textContent = t(L, "types");
-  if (els.labelColSources) els.labelColSources.textContent = t(L, "sources");
-  if (els.labelColAllTags) els.labelColAllTags.textContent = t(L, "allTags");
-  if (els.labelColAnyTags) els.labelColAnyTags.textContent = t(L, "anyTags");
-  if (els.labelColQuery) els.labelColQuery.textContent = t(L, "contains");
-  if (els.labelColFavOnly) els.labelColFavOnly.textContent = t(L, "favOnly");
-  if (els.colCancel) els.colCancel.textContent = t(L, "cancel");
-  if (els.colCreate) els.colCreate.textContent = t(L, "create");
-
-  renderFilterChips();
-  renderCollectionRuleChips();
-  renderAddCollectionChoices();
-  renderTagSuggestions();
-  renderSelectLabels();
-  updateAddSourceUi();
-  renderAuthStatus();
-}
-
-function authEmail(user) {
-  return String(user?.email || user?.user_metadata?.email || "").trim();
-}
-
-function renderAuthStatus() {
-  const email = authEmail(currentUser);
-  const signedIn = !!email;
-
-  if (els.btnAuthLabel) els.btnAuthLabel.textContent = signedIn ? t(state.lang, "signOut") : t(state.lang, "signInGoogle");
-  if (els.authStatus) {
-    els.authStatus.textContent = signedIn
-      ? `${t(state.lang, "authSignedInAs")}: ${email}`
-      : t(state.lang, "authSignedOut");
-  }
-}
-
-function renderSelectLabels() {
-  const typeSelect = els.formAddLink?.querySelector('select[name="type"]');
-  const sourceSelect = els.formAddLink?.querySelector('select[name="source"]');
-
-  if (typeSelect) {
-    for (const option of typeSelect.options) {
-      if (option.value === "") option.textContent = t(state.lang, "anyOption");
-      else option.textContent = t(state.lang, `type_${optionKey(option.value)}`);
-    }
-  }
-
-  if (sourceSelect) {
-    for (const option of sourceSelect.options) {
-      option.textContent = t(state.lang, `source_${optionKey(option.value)}`);
-    }
-  }
-}
-
-function getDetectedSourceFromUrl(rawUrl) {
-  try {
-    new URL(String(rawUrl || "").trim());
-  } catch {
-    return null;
-  }
-  const detected = detectSource(rawUrl);
-  return detected === "Site" ? null : detected;
+  return String(rawInput || "").split(",").map((x) => String(x || "").trim().toLowerCase()).filter(Boolean).filter((x) => x.length < TAG_MIN_LEN || x.length > TAG_MAX_LEN);
 }
 
 function updateAddSourceUi() {
-  const detected = getDetectedSourceFromUrl(els.inputAddUrl?.value || "");
-
-  if (detected && els.inputAddSource) {
-    els.inputAddSource.value = detected;
-    return;
-  }
-
-  if (els.inputAddSource) {
-    if (!els.inputAddSource.value) els.inputAddSource.value = "Other";
-  }
+  if (!els.inputAddSource || !els.inputAddUrl || !sourceAutofillEnabled) return;
+  const detected = detectSourceFromUrl(els.inputAddUrl.value || "");
+  els.inputAddSource.value = SOURCE_CODES.includes(detected) ? detected : "other";
 }
 
-function markItemViewed(itemId) {
-  const id = String(itemId || "").trim();
-  if (!id) return;
-
-  state.recentViewedIds = [id, ...(state.recentViewedIds || []).filter((x) => x !== id)].slice(0, 100);
-  persist();
-
-  if (state.activeCollectionId === "recent") {
-    render(state, els, persist);
-  }
+function closeAddModal() {
+  sourceAutofillEnabled = true;
+  activeTagMenuIndex = -1;
+  if (els.addTagsMenu) els.addTagsMenu.hidden = true;
+  els.modalAddLink?.close();
 }
 
-function updateAddModalModeTexts() {
-  const L = state.lang || "ru";
-  const isEdit = !!editingItemId;
-  if (els.modalAddTitle) els.modalAddTitle.textContent = t(L, isEdit ? "modalEditTitle" : "modalAddTitle");
-  if (els.addSave) els.addSave.textContent = t(L, isEdit ? "saveChanges" : "save");
-}
-
-function openEditLinkModal(itemId) {
-  const item = state.items.find((x) => x.id === itemId);
-  if (!item || !els.formAddLink) return;
-
-  editingItemId = item.id;
-  els.formAddLink.reset();
+function openNewLinkModal(preset = {}) {
+  sourceAutofillEnabled = true;
+  activeTagMenuIndex = -1;
+  els.formAddLink?.reset();
+  renderAddCollectionChoices();
   renderTagSuggestions();
-  renderAddCollectionChoices(item.collectionIds || []);
-
-  if (els.inputAddUrl) els.inputAddUrl.value = item.url || "";
-  if (els.inputAddTitle) els.inputAddTitle.value = item.title || "";
-  if (els.inputAddTags) els.inputAddTags.value = (item.tags || []).join(", ");
-  if (els.inputAddNote) els.inputAddNote.value = item.note || "";
-  if (els.addFavorite) els.addFavorite.checked = !!item.favorite;
-
-  const typeSelect = els.formAddLink.querySelector('select[name="type"]');
-  if (typeSelect) typeSelect.value = item.type || "";
-
-  if (els.inputAddSource) els.inputAddSource.value = item.source || "Other";
+  if (els.inputAddUrl) els.inputAddUrl.value = String(preset.url || "");
+  if (els.inputAddTitle) els.inputAddTitle.value = String(preset.title || "");
+  if (els.inputAddSource) els.inputAddSource.value = "other";
+  if (els.addFavorite) els.addFavorite.checked = state.activeCollectionId === "fav";
   updateAddSourceUi();
-  updateAddModalModeTexts();
   els.modalAddLink?.showModal();
-}
-
-function renderFilterChips() {
-  if (els.filterTypes) {
-    els.filterTypes.innerHTML = TYPE_OPTIONS.map((v) => chipCheckHtml("filterType", v, t(state.lang, `type_${optionKey(v)}`))).join("");
-  }
-  if (els.filterSources) {
-    els.filterSources.innerHTML = SOURCE_OPTIONS.map((v) => chipCheckHtml("filterSource", v, t(state.lang, `source_${optionKey(v)}`))).join("");
-  }
-
-  els.filterTypes?.querySelectorAll("input").forEach((x) => {
-    x.checked = state.filters.types.includes(x.value);
-    x.addEventListener("change", () => {
-      state.filters.types = [...els.filterTypes.querySelectorAll("input:checked")].map((el) => el.value);
-      render(state, els, persist);
-    });
-  });
-
-  els.filterSources?.querySelectorAll("input").forEach((x) => {
-    x.checked = state.filters.sources.includes(x.value);
-    x.addEventListener("change", () => {
-      state.filters.sources = [...els.filterSources.querySelectorAll("input:checked")].map((el) => el.value);
-      render(state, els, persist);
-    });
-  });
-}
-
-function renderCollectionRuleChips() {
-  if (els.colTypesChips) {
-    els.colTypesChips.innerHTML = TYPE_OPTIONS.map((v) => chipCheckHtml("types", v, t(state.lang, `type_${optionKey(v)}`))).join("");
-  }
-  if (els.colSourcesChips) {
-    els.colSourcesChips.innerHTML = SOURCE_OPTIONS.map((v) => chipCheckHtml("sources", v, t(state.lang, `source_${optionKey(v)}`))).join("");
-  }
-}
-
-function renderAddCollectionChoices(selectedIds = null) {
-  if (!els.addCollectionsList) return;
-  const manualCollections = state.collections.filter((col) => col.kind === "manual");
-  const activeId = state.activeCollectionId;
-  const selectedSet = selectedIds ? new Set(selectedIds) : null;
-
-  const chips = manualCollections.map((col) => {
-    const checked = selectedSet ? selectedSet.has(col.id) : activeId === col.id && col.kind === "manual";
-    return chipCheckHtml("collections", col.id, col.name, checked);
-  });
-
-  els.addCollectionsList.innerHTML = chips.join("");
-}
-
-function renderTagSuggestions() {
-  knownTags = [...new Set(state.items.flatMap((item) => normalizeTags(item.tags || [])))].sort((a, b) => a.localeCompare(b, state.lang));
-  updateTagsMenu();
-}
-
-function getTagInputContext() {
-  const raw = String(els.inputAddTags?.value || "");
-  const chunks = raw.split(",");
-  const currentRaw = chunks.pop() ?? "";
-  const chosen = normalizeTags(chunks.join(","));
-  const query = normalizeSearchText(currentRaw);
-  return { chosen, query };
 }
 
 function updateTagsMenu() {
@@ -638,27 +218,26 @@ function updateTagsMenu() {
     els.addTagsMenu.hidden = true;
     return;
   }
-  const { chosen, query } = getTagInputContext();
-
-  const next = knownTags
-    .filter((tag) => !chosen.includes(tag))
-    .filter((tag) => !query || tag.includes(query))
-    .slice(0, 8);
-
+  const raw = String(els.inputAddTags.value || "");
+  const chunks = raw.split(",");
+  const query = normalizeSearchText(chunks.pop() || "");
+  const chosen = normalizeTags(chunks.join(","));
+  const next = knownTags.filter((tag) => !chosen.includes(tag)).filter((tag) => !query || tag.includes(query)).slice(0, 8);
   if (!next.length) {
     activeTagMenuIndex = -1;
     els.addTagsMenu.hidden = true;
     els.addTagsMenu.innerHTML = "";
     return;
   }
-
   if (activeTagMenuIndex >= next.length) activeTagMenuIndex = next.length - 1;
   if (activeTagMenuIndex < -1) activeTagMenuIndex = -1;
-
-  els.addTagsMenu.innerHTML = next
-    .map((tag, idx) => `<button type="button" class="add-tags-menu__item ${idx === activeTagMenuIndex ? "add-tags-menu__item--active" : ""}" data-tag-suggestion="${escapeHtml(tag)}">${escapeHtml(tag)}</button>`)
-    .join("");
+  els.addTagsMenu.innerHTML = next.map((tag, i) => `<button type="button" class="add-tags-menu__item ${i === activeTagMenuIndex ? "add-tags-menu__item--active" : ""}" data-tag-suggestion="${escapeHtml(tag)}">${escapeHtml(tag)}</button>`).join("");
   els.addTagsMenu.hidden = false;
+}
+
+function renderTagSuggestions() {
+  knownTags = [...new Set(state.items.flatMap((item) => normalizeTags(item.tags || [])))].sort((a, b) => a.localeCompare(b, state.lang));
+  updateTagsMenu();
 }
 
 function applyTagSuggestion(tag) {
@@ -671,497 +250,430 @@ function applyTagSuggestion(tag) {
   els.inputAddTags.value = `${chosen.join(", ")}${chosen.length ? ", " : ""}`;
   activeTagMenuIndex = -1;
   updateTagsMenu();
-  els.inputAddTags.focus();
 }
 
-function chipCheckHtml(name, value, label, checked = false) {
-  return `<label class="chip-check"><input type="checkbox" name="${name}" value="${escapeHtml(value)}" ${checked ? "checked" : ""}/><span>${escapeHtml(label)}</span></label>`;
+function applyI18n() {
+  const L = state.lang;
+  if (els.brand) els.brand.textContent = t(L, "brand");
+  if (els.labelNav) els.labelNav.textContent = t(L, "nav");
+  if (els.labelCollections) els.labelCollections.textContent = t(L, "collections");
+  if (els.labelSavedFilters) els.labelSavedFilters.textContent = t(L, "savedFilters");
+  if (els.btnAddLink) els.btnAddLink.textContent = t(L, "addLink");
+  if (els.btnNewCollection) els.btnNewCollection.setAttribute("aria-label", t(L, "newCollection"));
+  if (els.btnSaveFilter) els.btnSaveFilter.setAttribute("aria-label", t(L, "saveFilter"));
+  if (els.btnSettings) els.btnSettings.textContent = t(L, "settings");
+  if (els.btnExport) els.btnExport.textContent = t(L, "exportJson");
+  if (els.btnImport) els.btnImport.textContent = t(L, "importJson");
+  if (els.localHint) els.localHint.textContent = t(L, "localHint");
+  if (els.searchInput) els.searchInput.placeholder = t(L, "searchPlaceholder");
+  if (els.btnFilters) els.btnFilters.textContent = t(L, "filters");
+  if (els.labelFilterTypes) els.labelFilterTypes.textContent = t(L, "filterTypes");
+  if (els.labelFilterSources) els.labelFilterSources.textContent = t(L, "filterSources");
+  if (els.labelFilterTag) els.labelFilterTag.textContent = t(L, "filterTag");
+  if (els.labelFilterFavorite) els.labelFilterFavorite.textContent = t(L, "filterFavoriteOnly");
+  if (els.modalAddTitle) els.modalAddTitle.textContent = t(L, "modalAddTitle");
+  if (els.labelAddUrl) els.labelAddUrl.textContent = t(L, "modalUrl");
+  if (els.labelAddTitle) els.labelAddTitle.textContent = t(L, "modalTitle");
+  if (els.labelAddTags) els.labelAddTags.textContent = t(L, "modalTags");
+  if (els.labelAddType) els.labelAddType.textContent = t(L, "modalType");
+  if (els.labelAddSource) els.labelAddSource.textContent = t(L, "modalSource");
+  if (els.labelAddNote) els.labelAddNote.textContent = t(L, "modalNote");
+  if (els.labelAddTo) els.labelAddTo.textContent = t(L, "addTo");
+  if (els.labelAddFavorite) els.labelAddFavorite.textContent = t(L, "markFavorite");
+  if (els.inputAddTitle) els.inputAddTitle.placeholder = t(L, "modalTitleHint");
+  if (els.inputAddNote) els.inputAddNote.placeholder = L === "ru" ? "Зачем сохранил?" : "Why saved?";
+  if (els.addCancel) els.addCancel.textContent = t(L, "cancel");
+  if (els.addSave) els.addSave.textContent = t(L, "save");
+  if (els.modalCollectionTitle) els.modalCollectionTitle.textContent = t(L, "modalCollectionTitle");
+  if (els.labelColName) els.labelColName.textContent = t(L, "name");
+  if (els.labelColDescription) els.labelColDescription.textContent = t(L, "description");
+  if (els.colCancel) els.colCancel.textContent = t(L, "cancel");
+  if (els.colCreate) els.colCreate.textContent = t(L, "create");
+  if (els.modalDeleteTitle) els.modalDeleteTitle.textContent = t(L, "deleteLinkTitle");
+  if (els.modalDeleteText) els.modalDeleteText.textContent = t(L, "deleteLinkText");
+  if (els.deleteCancel) els.deleteCancel.textContent = t(L, "cancel");
+  if (els.deleteConfirm) els.deleteConfirm.textContent = t(L, "del");
+
+  if (els.sortSelect) {
+    const labels = {
+      newest: t(L, "sortNewest"),
+      oldest: t(L, "sortOldest"),
+      title_asc: t(L, "sortTitleAsc"),
+      title_desc: t(L, "sortTitleDesc"),
+      source_asc: t(L, "sortSource")
+    };
+    for (const option of els.sortSelect.options) option.textContent = labels[option.value] || option.value;
+  }
+  const typeSelect = els.formAddLink?.querySelector('select[name="type"]');
+  if (typeSelect) {
+    for (const option of typeSelect.options) option.textContent = option.value ? t(L, `type_${optionKey(option.value)}`) : t(L, "anyOption");
+  }
+  if (els.inputAddSource) {
+    for (const option of els.inputAddSource.options) option.textContent = t(L, `source_${optionKey(option.value)}`);
+  }
+
+  renderFilterChips();
+  renderAddCollectionChoices();
+  renderTagSuggestions();
+  renderAuthStatus();
 }
 
-function toggleSettingsMenu(show) {
-  if (!els.settingsMenu) return;
-  els.settingsMenu.hidden = !show;
+function filterPayload() {
+  return {
+    types: [...state.filters.types],
+    sources: [...state.filters.sources],
+    tag: String(state.filters.tag || ""),
+    favoriteOnly: !!state.filters.favoriteOnly,
+    search: String(state.search || ""),
+    sortBy: FILTER_SORTS.has(state.sortBy) ? state.sortBy : "newest"
+  };
 }
 
-function updateRulesVisibility() {
-  if (!els.collectionRules) return;
-  const kind = els.kindSmart?.checked ? "smart" : "manual";
-  els.collectionRules.hidden = kind !== "smart";
+function isFilterActive() {
+  return Boolean(state.filters.types.length || state.filters.sources.length || state.filters.tag || state.filters.favoriteOnly || state.search);
+}
+
+async function loadData() {
+  const [links, collections, rows, savedFilters] = await Promise.all([
+    listLinks(),
+    listCollections(),
+    listLinkCollections(),
+    listSavedFilters()
+  ]);
+  const relMap = new Map();
+  for (const rel of rows || []) {
+    const linkId = String(rel.link_id || "");
+    const colId = String(rel.collection_id || "");
+    if (!linkId || !colId) continue;
+    const list = relMap.get(linkId) || [];
+    if (!list.includes(colId)) list.push(colId);
+    relMap.set(linkId, list);
+  }
+  state.items = links.map((x) => ({ ...x, previewImage: previewFallbackUrl(x.url), collectionIds: relMap.get(x.id) || [] }));
+  state.collections = collections;
+  state.savedFilters = savedFilters;
+}
+
+async function migrateLegacyIfNeeded() {
+  if (!currentUser?.id) return;
+  const key = `resource_vault_migrated_v5_${currentUser.id}`;
+  if (localStorage.getItem(key) === "1") return;
+  const legacy = loadLegacyVault();
+  if (!legacy || (!(legacy.items || []).length && !(legacy.collections || []).length)) {
+    localStorage.setItem(key, "1");
+    return;
+  }
+
+  const map = new Map();
+  for (const col of legacy.collections || []) {
+    const created = await createCollection({ name: String(col.name || "Collection"), description: String(col.description || "") }, currentUser.id);
+    if (created) map.set(col.id, created.id);
+  }
+
+  const seen = new Set(state.items.map((x) => normalizeUrlForCompare(x.url)));
+  for (const item of legacy.items || []) {
+    let url = "";
+    try { url = new URL(String(item.url || "").trim()).toString(); } catch {}
+    if (!url) continue;
+    const normalized = normalizeUrlForCompare(url);
+    if (seen.has(normalized)) continue;
+    seen.add(normalized);
+
+    const created = await createLink({
+      url,
+      title: String(item.title || "").trim() || domainFromUrl(url),
+      note: String(item.note || "").trim().slice(0, NOTE_MAX_LEN),
+      tags: normalizeTags(item.tags || []),
+      type: item.type || null,
+      source: item.source || detectSourceFromUrl(url),
+      favorite: !!item.favorite
+    }, currentUser.id);
+    if (!created) continue;
+    const colIds = (item.collectionIds || []).map((id) => map.get(id)).filter(Boolean);
+    await replaceLinkCollections(created.id, colIds, currentUser.id);
+  }
+  localStorage.setItem(key, "1");
+}
+
+const actions = {
+  onOpenItem: (id) => {
+    state.recentViewedIds = [id, ...state.recentViewedIds.filter((x) => x !== id)].slice(0, 100);
+    renderApp();
+  },
+  onToggleFavorite: async (id, next) => {
+    const item = state.items.find((x) => x.id === id);
+    if (!item) return;
+    const updated = await updateLink(id, { ...item, favorite: !!next });
+    if (!updated) return;
+    item.favorite = updated.favorite;
+    renderApp();
+  },
+  onDeleteItem: async (id) => {
+    await deleteLink(id);
+    state.items = state.items.filter((x) => x.id !== id);
+    renderTagSuggestions();
+    renderApp();
+  },
+  onAssignToCollection: async (linkId, collectionId) => {
+    const item = state.items.find((x) => x.id === linkId);
+    if (!item) return;
+    const next = [...new Set([...(item.collectionIds || []), collectionId])];
+    await replaceLinkCollections(linkId, next, currentUser.id);
+    item.collectionIds = next;
+    renderApp();
+  },
+  onRenameCollection: async (collectionId, name) => {
+    const col = state.collections.find((x) => x.id === collectionId);
+    if (!col) return;
+    const updated = await updateCollection(collectionId, { name, description: col.description });
+    if (!updated) return;
+    col.name = updated.name;
+    col.description = updated.description;
+    renderAddCollectionChoices();
+    renderApp();
+  },
+  onDeleteCollection: async (collectionId) => {
+    await deleteCollection(collectionId);
+    state.collections = state.collections.filter((x) => x.id !== collectionId);
+    for (const item of state.items) item.collectionIds = (item.collectionIds || []).filter((id) => id !== collectionId);
+    if (state.activeCollectionId === collectionId) state.activeCollectionId = "all";
+    renderAddCollectionChoices();
+    renderApp();
+  },
+  onDeleteSavedFilter: async (id) => {
+    await deleteSavedFilter(id);
+    state.savedFilters = state.savedFilters.filter((x) => x.id !== id);
+    if (state.activeSavedFilterId === id) {
+      state.activeSavedFilterId = null;
+      state.activeCollectionId = "all";
+    }
+    renderApp();
+  }
+};
+
+function firstHttpUrl(input) {
+  const text = String(input || "").trim();
+  if (!text) return "";
+  const lines = text.split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
+  for (const line of lines) {
+    try {
+      const u = new URL(line);
+      if (u.protocol === "http:" || u.protocol === "https:") return u.toString();
+    } catch {}
+  }
+  const inline = text.match(/https?:\/\/[^\s<>"')]+/i)?.[0] || "";
+  if (!inline) return "";
+  try {
+    const u = new URL(inline);
+    return u.protocol === "http:" || u.protocol === "https:" ? u.toString() : "";
+  } catch {
+    return "";
+  }
 }
 
 function setupEvents() {
   const mobileMq = window.matchMedia("(max-width: 700px)");
-  if (els.inputAddTitle) els.inputAddTitle.maxLength = TITLE_MAX_LEN;
-  if (els.inputAddTags) els.inputAddTags.maxLength = 300;
-  if (els.inputAddNote) els.inputAddNote.maxLength = NOTE_MAX_LEN;
-
-  function setMobileMenu(open) {
+  const setMobileMenu = (open) => {
     state.ui.mobileMenuOpen = !!open;
     document.body.classList.toggle("mobile-menu-open", !!open);
     els.btnMobileMenu?.setAttribute("aria-expanded", open ? "true" : "false");
-  }
+  };
+  const closeMobileMenuIfNeeded = () => { if (mobileMq.matches) setMobileMenu(false); };
 
-  function closeMobileMenuIfNeeded() {
-    if (!mobileMq.matches) return;
-    setMobileMenu(false);
-  }
+  els.inputAddTitle && (els.inputAddTitle.maxLength = TITLE_MAX_LEN);
+  els.inputAddNote && (els.inputAddNote.maxLength = NOTE_MAX_LEN);
+  els.navAll?.addEventListener("click", () => { state.activeSavedFilterId = null; state.activeCollectionId = "all"; renderApp(); closeMobileMenuIfNeeded(); });
+  els.navFav?.addEventListener("click", () => { state.activeSavedFilterId = null; state.activeCollectionId = "fav"; renderApp(); closeMobileMenuIfNeeded(); });
+  els.navRecent?.addEventListener("click", () => { state.activeSavedFilterId = null; state.activeCollectionId = "recent"; renderApp(); closeMobileMenuIfNeeded(); });
+  els.searchInput?.addEventListener("input", (e) => { state.activeSavedFilterId = null; state.search = String(e.target.value || ""); renderApp(); });
+  els.sortSelect?.addEventListener("change", (e) => { state.activeSavedFilterId = null; state.sortBy = FILTER_SORTS.has(String(e.target.value || "")) ? String(e.target.value) : "newest"; renderApp(); });
+  els.btnFilters?.addEventListener("click", () => { state.ui.filtersOpen = !state.ui.filtersOpen; if (els.filtersPanel) els.filtersPanel.hidden = !state.ui.filtersOpen; });
+  els.filterTagInput?.addEventListener("input", (e) => { state.activeSavedFilterId = null; state.filters.tag = normalizeSearchText(e.target.value); renderApp(); });
+  els.filterFavoriteOnly?.addEventListener("change", (e) => { state.activeSavedFilterId = null; state.filters.favoriteOnly = !!e.target.checked; renderApp(); });
 
-  els.navAll?.addEventListener("click", () => {
-    state.activeCollectionId = "all";
-    render(state, els, persist);
-    closeMobileMenuIfNeeded();
-  });
-
-  els.navFav?.addEventListener("click", () => {
-    state.activeCollectionId = "fav";
-    render(state, els, persist);
-    closeMobileMenuIfNeeded();
-  });
-
-  els.navRecent?.addEventListener("click", () => {
-    state.activeCollectionId = "recent";
-    render(state, els, persist);
-    closeMobileMenuIfNeeded();
-  });
-
-  els.searchInput?.addEventListener("input", (e) => {
-    state.search = String(e.target.value || "");
-    render(state, els, persist);
-  });
-
-  els.sortSelect?.addEventListener("change", (e) => {
-    state.sortBy = String(e.target.value || "newest");
-    persist();
-    render(state, els, persist);
-  });
-
-  els.btnFilters?.addEventListener("click", () => {
-    state.ui.filtersOpen = !state.ui.filtersOpen;
-    els.filtersPanel.hidden = !state.ui.filtersOpen;
-  });
-
-  els.filterTagInput?.addEventListener("input", (e) => {
-    state.filters.tag = normalizeSearchText(e.target.value);
-    render(state, els, persist);
-  });
-
-  els.filterFavoriteOnly?.addEventListener("change", (e) => {
-    state.filters.favoriteOnly = !!e.target.checked;
-    render(state, els, persist);
-  });
-
-  els.langRu?.addEventListener("click", () => {
-    state.lang = "ru";
-    persist();
-    applyI18n();
-    updateLangButtons();
-    render(state, els, persist);
-  });
-
-  els.langEn?.addEventListener("click", () => {
-    state.lang = "en";
-    persist();
-    applyI18n();
-    updateLangButtons();
-    render(state, els, persist);
-  });
-
-  els.btnSettings?.addEventListener("click", (e) => {
-    e.stopPropagation();
-    toggleSettingsMenu(els.settingsMenu.hidden);
-  });
+  els.langRu?.addEventListener("click", () => { state.lang = "ru"; applyI18n(); updateLangButtons(); renderApp(); });
+  els.langEn?.addEventListener("click", () => { state.lang = "en"; applyI18n(); updateLangButtons(); renderApp(); });
+  els.btnSettings?.addEventListener("click", (e) => { e.stopPropagation(); if (els.settingsMenu) els.settingsMenu.hidden = !els.settingsMenu.hidden; });
+  document.addEventListener("click", (e) => { if (!e.target.closest(".settings") && els.settingsMenu) els.settingsMenu.hidden = true; });
 
   els.btnAuth?.addEventListener("click", async () => {
-    const email = authEmail(currentUser);
-    if (email) {
-      await signOut();
+    if (authEmail(currentUser)) {
+      await logout();
       window.location.reload();
       return;
     }
-
-    const started = signInWithGoogle();
-    if (!started) console.warn("Google sign-in did not start");
+    loginWithGoogle();
   });
 
-  document.addEventListener("click", (e) => {
-    if (!e.target.closest(".settings")) toggleSettingsMenu(false);
+  els.btnAddLink?.addEventListener("click", () => { openNewLinkModal(); closeMobileMenuIfNeeded(); });
+  els.btnNewCollection?.addEventListener("click", () => { els.formCollection?.reset(); els.modalCollection?.showModal(); closeMobileMenuIfNeeded(); });
+  els.btnSaveFilter?.addEventListener("click", async () => {
+    if (!currentUser?.id) return;
+    if (!isFilterActive()) { alert(state.lang === "ru" ? "Сначала установите фильтры." : "Set filters first."); return; }
+    const name = String(prompt(t(state.lang, "saveFilterPrompt"), "") || "").trim();
+    if (!name) return;
+    const created = await createSavedFilter({ name, filter: filterPayload() }, currentUser.id);
+    if (!created) return;
+    state.savedFilters.push(created);
+    renderApp();
   });
 
-  els.btnMobileMenu?.addEventListener("click", () => {
-    if (!mobileMq.matches) return;
-    setMobileMenu(!state.ui.mobileMenuOpen);
+  els.btnExport?.addEventListener("click", () => {
+    const payload = {
+      version: 5,
+      exportedAt: new Date().toISOString(),
+      links: state.items,
+      collections: state.collections,
+      savedFilters: state.savedFilters
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const anchor = document.createElement("a");
+    anchor.href = URL.createObjectURL(blob);
+    anchor.download = `vault_export_${new Date().toISOString().slice(0, 10)}.json`;
+    anchor.click();
+    URL.revokeObjectURL(anchor.href);
   });
 
-  els.btnMobileClose?.addEventListener("click", () => setMobileMenu(false));
-  els.mobileOverlay?.addEventListener("click", () => setMobileMenu(false));
-
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") setMobileMenu(false);
+  els.btnImport?.addEventListener("click", () => {
+    alert(state.lang === "ru" ? "Импорт отключен. Используется Supabase." : "Import is disabled. Supabase is the source of truth.");
   });
 
-  els.sidebar?.addEventListener("click", (e) => {
-    const actionable = e.target.closest("#navAll, #navFav, #navRecent, .collection, #btnAddLink, #btnNewCollection");
-    if (!actionable) return;
-    closeMobileMenuIfNeeded();
-  });
-
-  mobileMq.addEventListener("change", (ev) => {
-    if (!ev.matches) setMobileMenu(false);
-  });
-
-  els.btnAddLink?.addEventListener("click", () => {
-    openNewLinkModal();
-    closeMobileMenuIfNeeded();
-  });
-
-  window.addEventListener("dragover", (e) => {
-    const types = e.dataTransfer?.types;
-    if (!types) return;
-    if (types.includes("text/resource-vault-item-id")) return;
-    if (!types.includes("text/uri-list") && !types.includes("text/plain")) return;
+  els.formCollection?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+    if (!currentUser?.id) return;
+    const fd = new FormData(els.formCollection);
+    const name = String(fd.get("name") || "").trim();
+    if (!name) return;
+    const description = String(fd.get("description") || "").trim();
+    const created = await createCollection({ name, description }, currentUser.id);
+    if (!created) return;
+    state.collections.push(created);
+    state.activeCollectionId = created.id;
+    els.modalCollection?.close();
+    renderAddCollectionChoices();
+    renderApp();
   });
 
-  window.addEventListener("drop", (e) => {
-    const types = e.dataTransfer?.types;
-    if (types?.includes("text/resource-vault-item-id")) return;
-
-    const dropTarget = e.target instanceof Element ? e.target : null;
-    if (dropTarget?.closest("input, textarea, select, [contenteditable='true']")) return;
-
-    const uriList = e.dataTransfer?.getData("text/uri-list") || "";
-    const plain = e.dataTransfer?.getData("text/plain") || "";
-    const url = firstHttpUrl(uriList) || firstHttpUrl(plain);
-    if (!url) return;
-
+  els.formAddLink?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    openNewLinkModal({ url });
+    if (!currentUser?.id) return;
+    const fd = new FormData(els.formAddLink);
+    const rawUrl = String(fd.get("url") || "").trim();
+    const title = String(fd.get("title") || "").trim().slice(0, TITLE_MAX_LEN);
+    const note = String(fd.get("note") || "").trim().slice(0, NOTE_MAX_LEN);
+    if (title && title.length < TITLE_MIN_LEN) { alert(state.lang === "ru" ? `Название: ${TITLE_MIN_LEN}-${TITLE_MAX_LEN} символов.` : `Title must be ${TITLE_MIN_LEN}-${TITLE_MAX_LEN} characters.`); return; }
+    if (invalidTagChunks(fd.get("tags")).length) { alert(state.lang === "ru" ? `Теги: ${TAG_MIN_LEN}-${TAG_MAX_LEN} символов.` : `Tags must be ${TAG_MIN_LEN}-${TAG_MAX_LEN} chars.`); return; }
+    let url = "";
+    try { url = new URL(rawUrl).toString(); } catch { alert(state.lang === "ru" ? "Некорректный URL." : "Invalid URL."); return; }
+    if (findDuplicateLink(url)) { alert(state.lang === "ru" ? "Такая ссылка уже есть." : "Link already exists."); return; }
+
+    const selectedCollections = fd.getAll("collections").map((x) => String(x)).filter((id) => state.collections.some((c) => c.id === id));
+    const created = await createLink({
+      url,
+      title: title || domainFromUrl(url),
+      note,
+      tags: normalizeTags(fd.get("tags")),
+      type: String(fd.get("type") || "") || null,
+      source: String(fd.get("source") || "") || detectSourceFromUrl(url),
+      favorite: !!fd.get("favorite")
+    }, currentUser.id);
+    if (!created) return;
+    await replaceLinkCollections(created.id, selectedCollections, currentUser.id);
+    state.items.unshift({ ...created, previewImage: previewFallbackUrl(created.url), collectionIds: selectedCollections });
+    closeAddModal();
+    renderTagSuggestions();
+    renderApp();
   });
 
   els.inputAddUrl?.addEventListener("input", updateAddSourceUi);
-  els.inputAddTags?.addEventListener("input", () => {
-    activeTagMenuIndex = -1;
-    updateTagsMenu();
-  });
-  els.inputAddTags?.addEventListener("focus", () => {
-    activeTagMenuIndex = -1;
-    updateTagsMenu();
-  });
-  els.inputAddTags?.addEventListener("keydown", (e) => {
-    if (!els.addTagsMenu || els.addTagsMenu.hidden) return;
-    const size = els.addTagsMenu.querySelectorAll("[data-tag-suggestion]").length;
-    if (!size) return;
-
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      activeTagMenuIndex = (activeTagMenuIndex + 1 + size) % size;
-      updateTagsMenu();
-      return;
-    }
-
-    if (e.key === "ArrowUp") {
-      e.preventDefault();
-      activeTagMenuIndex = (activeTagMenuIndex - 1 + size) % size;
-      updateTagsMenu();
-      return;
-    }
-
-    if (e.key === "Enter" && activeTagMenuIndex >= 0) {
-      e.preventDefault();
-      const btn = els.addTagsMenu.querySelectorAll("[data-tag-suggestion]")[activeTagMenuIndex];
-      const tag = btn?.dataset?.tagSuggestion;
-      if (tag) applyTagSuggestion(tag);
-      return;
-    }
-
-    if (e.key === "Escape") {
-      activeTagMenuIndex = -1;
-      els.addTagsMenu.hidden = true;
-    }
-  });
-
+  els.inputAddSource?.addEventListener("change", () => { sourceAutofillEnabled = false; });
+  els.inputAddTags?.addEventListener("input", () => { activeTagMenuIndex = -1; updateTagsMenu(); });
+  els.inputAddTags?.addEventListener("focus", () => { activeTagMenuIndex = -1; updateTagsMenu(); });
   els.addTagsMenu?.addEventListener("mousedown", (e) => {
     const btn = e.target.closest("[data-tag-suggestion]");
     if (!btn) return;
     e.preventDefault();
     const tag = String(btn.dataset.tagSuggestion || "").trim();
-    if (tag) applyTagSuggestion(tag);
+    if (!tag) return;
+    applyTagSuggestion(tag);
+    els.inputAddTags?.focus();
   });
-
+  els.inputAddTags?.addEventListener("keydown", (e) => {
+    if (!els.addTagsMenu || els.addTagsMenu.hidden) return;
+    const list = els.addTagsMenu.querySelectorAll("[data-tag-suggestion]");
+    if (!list.length) return;
+    if (e.key === "ArrowDown") { e.preventDefault(); activeTagMenuIndex = (activeTagMenuIndex + 1 + list.length) % list.length; updateTagsMenu(); }
+    if (e.key === "ArrowUp") { e.preventDefault(); activeTagMenuIndex = (activeTagMenuIndex - 1 + list.length) % list.length; updateTagsMenu(); }
+    if (e.key === "Enter" && activeTagMenuIndex >= 0) { e.preventDefault(); const tag = list[activeTagMenuIndex]?.dataset?.tagSuggestion; if (tag) applyTagSuggestion(tag); }
+  });
   document.addEventListener("mousedown", (e) => {
     if (!els.addTagsMenu || !els.inputAddTags) return;
     if (e.target.closest("#addTagsMenu") || e.target === els.inputAddTags) return;
     activeTagMenuIndex = -1;
     els.addTagsMenu.hidden = true;
   });
-
-  els.formAddLink?.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const fd = new FormData(els.formAddLink);
-
-    const url = String(fd.get("url") || "").trim();
-    const titleRaw = normalizeTitleInput(fd.get("title"));
-    if (titleRaw && titleRaw.length < TITLE_MIN_LEN) {
-      alert(`Title must be ${TITLE_MIN_LEN}-${TITLE_MAX_LEN} characters`);
-      return;
-    }
-
-    const invalidTags = invalidTagChunks(fd.get("tags"));
-    if (invalidTags.length) {
-      alert(`Each tag must be ${TAG_MIN_LEN}-${TAG_MAX_LEN} characters`);
-      return;
-    }
-
-    const tags = normalizeTags(fd.get("tags"));
-    const type = normalizeType(fd.get("type"));
-    const sourcePick = normalizeSource(fd.get("source"));
-    const rawNote = String(fd.get("note") || "").trim();
-    if (rawNote.length > NOTE_MAX_LEN) {
-      alert(`Note must be up to ${NOTE_MAX_LEN} characters`);
-      return;
-    }
-    const note = rawNote;
-    const favorite = !!fd.get("favorite");
-
-    const manualCollectionIds = new Set(state.collections.filter((col) => col.kind === "manual").map((col) => col.id));
-    const selectedCollections = fd.getAll("collections")
-      .map((x) => String(x))
-      .filter((id) => manualCollectionIds.has(id));
-
-    try {
-      new URL(url);
-    } catch {
-      alert("Bad URL");
-      return;
-    }
-
-    const domain = domainFromUrl(url);
-    const source = getDetectedSourceFromUrl(url) || sourcePick || "Other";
-    const now = Date.now();
-    const fallbackPreview = previewFallbackUrl(url);
-    const initialTitle = titleRaw || normalizeTitleInput(domain || url);
-    const existing = editingItemId ? state.items.find((x) => x.id === editingItemId) : null;
-    const duplicate = findItemByUrl(url, editingItemId || null);
-    if (editingItemId && duplicate) {
-      alert("This link already exists");
-      return;
-    }
-
-    const target = existing || duplicate;
-    const itemId = target?.id || uid("item");
-    if (editingItemId && !existing) {
-      editingItemId = null;
-      updateAddModalModeTexts();
-      return;
-    }
-
-    if (target) {
-      const urlChanged = target.url !== url;
-      target.url = url;
-      target.title = initialTitle;
-      target.tags = tags;
-      target.type = type;
-      target.source = source;
-      target.note = note;
-      target.favorite = favorite;
-      target.collectionIds = selectedCollections;
-      if (urlChanged || !target.previewImage) target.previewImage = fallbackPreview;
-      target.updatedAt = now;
-    } else {
-      state.items.push({
-        id: itemId,
-        url,
-        title: initialTitle,
-        previewImage: fallbackPreview,
-        tags,
-        type,
-        source,
-        note,
-        favorite,
-        createdAt: now,
-        updatedAt: now,
-        collectionIds: selectedCollections
-      });
-    }
-
-    editingItemId = null;
-    updateAddModalModeTexts();
-    persist();
-    els.modalAddLink?.close();
-    renderTagSuggestions();
-    render(state, els, persist);
-
-    void (async () => {
-      const [fetchedTitle, fetchedPreview] = await Promise.allSettled([
-        titleRaw ? Promise.resolve("") : tryFetchTitle(url),
-        tryFetchPreview(url)
-      ]);
-
-      const item = state.items.find((x) => x.id === itemId);
-      if (!item) return;
-
-      let changed = false;
-      const bestTitle = fetchedTitle.status === "fulfilled" ? String(fetchedTitle.value || "").trim() : "";
-      if (!titleRaw && bestTitle && bestTitle !== item.title) {
-        item.title = bestTitle;
-        changed = true;
-      }
-
-      const bestPreview = fetchedPreview.status === "fulfilled" ? String(fetchedPreview.value || "").trim() : "";
-      if (bestPreview && bestPreview !== item.previewImage) {
-        item.previewImage = bestPreview;
-        changed = true;
-      }
-
-      if (changed) {
-        item.updatedAt = Date.now();
-        persist();
-        render(state, els, persist);
-      }
-    })();
-  });
-
-  els.btnNewCollection?.addEventListener("click", () => {
-    els.formCollection?.reset();
-    if (els.kindManual) els.kindManual.checked = true;
-    updateRulesVisibility();
-    els.modalCollection?.showModal();
-    closeMobileMenuIfNeeded();
-  });
-
-  els.kindManual?.addEventListener("change", updateRulesVisibility);
-  els.kindSmart?.addEventListener("change", updateRulesVisibility);
-
-  els.formCollection?.addEventListener("submit", (e) => {
-    e.preventDefault();
-    const fd = new FormData(els.formCollection);
-
-    const name = String(fd.get("name") || "").trim();
-    if (!name) return;
-
-    const description = String(fd.get("description") || "").trim();
-    const kind = fd.get("kind") === "smart" ? "smart" : "manual";
-    const now = Date.now();
-    const id = uid("col");
-
-    const nextCollection = {
-      id,
-      name,
-      description,
-      kind,
-      rules: kind === "smart" ? {
-        types: fd.getAll("types").map(normalizeType).filter(Boolean),
-        sources: fd.getAll("sources").map(normalizeSource).filter(Boolean),
-        requiredTags: normalizeTags(fd.get("requiredTags")),
-        anyTags: normalizeTags(fd.get("anyTags")),
-        containsText: normalizeSearchText(fd.get("containsText")),
-        onlyFavorites: !!fd.get("onlyFavorites")
-      } : undefined,
-      createdAt: now,
-      updatedAt: now
-    };
-
-    state.collections.push(nextCollection);
-    state.activeCollectionId = id;
-    persist();
-    els.modalCollection?.close();
-    renderAddCollectionChoices();
-    render(state, els, persist);
-  });
-
-  els.btnExport?.addEventListener("click", () => {
-    const payload = {
-      version: 4,
-      items: state.items,
-      collections: state.collections,
-      lang: state.lang,
-      sortBy: state.sortBy
-    };
-
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `vault_export_${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-  });
-
-  els.btnImport?.addEventListener("click", () => {
-    els.fileImport.value = "";
-    els.fileImport.click();
-  });
-
-  els.fileImport?.addEventListener("change", async () => {
-    const file = els.fileImport.files?.[0];
-    if (!file) return;
-
-    try {
-      const text = await file.text();
-      const json = JSON.parse(text);
-      normalizeState(json);
-      persist();
-      applyI18n();
-      updateLangButtons();
-      render(state, els, persist);
-    } catch {
-      alert("Failed to import JSON");
-    }
-  });
-
-  els.modalAddLink?.addEventListener("close", () => {
-    editingItemId = null;
-    activeTagMenuIndex = -1;
-    if (els.addTagsMenu) els.addTagsMenu.hidden = true;
-    updateAddModalModeTexts();
-  });
-
   els.addCloseX?.addEventListener("click", closeAddModal);
   els.addCancel?.addEventListener("click", closeAddModal);
   els.colCloseX?.addEventListener("click", () => els.modalCollection?.close());
   els.colCancel?.addEventListener("click", () => els.modalCollection?.close());
+
+  window.addEventListener("dragover", (e) => {
+    const types = e.dataTransfer?.types;
+    if (!types || types.includes("text/resource-vault-item-id")) return;
+    if (!types.includes("text/uri-list") && !types.includes("text/plain")) return;
+    e.preventDefault();
+  });
+  window.addEventListener("drop", (e) => {
+    const types = e.dataTransfer?.types;
+    if (types?.includes("text/resource-vault-item-id")) return;
+    const target = e.target instanceof Element ? e.target : null;
+    if (target?.closest("input, textarea, select, [contenteditable='true']")) return;
+    const url = firstHttpUrl(e.dataTransfer?.getData("text/uri-list")) || firstHttpUrl(e.dataTransfer?.getData("text/plain"));
+    if (!url) return;
+    e.preventDefault();
+    openNewLinkModal({ url });
+  });
+
+  els.btnMobileMenu?.addEventListener("click", () => { if (mobileMq.matches) setMobileMenu(!state.ui.mobileMenuOpen); });
+  els.btnMobileClose?.addEventListener("click", () => setMobileMenu(false));
+  els.mobileOverlay?.addEventListener("click", () => setMobileMenu(false));
+  mobileMq.addEventListener("change", (e) => { if (!e.matches) setMobileMenu(false); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") setMobileMenu(false); });
 }
 
 function escapeHtml(str) {
-  return String(str || "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
+  return String(str || "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
 }
 
 async function bootstrap() {
-  const localData = load();
-  let cloudData = null;
-  let hasAuthSession = false;
+  const settings = loadUiSettings();
+  state.lang = settings.lang === "en" ? "en" : "ru";
+  state.sortBy = FILTER_SORTS.has(settings.sortBy) ? settings.sortBy : "newest";
+  state.ui.filtersOpen = false;
+  state.ui.mobileMenuOpen = false;
 
-  try {
-    await completeAuthFromUrl();
-    currentUser = await getCurrentUser();
-    hasAuthSession = !!authEmail(currentUser);
-    cloudData = await loadFromCloud();
-  } catch (err) {
-    console.warn("Bootstrap auth/cloud failed:", err?.message || err);
+  setupEvents();
+  try { currentUser = await initAuth(); } catch (err) { console.warn("Auth failed", err?.message || err); }
+  if (currentUser?.id) {
+    try {
+      await loadData();
+      if (!state.items.length && !state.collections.length) {
+        await migrateLegacyIfNeeded();
+        await loadData();
+      }
+    } catch (err) {
+      console.warn("Load failed", err?.message || err);
+    }
   }
 
-  const shouldMergeLocalIntoCloud = hasAuthSession && hasLocalChangesVsCloud(localData, cloudData);
-  const merged = hasAuthSession ? mergeVaultData(localData, cloudData) : null;
-  const initial = merged || cloudData || localData || {};
-
-  if (hasAuthSession && merged && shouldMergeLocalIntoCloud) save(merged);
-  else if (cloudData) save(cloudData);
-
-  normalizeState(initial);
-  setupEvents();
   applyI18n();
   updateLangButtons();
-  els.btnMobileMenu?.setAttribute("aria-expanded", "false");
-  if (els.sortSelect) els.sortSelect.value = state.sortBy || "newest";
-  if (els.filterTagInput) els.filterTagInput.value = state.filters.tag || "";
+  if (els.sortSelect) els.sortSelect.value = state.sortBy;
+  if (els.filterTagInput) els.filterTagInput.value = state.filters.tag;
   if (els.filterFavoriteOnly) els.filterFavoriteOnly.checked = !!state.filters.favoriteOnly;
-  updateRulesVisibility();
-  render(state, els, persist, { onEditItem: openEditLinkModal, onOpenItem: markItemViewed });
+  if (els.filtersPanel) els.filtersPanel.hidden = !state.ui.filtersOpen;
+  renderTagSuggestions();
+  renderApp();
 }
 
 void bootstrap();

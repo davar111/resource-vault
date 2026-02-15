@@ -335,7 +335,7 @@ select option { background: #1b1b1b; color: var(--text-primary); }
 .card {
   --stagger: 0ms;
   position: relative;
-  height: 430px;
+  height: 390px;
   margin: 0;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
@@ -349,8 +349,8 @@ select option { background: #1b1b1b; color: var(--text-primary); }
 }
 .card:hover { border-color: var(--border-default); background: var(--bg-surface-2); }
 .card--dragging { opacity: 0.62; }
-.card--menu-open { z-index: 30; }
 .card__preview-wrap {
+  position: relative;
   display: block;
   overflow: hidden;
   border-radius: var(--radius-sm);
@@ -358,7 +358,37 @@ select option { background: #1b1b1b; color: var(--text-primary); }
   background: #141414;
   margin-bottom: var(--space-3);
 }
+.card__preview-link { display: block; }
 .card__preview { width: 100%; display: block; aspect-ratio: 16 / 10; object-fit: cover; }
+.card__fav-preview {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 999px;
+  background: rgba(17, 17, 17, 0.72);
+  backdrop-filter: blur(4px);
+  color: #f2f2f2;
+  display: inline-grid;
+  place-items: center;
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 120ms ease, transform 120ms ease, background-color 120ms ease, color 120ms ease;
+}
+.card:hover .card__fav-preview,
+.card__preview-wrap:hover .card__fav-preview,
+.card__fav-preview:focus-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+.card__fav-preview:hover { background: rgba(17, 17, 17, 0.88); }
+.card__fav-preview--on {
+  color: #ff6b7a;
+  border-color: rgba(255, 107, 122, 0.7);
+}
 .card__top { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); }
 .card__left { display: flex; gap: var(--space-3); align-items: flex-start; min-width: 0; }
 .card__tools { display: inline-flex; align-items: center; gap: 6px; position: relative; flex: 0 0 auto; }
@@ -421,7 +451,8 @@ select option { background: #1b1b1b; color: var(--text-primary); }
   flex: 0 0 auto;
 }
 .card__note-more:hover { background: var(--bg-surface-3); color: var(--text-primary); }
-.tags { margin-top: auto; display: flex; flex-wrap: wrap; gap: 8px; max-height: 56px; overflow: hidden; }
+.card__note--empty { color: var(--text-placeholder); }
+.tags { margin-top: var(--space-3); display: flex; flex-wrap: wrap; gap: 8px; max-height: 56px; overflow: hidden; }
 .tag {
   font-size: 12px;
   line-height: 1.2;
@@ -461,8 +492,8 @@ select option { background: #1b1b1b; color: var(--text-primary); }
 
 .card--add {
   width: 100%;
-  min-height: 430px;
-  height: 430px;
+  min-height: 390px;
+  height: 390px;
   border-style: dashed;
   border-color: var(--border-default);
   background: #1b1b1b;
@@ -560,6 +591,29 @@ select option { background: #1b1b1b; color: var(--text-primary); }
 }
 .fav:hover { background: var(--bg-surface-3); color: var(--text-primary); }
 .fav--on { background: #303030; border-color: var(--border-strong); color: var(--text-primary); }
+.card__delete {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  background: var(--bg-surface-2);
+  color: var(--text-secondary);
+  display: inline-grid;
+  place-items: center;
+  cursor: pointer;
+  line-height: 1;
+}
+.card__delete:hover { background: #2b1b1b; border-color: #5b3434; color: #ffd1d1; }
+.card__delete svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
 
 .card__menu { position: relative; }
 .card__menu-trigger {
@@ -644,6 +698,8 @@ select option { background: #1b1b1b; color: var(--text-primary); }
   color: var(--text-primary);
   padding: var(--space-4);
 }
+.modal__card--small { width: min(420px, 94vw); }
+.modal__text { margin: 0 0 var(--space-4); color: var(--text-secondary); font-size: 14px; }
 .modal__card::-webkit-scrollbar { width: 0; height: 0; }
 .modal__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-2); }
 .modal__title { font-size: 22px; font-weight: 700; }

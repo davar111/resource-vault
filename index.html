@@ -35,6 +35,14 @@
             </div>
             <nav id="collectionsList" class="collections"></nav>
           </div>
+
+          <div class="sidebar__section">
+            <div class="sidebar__section-head">
+              <div class="sidebar__label" id="labelSavedFilters">Saved filters</div>
+              <button id="btnSaveFilter" class="btn btn--secondary btn--icon" type="button" aria-label="Save filter">+</button>
+            </div>
+            <nav id="savedFiltersList" class="collections"></nav>
+          </div>
         </div>
 
         <div class="sidebar__bottom sidebar__bottom--stack">
@@ -136,16 +144,11 @@
         </div>
 
         <div class="modal__section">
-          <div id="labelAddTo" class="modal__section-title">Add to</div>
+          <div id="labelAddTo" class="modal__section-title">Add to collections</div>
           <div id="addCollectionsList" class="multi__chips"></div>
-          <label class="check">
-            <input id="addFavorite" type="checkbox" name="favorite" />
-            <span id="labelAddFavorite">Mark as favorite</span>
-          </label>
         </div>
 
         <div class="modal__section">
-          <div id="sectionAddClassify" class="modal__section-title">Classification</div>
           <label class="field">
             <span id="labelAddTags">Tags (comma)</span>
             <input id="inputAddTags" name="tags" autocomplete="off" placeholder="dark, fintech" />
@@ -157,32 +160,37 @@
               <span id="labelAddType">Type</span>
               <select name="type">
                 <option value="">Any</option>
-                <option value="Project">Project</option>
-                <option value="Studio">Studio</option>
-                <option value="Designer">Designer</option>
-                <option value="Inspiration">Inspiration</option>
-                <option value="Source">Source</option>
+                <option value="case">Case</option>
+                <option value="inspiration">Inspiration</option>
+                <option value="article">Article</option>
+                <option value="tool">Tool</option>
+                <option value="asset">Asset</option>
               </select>
             </label>
 
             <label id="addSourceField" class="field">
               <span id="labelAddSource">Source</span>
               <select id="inputAddSource" name="source">
-                <option value="Other">Other</option>
-                <option value="Site">Site</option>
-                <option value="Behance">Behance</option>
-                <option value="Awwwards">Awwwards</option>
-                <option value="Pinterest">Pinterest</option>
-                <option value="Dribbble">Dribbble</option>
+                <option value="other">Other</option>
+                <option value="site">Site</option>
+                <option value="behance">Behance</option>
+                <option value="awwwards">Awwwards</option>
+                <option value="pinterest">Pinterest</option>
+                <option value="dribbble">Dribbble</option>
               </select>
             </label>
           </div>
+
+          <label class="check">
+            <input id="addFavorite" type="checkbox" name="favorite" />
+            <span id="labelAddFavorite">Favorite</span>
+          </label>
         </div>
 
         <div class="modal__section">
           <label class="field">
             <span id="labelAddNote">Note</span>
-            <textarea id="inputAddNote" name="note" rows="3" placeholder="Why saved?"></textarea>
+            <textarea id="inputAddNote" name="note" rows="3" placeholder="Зачем сохранил?"></textarea>
           </label>
         </div>
 
@@ -210,62 +218,24 @@
           <input name="description" placeholder="Optional short description" />
         </label>
 
-        <div class="field">
-          <span id="labelCollectionKind">Collection type</span>
-          <div class="kind-toggle">
-            <label class="chip-check">
-              <input id="kindManual" type="radio" name="kind" value="manual" checked />
-              <span id="labelKindManual">Manual</span>
-            </label>
-            <label class="chip-check">
-              <input id="kindSmart" type="radio" name="kind" value="smart" />
-              <span id="labelKindSmart">Smart</span>
-            </label>
-          </div>
-        </div>
-
-        <div id="collectionRules" class="modal__section" hidden>
-          <div id="sectionColRules" class="modal__section-title">Collection rules</div>
-          <div id="smartHint" class="hint">This is a dynamic view based on rules.</div>
-
-          <div class="row">
-            <fieldset class="field multi">
-              <legend id="labelColTypes">Types</legend>
-              <div class="multi__chips" id="colTypesChips"></div>
-            </fieldset>
-
-            <fieldset class="field multi">
-              <legend id="labelColSources">Sources</legend>
-              <div class="multi__chips" id="colSourcesChips"></div>
-            </fieldset>
-          </div>
-
-          <label class="field">
-            <span id="labelColAllTags">All tags (required)</span>
-            <input id="inputColAllTags" name="requiredTags" placeholder="dark, fintech" />
-          </label>
-
-          <label class="field">
-            <span id="labelColAnyTags">Any tag (at least one)</span>
-            <input id="inputColAnyTags" name="anyTags" placeholder="landing, typography" />
-          </label>
-
-          <label class="field">
-            <span id="labelColQuery">Contains text</span>
-            <input id="inputColQuery" name="containsText" placeholder="saas, serif, motion" />
-          </label>
-
-          <label class="check">
-            <input type="checkbox" name="onlyFavorites" />
-            <span id="labelColFavOnly">Only favorites</span>
-          </label>
-        </div>
-
         <div class="row row--end">
           <button id="colCancel" class="btn btn--secondary" type="button">Cancel</button>
           <button id="colCreate" class="btn btn--primary" type="submit">Create</button>
         </div>
       </form>
+    </dialog>
+
+    <dialog id="modalDeleteLink" class="modal">
+      <div class="modal__card modal__card--small">
+        <div class="modal__header">
+          <div id="modalDeleteTitle" class="modal__title">Delete link?</div>
+        </div>
+        <p id="modalDeleteText" class="modal__text">This action cannot be undone.</p>
+        <div class="row row--end">
+          <button id="deleteCancel" class="btn btn--secondary" type="button">Cancel</button>
+          <button id="deleteConfirm" class="btn btn--destructive" type="button">Delete</button>
+        </div>
+      </div>
     </dialog>
 
     <script type="module" src="/src/main.js"></script>

@@ -25,12 +25,24 @@ export function normalizeSearchText(input) {
 }
 
 export function detectSource(url) {
-  const u = String(url || "").toLowerCase();
-  if (u.includes("behance.net")) return "Behance";
-  if (u.includes("awwwards.com")) return "Awwwards";
-  if (u.includes("pinterest.")) return "Pinterest";
-  if (u.includes("dribbble.com")) return "Dribbble";
-  return "Site";
+  return detectSourceFromUrl(url);
+}
+
+export function detectSourceFromUrl(url) {
+  const raw = String(url || "").trim();
+  if (!raw) return "other";
+
+  try {
+    const u = new URL(raw);
+    const host = u.hostname.toLowerCase();
+    if (host.includes("behance.net")) return "behance";
+    if (host.includes("dribbble.com")) return "dribbble";
+    if (host.includes("pinterest.com") || host.includes("pin.it")) return "pinterest";
+    if (host.includes("awwwards.com")) return "awwwards";
+    return "site";
+  } catch {
+    return "other";
+  }
 }
 
 export function domainFromUrl(url) {
