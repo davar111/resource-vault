@@ -134,7 +134,6 @@ create policy "link_collections_select_own" on public.link_collections for selec
 );
 create policy "link_collections_insert_own" on public.link_collections for insert to authenticated with check (
   user_id = auth.uid()
-  and exists (select 1 from public.links l where l.id = link_collections.link_id and l.user_id = auth.uid())
   and (
     exists (select 1 from public.collections c where c.id = link_collections.collection_id and c.user_id = auth.uid())
     or exists (
