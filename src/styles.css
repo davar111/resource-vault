@@ -716,9 +716,10 @@ select option { background: var(--bg-surface-1); color: var(--text-primary); }
 }
 .card__delete:hover { background: #2b1b1b; border-color: #5b3434; color: #ffd1d1; }
 .card__delete svg {
-  width: 39px;
-  height: 39px;
+  width: 24px;
+  height: 24px;
   fill: currentColor;
+  display: block;
 }
 
 .card__menu { position: relative; }
