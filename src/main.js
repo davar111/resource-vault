@@ -69,6 +69,7 @@ const els = {
   labelAddSource: document.getElementById("labelAddSource"),
   labelAddNote: document.getElementById("labelAddNote"),
   labelAddTo: document.getElementById("labelAddTo"),
+  addToSection: document.getElementById("addToSection"),
   labelAddFavorite: document.getElementById("labelAddFavorite"),
   inputAddUrl: document.querySelector('#formAddLink input[name="url"]'),
   inputAddTitle: document.getElementById("inputAddTitle"),
@@ -248,7 +249,13 @@ function openNewLinkModal(preset = {}) {
   sourceAutofillEnabled = true;
   activeTagMenuIndex = -1;
   els.formAddLink?.reset();
-  renderAddCollectionChoices();
+  const inManualCollection = state.activeCollectionId !== "all"
+    && state.activeCollectionId !== "fav"
+    && state.activeCollectionId !== "recent"
+    && !state.activeSavedFilterId
+    && state.collections.some((c) => c.id === state.activeCollectionId);
+  if (els.addToSection) els.addToSection.hidden = inManualCollection;
+  renderAddCollectionChoices(inManualCollection ? [state.activeCollectionId] : []);
   renderTagSuggestions();
   if (els.inputAddUrl) els.inputAddUrl.value = String(preset.url || "");
   if (els.inputAddTitle) els.inputAddTitle.value = String(preset.title || "");
@@ -686,7 +693,14 @@ function setupEvents() {
     try { url = new URL(rawUrl).toString(); } catch { alert(state.lang === "ru" ? "Некорректный URL." : "Invalid URL."); return; }
     if (findDuplicateLink(url)) { alert(state.lang === "ru" ? "Такая ссылка уже есть." : "Link already exists."); return; }
 
-    const selectedCollections = fd.getAll("collections").map((x) => String(x)).filter((id) => state.collections.some((c) => c.id === id));
+    const activeCollectionIsManual = state.activeCollectionId !== "all"
+      && state.activeCollectionId !== "fav"
+      && state.activeCollectionId !== "recent"
+      && !state.activeSavedFilterId
+      && state.collections.some((c) => c.id === state.activeCollectionId);
+    const selectedCollections = activeCollectionIsManual
+      ? [state.activeCollectionId]
+      : fd.getAll("collections").map((x) => String(x)).filter((id) => state.collections.some((c) => c.id === id));
     if (els.addSave) els.addSave.disabled = true;
     const created = await createLink({
       url,
