@@ -7,7 +7,7 @@ import { render } from "./ui.js";
 import { SOURCE_CODES, TYPE_CODES } from "./domain.js";
 import { initAuth, loginWithGoogle, logout } from "./useAuth.js";
 import { createLink, deleteLink, listLinks, updateLink } from "./useLinks.js";
-import { createCollection, createCollectionInvite, deleteCollection, listCollections, listLinkCollections, replaceLinkCollections, updateCollection } from "./useCollections.js";
+import { addLinkCollections, createCollection, createCollectionInvite, deleteCollection, listCollections, listLinkCollections, replaceLinkCollections, updateCollection } from "./useCollections.js";
 import { createSavedFilter, deleteSavedFilter, listSavedFilters } from "./useSavedFilters.js";
 
 const TITLE_MIN_LEN = 2;
@@ -702,23 +702,29 @@ function setupEvents() {
       ? [state.activeCollectionId]
       : fd.getAll("collections").map((x) => String(x)).filter((id) => state.collections.some((c) => c.id === id));
     if (els.addSave) els.addSave.disabled = true;
-    const created = await createLink({
-      url,
-      title: title || domainFromUrl(url),
-      note,
-      tags: normalizeTags(fd.get("tags")),
-      type: String(fd.get("type") || "") || null,
-      source: String(fd.get("source") || "") || detectSourceFromUrl(url),
-      favorite: !!fd.get("favorite")
-    }, currentUser.id);
-    if (created) {
-      await replaceLinkCollections(created.id, selectedCollections, currentUser.id);
-      state.items.unshift({ ...created, previewImage: previewFallbackUrl(created.url), collectionIds: selectedCollections });
-      closeAddModal();
-      renderTagSuggestions();
+    try {
+      const created = await createLink({
+        url,
+        title: title || domainFromUrl(url),
+        note,
+        tags: normalizeTags(fd.get("tags")),
+        type: String(fd.get("type") || "") || null,
+        source: String(fd.get("source") || "") || detectSourceFromUrl(url),
+        favorite: !!fd.get("favorite")
+      }, currentUser.id);
+      if (created) {
+        // For newly created links we only need INSERT into relation table.
+        await addLinkCollections(created.id, selectedCollections, currentUser.id);
+        state.items.unshift({ ...created, previewImage: previewFallbackUrl(created.url), collectionIds: selectedCollections });
+        closeAddModal();
+        renderTagSuggestions();
+      }
+      renderApp();
+    } catch (err) {
+      alert(err?.message || (state.lang === "ru" ? "Не удалось добавить ссылку." : "Failed to add link."));
+    } finally {
+      if (els.addSave) els.addSave.disabled = false;
     }
-    if (els.addSave) els.addSave.disabled = false;
-    renderApp();
   });
 
   els.inputAddUrl?.addEventListener("input", updateAddSourceUi);

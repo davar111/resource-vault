@@ -89,6 +89,21 @@ export async function replaceLinkCollections(linkId, collectionIds, userId) {
   });
 }
 
+export async function addLinkCollections(linkId, collectionIds, userId) {
+  const uniqueIds = [...new Set((collectionIds || []).map((x) => String(x)).filter(Boolean))];
+  if (!uniqueIds.length) return;
+
+  await supabaseRequest(restPath(LINK_COLLECTIONS_TABLE), {
+    method: "POST",
+    body: uniqueIds.map((collectionId) => ({
+      user_id: userId,
+      link_id: linkId,
+      collection_id: collectionId
+    })),
+    prefer: "return=minimal"
+  });
+}
+
 export async function createCollectionInvite(collectionId, email, ownerUserId) {
   const normalized = normalizeEmail(email);
   if (!normalized) return null;
