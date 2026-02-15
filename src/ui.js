@@ -36,6 +36,11 @@ function renderCollections(state, els, onChange, L) {
 
   for (const c of state.collections || []) {
     const count = visibleItems(state, c).length;
+    const isOwner = !!(state.currentUserId && c.ownerId === state.currentUserId);
+    const canInvite = !!(isOwner && c.isShared);
+    const canManage = !!isOwner;
+    const hasMenu = canInvite || canManage;
+    const sharedBadge = c.isShared ? `<span class="badge badge--smart">${escapeHtml(t(L, "sharedBadge"))}</span>` : "";
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "collection" + (state.activeCollectionId === c.id ? " collection--active" : "");
@@ -43,17 +48,18 @@ function renderCollections(state, els, onChange, L) {
     btn.innerHTML = `
       <div class="collection__left">
         <div class="dot"></div>
-        <div class="collection__name"><div>${escapeHtml(c.name)}</div></div>
+        <div class="collection__name"><div>${escapeHtml(c.name)}</div>${sharedBadge}</div>
       </div>
       <div class="collection__right">
         <div class="badge">${count}</div>
-        <div class="collection__menu">
+        ${hasMenu ? `<div class="collection__menu">
           <button class="collection__menu-trigger" type="button" data-col-menu="1"><span class="collection__menu-dots">&#8943;</span></button>
           <div class="collection__menu-pop" data-col-pop hidden>
-            <button class="collection__menu-item" type="button" data-col-rename="1">${escapeHtml(t(L, "renameCollection"))}</button>
-            <button class="collection__menu-item collection__menu-item--danger" type="button" data-col-del="1">${escapeHtml(t(L, "deleteCollection"))}</button>
+            ${canInvite ? `<button class="collection__menu-item" type="button" data-col-invite="1">${escapeHtml(t(L, "inviteToCollection"))}</button>` : ""}
+            ${canManage ? `<button class="collection__menu-item" type="button" data-col-rename="1">${escapeHtml(t(L, "renameCollection"))}</button>` : ""}
+            ${canManage ? `<button class="collection__menu-item collection__menu-item--danger" type="button" data-col-del="1">${escapeHtml(t(L, "deleteCollection"))}</button>` : ""}
           </div>
-        </div>
+        </div>` : ""}
       </div>
     `;
 
@@ -98,6 +104,12 @@ function renderCollections(state, els, onChange, L) {
       const name = String(next).trim();
       if (!name) return;
       await activeActions?.onRenameCollection?.(c.id, name);
+    });
+
+    btn.querySelector("[data-col-invite]")?.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      closeAllCollectionMenus();
+      await activeActions?.onInviteCollection?.(c.id);
     });
 
     btn.querySelector("[data-col-del]")?.addEventListener("click", async (e) => {

@@ -25,11 +25,27 @@ create table if not exists public.collections (
   user_id uuid not null,
   name text not null,
   description text null,
+  is_shared boolean not null default false,
   created_at timestamptz not null default now()
 );
+alter table public.collections add column if not exists is_shared boolean not null default false;
 
 create index if not exists collections_user_id_idx on public.collections (user_id);
 create index if not exists collections_created_at_idx on public.collections (created_at desc);
+create index if not exists collections_is_shared_idx on public.collections (is_shared);
+
+create table if not exists public.collection_invites (
+  id uuid primary key default gen_random_uuid(),
+  collection_id uuid not null references public.collections(id) on delete cascade,
+  owner_user_id uuid not null,
+  invitee_email text not null,
+  created_at timestamptz not null default now()
+);
+
+create unique index if not exists collection_invites_unique_email_per_collection_idx
+  on public.collection_invites (collection_id, lower(invitee_email));
+create index if not exists collection_invites_owner_user_id_idx on public.collection_invites (owner_user_id);
+create index if not exists collection_invites_invitee_email_idx on public.collection_invites (lower(invitee_email));
 
 create table if not exists public.link_collections (
   id uuid primary key default gen_random_uuid(),
@@ -59,12 +75,24 @@ alter table public.links enable row level security;
 alter table public.collections enable row level security;
 alter table public.link_collections enable row level security;
 alter table public.saved_filters enable row level security;
+alter table public.collection_invites enable row level security;
 
 drop policy if exists "links_select_own" on public.links;
 drop policy if exists "links_insert_own" on public.links;
 drop policy if exists "links_update_own" on public.links;
 drop policy if exists "links_delete_own" on public.links;
-create policy "links_select_own" on public.links for select to authenticated using (user_id = auth.uid());
+create policy "links_select_own" on public.links for select to authenticated using (
+  user_id = auth.uid()
+  or exists (
+    select 1
+    from public.link_collections lc
+    join public.collections c on c.id = lc.collection_id
+    join public.collection_invites ci on ci.collection_id = c.id
+    where lc.link_id = links.id
+      and c.is_shared = true
+      and lower(ci.invitee_email) = lower(coalesce(auth.jwt()->>'email', ''))
+  )
+);
 create policy "links_insert_own" on public.links for insert to authenticated with check (user_id = auth.uid());
 create policy "links_update_own" on public.links for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
 create policy "links_delete_own" on public.links for delete to authenticated using (user_id = auth.uid());
@@ -73,7 +101,18 @@ drop policy if exists "collections_select_own" on public.collections;
 drop policy if exists "collections_insert_own" on public.collections;
 drop policy if exists "collections_update_own" on public.collections;
 drop policy if exists "collections_delete_own" on public.collections;
-create policy "collections_select_own" on public.collections for select to authenticated using (user_id = auth.uid());
+create policy "collections_select_own" on public.collections for select to authenticated using (
+  user_id = auth.uid()
+  or (
+    is_shared = true
+    and exists (
+      select 1
+      from public.collection_invites ci
+      where ci.collection_id = collections.id
+        and lower(ci.invitee_email) = lower(coalesce(auth.jwt()->>'email', ''))
+    )
+  )
+);
 create policy "collections_insert_own" on public.collections for insert to authenticated with check (user_id = auth.uid());
 create policy "collections_update_own" on public.collections for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
 create policy "collections_delete_own" on public.collections for delete to authenticated using (user_id = auth.uid());
@@ -82,10 +121,37 @@ drop policy if exists "link_collections_select_own" on public.link_collections;
 drop policy if exists "link_collections_insert_own" on public.link_collections;
 drop policy if exists "link_collections_update_own" on public.link_collections;
 drop policy if exists "link_collections_delete_own" on public.link_collections;
-create policy "link_collections_select_own" on public.link_collections for select to authenticated using (user_id = auth.uid());
-create policy "link_collections_insert_own" on public.link_collections for insert to authenticated with check (user_id = auth.uid());
+create policy "link_collections_select_own" on public.link_collections for select to authenticated using (
+  user_id = auth.uid()
+  or exists (
+    select 1
+    from public.collections c
+    join public.collection_invites ci on ci.collection_id = c.id
+    where c.id = link_collections.collection_id
+      and c.is_shared = true
+      and lower(ci.invitee_email) = lower(coalesce(auth.jwt()->>'email', ''))
+  )
+);
+create policy "link_collections_insert_own" on public.link_collections for insert to authenticated with check (
+  user_id = auth.uid()
+  and exists (select 1 from public.links l where l.id = link_collections.link_id and l.user_id = auth.uid())
+  and (
+    exists (select 1 from public.collections c where c.id = link_collections.collection_id and c.user_id = auth.uid())
+    or exists (
+      select 1
+      from public.collections c
+      join public.collection_invites ci on ci.collection_id = c.id
+      where c.id = link_collections.collection_id
+        and c.is_shared = true
+        and lower(ci.invitee_email) = lower(coalesce(auth.jwt()->>'email', ''))
+    )
+  )
+);
 create policy "link_collections_update_own" on public.link_collections for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
-create policy "link_collections_delete_own" on public.link_collections for delete to authenticated using (user_id = auth.uid());
+create policy "link_collections_delete_own" on public.link_collections for delete to authenticated using (
+  user_id = auth.uid()
+  or exists (select 1 from public.collections c where c.id = link_collections.collection_id and c.user_id = auth.uid())
+);
 
 drop policy if exists "saved_filters_select_own" on public.saved_filters;
 drop policy if exists "saved_filters_insert_own" on public.saved_filters;
@@ -95,3 +161,24 @@ create policy "saved_filters_select_own" on public.saved_filters for select to a
 create policy "saved_filters_insert_own" on public.saved_filters for insert to authenticated with check (user_id = auth.uid());
 create policy "saved_filters_update_own" on public.saved_filters for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
 create policy "saved_filters_delete_own" on public.saved_filters for delete to authenticated using (user_id = auth.uid());
+
+drop policy if exists "collection_invites_select_own_or_received" on public.collection_invites;
+drop policy if exists "collection_invites_insert_owner_only" on public.collection_invites;
+drop policy if exists "collection_invites_delete_owner_only" on public.collection_invites;
+create policy "collection_invites_select_own_or_received" on public.collection_invites for select to authenticated using (
+  owner_user_id = auth.uid()
+  or lower(invitee_email) = lower(coalesce(auth.jwt()->>'email', ''))
+);
+create policy "collection_invites_insert_owner_only" on public.collection_invites for insert to authenticated with check (
+  owner_user_id = auth.uid()
+  and exists (
+    select 1
+    from public.collections c
+    where c.id = collection_invites.collection_id
+      and c.user_id = auth.uid()
+      and c.is_shared = true
+  )
+);
+create policy "collection_invites_delete_owner_only" on public.collection_invites for delete to authenticated using (
+  owner_user_id = auth.uid()
+);

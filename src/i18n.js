@@ -30,6 +30,10 @@
 
     searchPlaceholder: "Поиск по URL, названию, заметке...",
     filters: "Фильтры",
+    themeLight: "Светлая",
+    themeDark: "Темная",
+    switchThemeToLight: "Включить светлую тему",
+    switchThemeToDark: "Включить темную тему",
 
     sortNewest: "Сначала новые",
     sortOldest: "Сначала старые",
@@ -64,6 +68,13 @@
     modalCollectionTitle: "Создать коллекцию",
     name: "Название",
     description: "Описание",
+    sharedCollection: "Совместная коллекция",
+    sharedBadge: "Совместная",
+    inviteToCollection: "Пригласить",
+    invitePrompt: "Email участника",
+    inviteInvalidEmail: "Введите корректный email.",
+    inviteSelfError: "Нельзя пригласить свою же почту.",
+    inviteSent: "Приглашение отправлено.",
     create: "Создать",
 
     saveFilterTitle: "Сохранить фильтр",
@@ -149,6 +160,10 @@
 
     searchPlaceholder: "Search in URL, title, note...",
     filters: "Filters",
+    themeLight: "Light",
+    themeDark: "Dark",
+    switchThemeToLight: "Switch to light theme",
+    switchThemeToDark: "Switch to dark theme",
 
     sortNewest: "Newest first",
     sortOldest: "Oldest first",
@@ -183,6 +198,13 @@
     modalCollectionTitle: "Create collection",
     name: "Name",
     description: "Description",
+    sharedCollection: "Shared collection",
+    sharedBadge: "Shared",
+    inviteToCollection: "Invite",
+    invitePrompt: "Teammate email",
+    inviteInvalidEmail: "Enter a valid email.",
+    inviteSelfError: "You cannot invite your own email.",
+    inviteSent: "Invitation sent.",
     create: "Create",
 
     saveFilterTitle: "Save filter",

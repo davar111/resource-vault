@@ -1,6 +1,9 @@
 export const state = {
   isAuthenticated: false,
+  currentUserId: "",
   lang: "ru",
+  themeMode: "system",
+  theme: "dark",
   activeCollectionId: "all",
   activeSavedFilterId: null,
   sortBy: "newest",
@@ -12,7 +15,8 @@ export const state = {
     favoriteOnly: false
   },
   ui: {
-    filtersOpen: false
+    filtersOpen: false,
+    mobileMenuOpen: false
   },
   recentViewedIds: [],
   items: [],

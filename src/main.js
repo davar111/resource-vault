@@ -7,17 +7,18 @@ import { render } from "./ui.js";
 import { SOURCE_CODES, TYPE_CODES } from "./domain.js";
 import { initAuth, loginWithGoogle, logout } from "./useAuth.js";
 import { createLink, deleteLink, listLinks, updateLink } from "./useLinks.js";
-import { createCollection, deleteCollection, listCollections, listLinkCollections, replaceLinkCollections, updateCollection } from "./useCollections.js";
+import { createCollection, createCollectionInvite, deleteCollection, listCollections, listLinkCollections, replaceLinkCollections, updateCollection } from "./useCollections.js";
 import { createSavedFilter, deleteSavedFilter, listSavedFilters } from "./useSavedFilters.js";
 
 const TITLE_MIN_LEN = 2;
 const TITLE_MAX_LEN = 120;
 const NOTE_MAX_LEN = 500;
 const FILTER_SORTS = new Set(["newest", "oldest", "title_asc", "title_desc", "source_asc"]);
+const THEME_MODES = new Set(["system", "light", "dark"]);
 
 const els = {
-  langRu: document.getElementById("langRu"),
-  langEn: document.getElementById("langEn"),
+  langSelect: document.getElementById("langSelect"),
+  btnTheme: document.getElementById("btnTheme"),
   brand: document.getElementById("brand"),
   navAll: document.getElementById("navAll"),
   navFav: document.getElementById("navFav"),
@@ -85,6 +86,8 @@ const els = {
   modalCollectionTitle: document.getElementById("modalCollectionTitle"),
   labelColName: document.getElementById("labelColName"),
   labelColDescription: document.getElementById("labelColDescription"),
+  labelColShared: document.getElementById("labelColShared"),
+  colShared: document.getElementById("colShared"),
   modalDeleteLink: document.getElementById("modalDeleteLink"),
   modalDeleteTitle: document.getElementById("modalDeleteTitle"),
   modalDeleteText: document.getElementById("modalDeleteText"),
@@ -107,7 +110,7 @@ function ensureAuth() {
 }
 
 function persistUiSettings() {
-  saveUiSettings({ lang: state.lang, sortBy: state.sortBy });
+  saveUiSettings({ lang: state.lang, sortBy: state.sortBy, themeMode: state.themeMode });
 }
 
 function syncSaveFilterButton() {
@@ -132,9 +135,34 @@ function authEmail(user) {
   return String(user?.email || user?.user_metadata?.email || "").trim();
 }
 
-function updateLangButtons() {
-  els.langRu?.classList.toggle("lang__btn--active", state.lang === "ru");
-  els.langEn?.classList.toggle("lang__btn--active", state.lang === "en");
+function preferredBrowserTheme() {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return "dark";
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+function resolveTheme(mode) {
+  return mode === "system" ? preferredBrowserTheme() : (mode === "light" ? "light" : "dark");
+}
+
+function applyTheme(mode) {
+  const nextMode = THEME_MODES.has(mode) ? mode : "system";
+  const nextTheme = resolveTheme(nextMode);
+  state.themeMode = nextMode;
+  state.theme = nextTheme;
+  document.documentElement.dataset.theme = nextTheme;
+}
+
+function syncLanguageSelect() {
+  if (!els.langSelect) return;
+  els.langSelect.value = state.lang === "en" ? "en" : "ru";
+}
+
+function syncThemeToggle() {
+  if (!els.btnTheme) return;
+  const nextIsDark = state.theme !== "dark";
+  els.btnTheme.textContent = state.theme === "dark" ? t(state.lang, "themeDark") : t(state.lang, "themeLight");
+  els.btnTheme.setAttribute("title", nextIsDark ? t(state.lang, "switchThemeToDark") : t(state.lang, "switchThemeToLight"));
+  els.btnTheme.setAttribute("aria-label", nextIsDark ? t(state.lang, "switchThemeToDark") : t(state.lang, "switchThemeToLight"));
 }
 
 function renderAuthStatus() {
@@ -283,6 +311,7 @@ function applyI18n() {
     els.btnSaveFilterInline.textContent = t(L, "saveFilter");
   }
   if (els.localHint) els.localHint.textContent = t(L, "localHint");
+  if (els.langSelect) els.langSelect.value = L === "en" ? "en" : "ru";
   if (els.searchInput) els.searchInput.placeholder = t(L, "searchPlaceholder");
   if (els.btnFilters) els.btnFilters.textContent = t(L, "filters");
   if (els.labelFilterTypes) els.labelFilterTypes.textContent = t(L, "filterTypes");
@@ -305,6 +334,7 @@ function applyI18n() {
   if (els.modalCollectionTitle) els.modalCollectionTitle.textContent = t(L, "modalCollectionTitle");
   if (els.labelColName) els.labelColName.textContent = t(L, "name");
   if (els.labelColDescription) els.labelColDescription.textContent = t(L, "description");
+  if (els.labelColShared) els.labelColShared.textContent = t(L, "sharedCollection");
   if (els.colCancel) els.colCancel.textContent = t(L, "cancel");
   if (els.colCreate) els.colCreate.textContent = t(L, "create");
   if (els.modalDeleteTitle) els.modalDeleteTitle.textContent = t(L, "deleteLinkTitle");
@@ -334,6 +364,7 @@ function applyI18n() {
   renderAddCollectionChoices();
   renderTagSuggestions();
   renderAuthStatus();
+  syncThemeToggle();
 }
 
 function filterPayload() {
@@ -349,6 +380,15 @@ function filterPayload() {
 
 function isFilterActive() {
   return Boolean(state.filters.types.length || state.filters.sources.length || state.filters.tag || state.filters.favoriteOnly || state.search);
+}
+
+function normalizeEmail(input) {
+  return String(input || "").trim().toLowerCase();
+}
+
+function isValidEmail(input) {
+  const normalized = normalizeEmail(input);
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized);
 }
 
 async function loadData() {
@@ -466,14 +506,46 @@ const actions = {
       pendingCollectionOps.delete(collectionId);
       return;
     }
-    const updated = await updateCollection(collectionId, { name, description: col.description });
+    const updated = await updateCollection(collectionId, {
+      name,
+      description: col.description,
+      isShared: !!col.isShared
+    });
     if (updated) {
       col.name = updated.name;
       col.description = updated.description;
+      col.isShared = updated.isShared;
     }
     pendingCollectionOps.delete(collectionId);
     renderAddCollectionChoices();
     renderApp();
+  },
+  onInviteCollection: async (collectionId) => {
+    if (!ensureAuth()) return;
+    const col = state.collections.find((x) => x.id === collectionId);
+    if (!col || !col.isShared || col.ownerId !== currentUser?.id) return;
+    const emailRaw = prompt(t(state.lang, "invitePrompt"), "") || "";
+    const email = normalizeEmail(emailRaw);
+    if (!email) return;
+    if (!isValidEmail(email)) {
+      alert(t(state.lang, "inviteInvalidEmail"));
+      return;
+    }
+    if (email === normalizeEmail(authEmail(currentUser))) {
+      alert(t(state.lang, "inviteSelfError"));
+      return;
+    }
+    try {
+      await createCollectionInvite(collectionId, email, currentUser.id);
+      alert(t(state.lang, "inviteSent"));
+    } catch (err) {
+      const msg = String(err?.message || "");
+      if (msg.includes("duplicate key")) {
+        alert(t(state.lang, "inviteSent"));
+      } else {
+        alert(msg || "Invite failed");
+      }
+    }
   },
   onDeleteCollection: async (collectionId) => {
     if (!ensureAuth()) return;
@@ -542,8 +614,17 @@ function setupEvents() {
   els.filterTagInput?.addEventListener("input", (e) => { state.activeSavedFilterId = null; state.filters.tag = normalizeSearchText(e.target.value); renderApp(); });
   els.filterFavoriteOnly?.addEventListener("change", (e) => { state.activeSavedFilterId = null; state.filters.favoriteOnly = !!e.target.checked; renderApp(); });
 
-  els.langRu?.addEventListener("click", () => { state.lang = "ru"; applyI18n(); updateLangButtons(); renderApp(); });
-  els.langEn?.addEventListener("click", () => { state.lang = "en"; applyI18n(); updateLangButtons(); renderApp(); });
+  els.langSelect?.addEventListener("change", (e) => {
+    state.lang = String(e.target?.value || "") === "en" ? "en" : "ru";
+    applyI18n();
+    syncLanguageSelect();
+    renderApp();
+  });
+  els.btnTheme?.addEventListener("click", () => {
+    applyTheme(state.theme === "dark" ? "light" : "dark");
+    syncThemeToggle();
+    renderApp();
+  });
 
   els.btnAuth?.addEventListener("click", async () => {
     if (authEmail(currentUser)) {
@@ -578,8 +659,9 @@ function setupEvents() {
     const name = String(fd.get("name") || "").trim();
     if (!name) return;
     const description = String(fd.get("description") || "").trim();
+    const isShared = !!fd.get("shared");
     if (els.colCreate) els.colCreate.disabled = true;
-    const created = await createCollection({ name, description }, currentUser.id);
+    const created = await createCollection({ name, description, isShared }, currentUser.id);
     if (created) {
       state.collections.push(created);
       state.activeCollectionId = created.id;
@@ -689,12 +771,24 @@ async function bootstrap() {
   const settings = loadUiSettings();
   state.lang = settings.lang === "en" ? "en" : "ru";
   state.sortBy = FILTER_SORTS.has(settings.sortBy) ? settings.sortBy : "newest";
+  applyTheme(THEME_MODES.has(settings.themeMode) ? settings.themeMode : "system");
   state.ui.filtersOpen = false;
   state.ui.mobileMenuOpen = false;
+
+  if (typeof window !== "undefined" && typeof window.matchMedia === "function") {
+    const colorScheme = window.matchMedia("(prefers-color-scheme: dark)");
+    colorScheme.addEventListener("change", () => {
+      if (state.themeMode === "system") {
+        applyTheme("system");
+        syncThemeToggle();
+      }
+    });
+  }
 
   setupEvents();
   try { currentUser = await initAuth(); } catch (err) { console.warn("Auth failed", err?.message || err); }
   state.isAuthenticated = !!currentUser?.id;
+  state.currentUserId = currentUser?.id || "";
   if (currentUser?.id) {
     try {
       await loadData();
@@ -706,6 +800,7 @@ async function bootstrap() {
       console.warn("Load failed", err?.message || err);
     }
   } else {
+    state.currentUserId = "";
     state.items = [];
     state.collections = [];
     state.savedFilters = [];
@@ -713,7 +808,8 @@ async function bootstrap() {
   }
 
   applyI18n();
-  updateLangButtons();
+  syncLanguageSelect();
+  syncThemeToggle();
   if (els.sortSelect) els.sortSelect.value = state.sortBy;
   if (els.filterTagInput) els.filterTagInput.value = state.filters.tag;
   if (els.filterFavoriteOnly) els.filterFavoriteOnly.checked = !!state.filters.favoriteOnly;

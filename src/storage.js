@@ -9,21 +9,28 @@ const SOURCE_VALUES = ["site", "behance", "awwwards", "pinterest", "dribbble", "
 export function loadUiSettings() {
   try {
     const raw = localStorage.getItem(UI_SETTINGS_KEY);
-    if (!raw) return { lang: "ru", sortBy: "newest" };
+    if (!raw) return { lang: "ru", sortBy: "newest", themeMode: "system" };
     const parsed = JSON.parse(raw);
+    const themeMode = parsed?.themeMode === "dark" || parsed?.themeMode === "light" || parsed?.themeMode === "system"
+      ? parsed.themeMode
+      : "system";
     return {
       lang: parsed?.lang === "en" ? "en" : "ru",
-      sortBy: typeof parsed?.sortBy === "string" ? parsed.sortBy : "newest"
+      sortBy: typeof parsed?.sortBy === "string" ? parsed.sortBy : "newest",
+      themeMode
     };
   } catch {
-    return { lang: "ru", sortBy: "newest" };
+    return { lang: "ru", sortBy: "newest", themeMode: "system" };
   }
 }
 
 export function saveUiSettings(settings) {
   const payload = {
     lang: settings?.lang === "en" ? "en" : "ru",
-    sortBy: typeof settings?.sortBy === "string" ? settings.sortBy : "newest"
+    sortBy: typeof settings?.sortBy === "string" ? settings.sortBy : "newest",
+    themeMode: settings?.themeMode === "dark" || settings?.themeMode === "light" || settings?.themeMode === "system"
+      ? settings.themeMode
+      : "system"
   };
   localStorage.setItem(UI_SETTINGS_KEY, JSON.stringify(payload));
 }
