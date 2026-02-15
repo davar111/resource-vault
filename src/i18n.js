@@ -12,6 +12,7 @@
     addLink: "+ Добавить ссылку",
     newCollection: "Создать коллекцию",
     saveFilter: "Сохранить фильтр",
+    saveFilterShort: "Сохранить",
     exportJson: "Экспорт JSON",
     importJson: "Импорт JSON",
     settings: "Настройки",
@@ -41,6 +42,7 @@
     filterTag: "Тег содержит",
     filterFavoriteOnly: "Только избранное",
     clearFilters: "Сбросить всё",
+    chipSearch: "Поиск",
 
     modalAddTitle: "Добавить ссылку",
     modalEditTitle: "Редактировать ссылку",
@@ -72,6 +74,10 @@
     del: "Удалить",
     deleteLinkTitle: "Удалить ссылку?",
     deleteLinkText: "Это действие нельзя отменить.",
+    deleteSavedFilterTitle: "Удалить фильтр?",
+    deleteSavedFilterText: "Сохраненный фильтр будет удален.",
+    deleteCollectionTitle: "Удалить коллекцию?",
+    deleteCollectionText: "Коллекция будет удалена. Ссылки останутся в Vault.",
     deleteCollection: "Удалить коллекцию",
     renameCollection: "Переименовать",
     renameCollectionPrompt: "Новое название коллекции",
@@ -108,6 +114,8 @@
     source_pinterest: "Pinterest",
     source_dribbble: "Dribbble",
     source_other: "Другое"
+    ,
+    authRequired: "Сначала войдите через Google."
   },
 
   en: {
@@ -123,6 +131,7 @@
     addLink: "+ Add link",
     newCollection: "Create collection",
     saveFilter: "Save filter",
+    saveFilterShort: "Save",
     exportJson: "Export JSON",
     importJson: "Import JSON",
     settings: "Settings",
@@ -152,6 +161,7 @@
     filterTag: "Tag contains",
     filterFavoriteOnly: "Only favorites",
     clearFilters: "Clear all",
+    chipSearch: "Search",
 
     modalAddTitle: "Add link",
     modalEditTitle: "Edit link",
@@ -183,6 +193,10 @@
     del: "Delete",
     deleteLinkTitle: "Delete link?",
     deleteLinkText: "This action cannot be undone.",
+    deleteSavedFilterTitle: "Delete filter?",
+    deleteSavedFilterText: "Saved filter will be removed.",
+    deleteCollectionTitle: "Delete collection?",
+    deleteCollectionText: "Collection will be removed. Links will stay in Vault.",
     deleteCollection: "Delete collection",
     renameCollection: "Rename",
     renameCollectionPrompt: "New collection name",
@@ -218,7 +232,8 @@
     source_awwwards: "Awwwards",
     source_pinterest: "Pinterest",
     source_dribbble: "Dribbble",
-    source_other: "Other"
+    source_other: "Other",
+    authRequired: "Sign in with Google first."
   }
 };
 

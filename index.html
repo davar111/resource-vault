@@ -36,10 +36,9 @@
             <nav id="collectionsList" class="collections"></nav>
           </div>
 
-          <div class="sidebar__section">
+          <div id="savedFiltersSection" class="sidebar__section" hidden>
             <div class="sidebar__section-head">
               <div class="sidebar__label" id="labelSavedFilters">Saved filters</div>
-              <button id="btnSaveFilter" class="btn btn--secondary btn--icon" type="button" aria-label="Save filter">+</button>
             </div>
             <nav id="savedFiltersList" class="collections"></nav>
           </div>
@@ -56,15 +55,6 @@
             <span id="btnAuthLabel">Sign in with Google</span>
           </button>
           <div id="authStatus" class="hint"></div>
-
-          <div class="settings">
-            <button id="btnSettings" class="btn btn--ghost" type="button">Settings</button>
-            <div id="settingsMenu" class="settings__menu" hidden>
-              <button id="btnExport" class="settings__item" type="button">Export JSON</button>
-              <button id="btnImport" class="settings__item" type="button">Import JSON</button>
-              <input id="fileImport" type="file" accept="application/json" hidden />
-            </div>
-          </div>
 
           <div id="localHint" class="hint">Данные хранятся локально в браузере (localStorage).</div>
         </div>
@@ -112,6 +102,9 @@
               <input id="filterFavoriteOnly" type="checkbox" />
               <span id="labelFilterFavorite">Only favorites</span>
             </label>
+          </div>
+          <div class="filters-actions">
+            <button id="btnSaveFilterInline" class="btn btn--secondary" type="button" hidden>Save filter</button>
           </div>
         </section>
 

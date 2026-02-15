@@ -1,4 +1,4 @@
-import "./styles.css";
+﻿import "./styles.css";
 import { state } from "./state.js";
 import { loadLegacyVault, loadUiSettings, saveUiSettings } from "./storage.js";
 import { TAG_MAX_LEN, TAG_MIN_LEN, detectSourceFromUrl, domainFromUrl, normalizeSearchText, normalizeTags, previewFallbackUrl } from "./filter.js";
@@ -25,6 +25,7 @@ const els = {
   labelNav: document.getElementById("labelNav"),
   labelCollections: document.getElementById("labelCollections"),
   labelSavedFilters: document.getElementById("labelSavedFilters"),
+  savedFiltersSection: document.getElementById("savedFiltersSection"),
   collectionsList: document.getElementById("collectionsList"),
   savedFiltersList: document.getElementById("savedFiltersList"),
   sidebar: document.getElementById("sidebar"),
@@ -49,15 +50,10 @@ const els = {
   grid: document.getElementById("grid"),
   btnAddLink: document.getElementById("btnAddLink"),
   btnNewCollection: document.getElementById("btnNewCollection"),
-  btnSaveFilter: document.getElementById("btnSaveFilter"),
-  btnSettings: document.getElementById("btnSettings"),
-  settingsMenu: document.getElementById("settingsMenu"),
-  btnExport: document.getElementById("btnExport"),
-  btnImport: document.getElementById("btnImport"),
+  btnSaveFilterInline: document.getElementById("btnSaveFilterInline"),
   btnAuth: document.getElementById("btnAuth"),
   btnAuthLabel: document.getElementById("btnAuthLabel"),
   authStatus: document.getElementById("authStatus"),
-  fileImport: document.getElementById("fileImport"),
   localHint: document.getElementById("localHint"),
   modalAddLink: document.getElementById("modalAddLink"),
   formAddLink: document.getElementById("formAddLink"),
@@ -100,13 +96,35 @@ let currentUser = null;
 let knownTags = [];
 let activeTagMenuIndex = -1;
 let sourceAutofillEnabled = true;
+const pendingLinkOps = new Set();
+const pendingCollectionOps = new Set();
+const pendingSavedFilterOps = new Set();
+
+function ensureAuth() {
+  if (currentUser?.id) return true;
+  alert(t(state.lang, "authRequired"));
+  return false;
+}
 
 function persistUiSettings() {
   saveUiSettings({ lang: state.lang, sortBy: state.sortBy });
 }
 
+function syncSaveFilterButton() {
+  if (!els.btnSaveFilterInline) return;
+  els.btnSaveFilterInline.hidden = !isFilterActive();
+}
+
+function syncSavedFiltersSection() {
+  if (!els.savedFiltersSection) return;
+  const hasSaved = Array.isArray(state.savedFilters) && state.savedFilters.length > 0;
+  els.savedFiltersSection.hidden = !state.isAuthenticated || !hasSaved;
+}
+
 function renderApp() {
   persistUiSettings();
+  syncSaveFilterButton();
+  syncSavedFiltersSection();
   render(state, els, persistUiSettings, actions);
 }
 
@@ -260,10 +278,10 @@ function applyI18n() {
   if (els.labelSavedFilters) els.labelSavedFilters.textContent = t(L, "savedFilters");
   if (els.btnAddLink) els.btnAddLink.textContent = t(L, "addLink");
   if (els.btnNewCollection) els.btnNewCollection.setAttribute("aria-label", t(L, "newCollection"));
-  if (els.btnSaveFilter) els.btnSaveFilter.setAttribute("aria-label", t(L, "saveFilter"));
-  if (els.btnSettings) els.btnSettings.textContent = t(L, "settings");
-  if (els.btnExport) els.btnExport.textContent = t(L, "exportJson");
-  if (els.btnImport) els.btnImport.textContent = t(L, "importJson");
+  if (els.btnSaveFilterInline) {
+    els.btnSaveFilterInline.setAttribute("aria-label", t(L, "saveFilter"));
+    els.btnSaveFilterInline.textContent = t(L, "saveFilter");
+  }
   if (els.localHint) els.localHint.textContent = t(L, "localHint");
   if (els.searchInput) els.searchInput.placeholder = t(L, "searchPlaceholder");
   if (els.btnFilters) els.btnFilters.textContent = t(L, "filters");
@@ -401,52 +419,85 @@ const actions = {
     renderApp();
   },
   onToggleFavorite: async (id, next) => {
+    if (!ensureAuth()) return;
+    if (pendingLinkOps.has(id)) return;
+    pendingLinkOps.add(id);
     const item = state.items.find((x) => x.id === id);
-    if (!item) return;
+    if (!item) {
+      pendingLinkOps.delete(id);
+      return;
+    }
     const updated = await updateLink(id, { ...item, favorite: !!next });
-    if (!updated) return;
-    item.favorite = updated.favorite;
+    if (updated) item.favorite = updated.favorite;
+    pendingLinkOps.delete(id);
     renderApp();
   },
   onDeleteItem: async (id) => {
+    if (!ensureAuth()) return;
+    if (pendingLinkOps.has(id)) return;
+    pendingLinkOps.add(id);
     await deleteLink(id);
     state.items = state.items.filter((x) => x.id !== id);
     renderTagSuggestions();
+    pendingLinkOps.delete(id);
     renderApp();
   },
   onAssignToCollection: async (linkId, collectionId) => {
+    if (!ensureAuth()) return;
+    if (pendingLinkOps.has(linkId)) return;
+    pendingLinkOps.add(linkId);
     const item = state.items.find((x) => x.id === linkId);
-    if (!item) return;
+    if (!item) {
+      pendingLinkOps.delete(linkId);
+      return;
+    }
     const next = [...new Set([...(item.collectionIds || []), collectionId])];
     await replaceLinkCollections(linkId, next, currentUser.id);
     item.collectionIds = next;
+    pendingLinkOps.delete(linkId);
     renderApp();
   },
   onRenameCollection: async (collectionId, name) => {
+    if (!ensureAuth()) return;
+    if (pendingCollectionOps.has(collectionId)) return;
+    pendingCollectionOps.add(collectionId);
     const col = state.collections.find((x) => x.id === collectionId);
-    if (!col) return;
+    if (!col) {
+      pendingCollectionOps.delete(collectionId);
+      return;
+    }
     const updated = await updateCollection(collectionId, { name, description: col.description });
-    if (!updated) return;
-    col.name = updated.name;
-    col.description = updated.description;
+    if (updated) {
+      col.name = updated.name;
+      col.description = updated.description;
+    }
+    pendingCollectionOps.delete(collectionId);
     renderAddCollectionChoices();
     renderApp();
   },
   onDeleteCollection: async (collectionId) => {
+    if (!ensureAuth()) return;
+    if (pendingCollectionOps.has(collectionId)) return;
+    pendingCollectionOps.add(collectionId);
     await deleteCollection(collectionId);
     state.collections = state.collections.filter((x) => x.id !== collectionId);
     for (const item of state.items) item.collectionIds = (item.collectionIds || []).filter((id) => id !== collectionId);
     if (state.activeCollectionId === collectionId) state.activeCollectionId = "all";
+    pendingCollectionOps.delete(collectionId);
     renderAddCollectionChoices();
     renderApp();
   },
   onDeleteSavedFilter: async (id) => {
+    if (!ensureAuth()) return;
+    if (pendingSavedFilterOps.has(id)) return;
+    pendingSavedFilterOps.add(id);
     await deleteSavedFilter(id);
     state.savedFilters = state.savedFilters.filter((x) => x.id !== id);
     if (state.activeSavedFilterId === id) {
       state.activeSavedFilterId = null;
       state.activeCollectionId = "all";
     }
+    pendingSavedFilterOps.delete(id);
     renderApp();
   }
 };
@@ -493,8 +544,6 @@ function setupEvents() {
 
   els.langRu?.addEventListener("click", () => { state.lang = "ru"; applyI18n(); updateLangButtons(); renderApp(); });
   els.langEn?.addEventListener("click", () => { state.lang = "en"; applyI18n(); updateLangButtons(); renderApp(); });
-  els.btnSettings?.addEventListener("click", (e) => { e.stopPropagation(); if (els.settingsMenu) els.settingsMenu.hidden = !els.settingsMenu.hidden; });
-  document.addEventListener("click", (e) => { if (!e.target.closest(".settings") && els.settingsMenu) els.settingsMenu.hidden = true; });
 
   els.btnAuth?.addEventListener("click", async () => {
     if (authEmail(currentUser)) {
@@ -507,48 +556,35 @@ function setupEvents() {
 
   els.btnAddLink?.addEventListener("click", () => { openNewLinkModal(); closeMobileMenuIfNeeded(); });
   els.btnNewCollection?.addEventListener("click", () => { els.formCollection?.reset(); els.modalCollection?.showModal(); closeMobileMenuIfNeeded(); });
-  els.btnSaveFilter?.addEventListener("click", async () => {
-    if (!currentUser?.id) return;
+  els.btnSaveFilterInline?.addEventListener("click", async () => {
+    if (!ensureAuth()) return;
+    if (els.btnSaveFilterInline?.disabled) return;
     if (!isFilterActive()) { alert(state.lang === "ru" ? "Сначала установите фильтры." : "Set filters first."); return; }
+    if (els.btnSaveFilterInline) els.btnSaveFilterInline.disabled = true;
     const name = String(prompt(t(state.lang, "saveFilterPrompt"), "") || "").trim();
-    if (!name) return;
-    const created = await createSavedFilter({ name, filter: filterPayload() }, currentUser.id);
-    if (!created) return;
-    state.savedFilters.push(created);
+    if (name) {
+      const created = await createSavedFilter({ name, filter: filterPayload() }, currentUser.id);
+      if (created) state.savedFilters.push(created);
+    }
+    if (els.btnSaveFilterInline) els.btnSaveFilterInline.disabled = false;
     renderApp();
-  });
-
-  els.btnExport?.addEventListener("click", () => {
-    const payload = {
-      version: 5,
-      exportedAt: new Date().toISOString(),
-      links: state.items,
-      collections: state.collections,
-      savedFilters: state.savedFilters
-    };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-    const anchor = document.createElement("a");
-    anchor.href = URL.createObjectURL(blob);
-    anchor.download = `vault_export_${new Date().toISOString().slice(0, 10)}.json`;
-    anchor.click();
-    URL.revokeObjectURL(anchor.href);
-  });
-
-  els.btnImport?.addEventListener("click", () => {
-    alert(state.lang === "ru" ? "Импорт отключен. Используется Supabase." : "Import is disabled. Supabase is the source of truth.");
   });
 
   els.formCollection?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    if (!currentUser?.id) return;
+    if (!ensureAuth()) return;
+    if (els.colCreate?.disabled) return;
     const fd = new FormData(els.formCollection);
     const name = String(fd.get("name") || "").trim();
     if (!name) return;
     const description = String(fd.get("description") || "").trim();
+    if (els.colCreate) els.colCreate.disabled = true;
     const created = await createCollection({ name, description }, currentUser.id);
-    if (!created) return;
-    state.collections.push(created);
-    state.activeCollectionId = created.id;
+    if (created) {
+      state.collections.push(created);
+      state.activeCollectionId = created.id;
+    }
+    if (els.colCreate) els.colCreate.disabled = false;
     els.modalCollection?.close();
     renderAddCollectionChoices();
     renderApp();
@@ -556,7 +592,8 @@ function setupEvents() {
 
   els.formAddLink?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    if (!currentUser?.id) return;
+    if (!ensureAuth()) return;
+    if (els.addSave?.disabled) return;
     const fd = new FormData(els.formAddLink);
     const rawUrl = String(fd.get("url") || "").trim();
     const title = String(fd.get("title") || "").trim().slice(0, TITLE_MAX_LEN);
@@ -568,6 +605,7 @@ function setupEvents() {
     if (findDuplicateLink(url)) { alert(state.lang === "ru" ? "Такая ссылка уже есть." : "Link already exists."); return; }
 
     const selectedCollections = fd.getAll("collections").map((x) => String(x)).filter((id) => state.collections.some((c) => c.id === id));
+    if (els.addSave) els.addSave.disabled = true;
     const created = await createLink({
       url,
       title: title || domainFromUrl(url),
@@ -577,11 +615,13 @@ function setupEvents() {
       source: String(fd.get("source") || "") || detectSourceFromUrl(url),
       favorite: !!fd.get("favorite")
     }, currentUser.id);
-    if (!created) return;
-    await replaceLinkCollections(created.id, selectedCollections, currentUser.id);
-    state.items.unshift({ ...created, previewImage: previewFallbackUrl(created.url), collectionIds: selectedCollections });
-    closeAddModal();
-    renderTagSuggestions();
+    if (created) {
+      await replaceLinkCollections(created.id, selectedCollections, currentUser.id);
+      state.items.unshift({ ...created, previewImage: previewFallbackUrl(created.url), collectionIds: selectedCollections });
+      closeAddModal();
+      renderTagSuggestions();
+    }
+    if (els.addSave) els.addSave.disabled = false;
     renderApp();
   });
 
@@ -654,6 +694,7 @@ async function bootstrap() {
 
   setupEvents();
   try { currentUser = await initAuth(); } catch (err) { console.warn("Auth failed", err?.message || err); }
+  state.isAuthenticated = !!currentUser?.id;
   if (currentUser?.id) {
     try {
       await loadData();
@@ -664,6 +705,11 @@ async function bootstrap() {
     } catch (err) {
       console.warn("Load failed", err?.message || err);
     }
+  } else {
+    state.items = [];
+    state.collections = [];
+    state.savedFilters = [];
+    state.activeSavedFilterId = null;
   }
 
   applyI18n();
@@ -677,3 +723,4 @@ async function bootstrap() {
 }
 
 void bootstrap();
+

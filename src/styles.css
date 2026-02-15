@@ -30,6 +30,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { height: 100%; }
 body {
   margin: 0;
@@ -60,13 +61,22 @@ textarea:focus-visible,
   flex: 0 0 304px;
   background: var(--bg-sidebar);
   border-right: 1px solid var(--border-subtle);
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
   gap: var(--space-3);
   padding: var(--space-4);
+  height: 100vh;
+  overflow: hidden;
 }
 
-.sidebar__top { display: flex; flex-direction: column; gap: var(--space-4); }
+.sidebar__top {
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 2px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
 .sidebar__section { display: flex; flex-direction: column; gap: var(--space-2); }
 .sidebar__section-head { display: flex; align-items: center; justify-content: space-between; }
 .sidebar__section-head .btn--icon {
@@ -92,7 +102,7 @@ textarea:focus-visible,
 .brand-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
 .brand { font-size: 22px; font-weight: 700; letter-spacing: 0.01em; }
 
-.sidebar__bottom { margin-top: auto; }
+.sidebar__bottom { margin-top: 0; }
 .sidebar__bottom--stack { display: flex; flex-direction: column; gap: var(--space-2); }
 .sidebar__bottom--stack > .btn,
 .sidebar__bottom--stack .settings > .btn {
@@ -182,6 +192,7 @@ textarea:focus-visible,
 .collection:hover .collection__menu-trigger,
 .collection:focus-visible .collection__menu-trigger,
 .collection .collection__menu-trigger:focus-visible,
+.collection__menu.collection__menu--open .collection__menu-trigger,
 .collection__menu:has(.collection__menu-pop:not([hidden])) .collection__menu-trigger {
   opacity: 1;
   pointer-events: auto;
@@ -296,6 +307,11 @@ select option { background: #1b1b1b; color: var(--text-primary); }
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-3);
+}
+.filters-actions {
+  margin-top: 10px;
+  display: flex;
+  justify-content: flex-end;
 }
 
 .chipsbar { border-bottom: 0; padding: 10px var(--space-5); }
@@ -860,7 +876,7 @@ select option { background: #1b1b1b; color: var(--text-primary); }
     line-height: 1;
   }
   .sidebar {
-    display: flex;
+    display: grid;
     position: fixed;
     top: 0;
     left: 0;
@@ -870,6 +886,7 @@ select option { background: #1b1b1b; color: var(--text-primary); }
     flex-basis: auto;
     transform: translateX(calc(-100% - 14px));
     transition: transform 180ms ease;
+    height: 100vh;
   }
   body.mobile-menu-open .sidebar { transform: translateX(0); }
   body.mobile-menu-open .mobile-overlay {

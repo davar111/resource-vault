@@ -86,6 +86,7 @@ function renderCollections(state, els, onChange, L) {
         const wasHidden = pop.hidden;
         closeAllCollectionMenus();
         pop.hidden = !wasHidden;
+        trigger.closest(".collection__menu")?.classList.toggle("collection__menu--open", !pop.hidden);
       });
     }
 
@@ -102,7 +103,12 @@ function renderCollections(state, els, onChange, L) {
     btn.querySelector("[data-col-del]")?.addEventListener("click", async (e) => {
       e.stopPropagation();
       closeAllCollectionMenus();
-      if (!confirm(t(L, "deleteCollectionConfirm"))) return;
+      const ok = await confirmAction(els, L, {
+        title: t(L, "deleteCollectionTitle"),
+        text: t(L, "deleteCollectionText"),
+        confirm: t(L, "del")
+      });
+      if (!ok) return;
       await activeActions?.onDeleteCollection?.(c.id);
     });
 
@@ -111,6 +117,9 @@ function renderCollections(state, els, onChange, L) {
 }
 
 function renderSavedFilters(state, els, onChange, actions, L) {
+  if (els.savedFiltersSection) {
+    els.savedFiltersSection.hidden = !state.isAuthenticated || !(state.savedFilters || []).length;
+  }
   if (!els.savedFiltersList) return;
   els.savedFiltersList.innerHTML = "";
 
@@ -158,13 +167,19 @@ function renderSavedFilters(state, els, onChange, actions, L) {
         const wasHidden = pop.hidden;
         closeAllCollectionMenus();
         pop.hidden = !wasHidden;
+        trigger.closest(".collection__menu")?.classList.toggle("collection__menu--open", !pop.hidden);
       });
     }
 
     btn.querySelector("[data-filter-del]")?.addEventListener("click", async (e) => {
       e.stopPropagation();
       closeAllCollectionMenus();
-      if (!confirm(t(L, "deleteLinkText"))) return;
+      const ok = await confirmAction(els, L, {
+        title: t(L, "deleteSavedFilterTitle"),
+        text: t(L, "deleteSavedFilterText"),
+        confirm: t(L, "del")
+      });
+      if (!ok) return;
       await actions?.onDeleteSavedFilter?.(f.id);
     });
 
@@ -241,7 +256,7 @@ function renderActiveFilters(state, els, onChange, L) {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "chip chip--on";
-    btn.textContent = `Search: ${state.search} x`;
+    btn.textContent = `${t(L, "chipSearch")}: ${state.search} x`;
     btn.addEventListener("click", () => {
       state.search = "";
       if (els.searchInput) els.searchInput.value = "";
@@ -351,7 +366,14 @@ function renderGrid(state, els, onChange, actions, L) {
       await actions?.onDeleteItem?.(item.id);
     });
 
-    card.querySelector("[data-note-expand]")?.addEventListener("click", () => alert(noteText));
+    card.querySelector("[data-note-expand]")?.addEventListener("click", async () => {
+      await confirmAction(els, L, {
+        title: t(L, "modalNote"),
+        text: noteText,
+        confirm: t(L, "cancel"),
+        hideCancel: true
+      });
+    });
 
     const previewEl = card.querySelector(".card__preview");
     if (previewEl) {
@@ -508,6 +530,7 @@ let collectionMenuOutsideBound = false;
 function closeAllCollectionMenus() {
   document.querySelectorAll("[data-col-pop], [data-filter-pop]").forEach((el) => {
     el.hidden = true;
+    el.closest(".collection__menu")?.classList.remove("collection__menu--open");
   });
 }
 
@@ -526,31 +549,67 @@ function ensureCollectionMenuOutsideClose() {
 }
 
 function confirmDelete(els, L) {
+  return confirmAction(els, L, {
+    title: t(L, "deleteLinkTitle"),
+    text: t(L, "deleteLinkText"),
+    confirm: t(L, "del")
+  });
+}
+
+function confirmAction(els, L, options = {}) {
   const dialog = els.modalDeleteLink;
-  if (!dialog || !els.deleteCancel || !els.deleteConfirm) return Promise.resolve(confirm(t(L, "deleteLinkText")));
+  if (!dialog || !els.deleteCancel || !els.deleteConfirm || !els.modalDeleteTitle || !els.modalDeleteText) {
+    return Promise.resolve(confirm(String(options.text || t(L, "deleteLinkText"))));
+  }
+
+  const title = String(options.title || t(L, "deleteLinkTitle"));
+  const text = String(options.text || t(L, "deleteLinkText"));
+  const confirmLabel = String(options.confirm || t(L, "del"));
+  const hideCancel = !!options.hideCancel;
+
+  const prevTitle = els.modalDeleteTitle.textContent || "";
+  const prevText = els.modalDeleteText.textContent || "";
+  const prevConfirm = els.deleteConfirm.textContent || "";
+  const prevCancelHidden = !!els.deleteCancel.hidden;
+
+  els.modalDeleteTitle.textContent = title;
+  els.modalDeleteText.textContent = text;
+  els.deleteConfirm.textContent = confirmLabel;
+  els.deleteCancel.hidden = hideCancel;
 
   return new Promise((resolve) => {
+    let settled = false;
     const cleanup = () => {
       els.deleteCancel.removeEventListener("click", onCancel);
       els.deleteConfirm.removeEventListener("click", onConfirm);
       dialog.removeEventListener("cancel", onCancel);
       dialog.removeEventListener("close", onClose);
+      els.modalDeleteTitle.textContent = prevTitle;
+      els.modalDeleteText.textContent = prevText;
+      els.deleteConfirm.textContent = prevConfirm;
+      els.deleteCancel.hidden = prevCancelHidden;
     };
 
     const onCancel = (e) => {
       if (e) e.preventDefault();
+      if (settled) return;
+      settled = true;
       cleanup();
       dialog.close();
       resolve(false);
     };
 
     const onConfirm = () => {
+      if (settled) return;
+      settled = true;
       cleanup();
       dialog.close();
       resolve(true);
     };
 
     const onClose = () => {
+      if (settled) return;
+      settled = true;
       cleanup();
       resolve(false);
     };

@@ -1,4 +1,5 @@
 export const state = {
+  isAuthenticated: false,
   lang: "ru",
   activeCollectionId: "all",
   activeSavedFilterId: null,
