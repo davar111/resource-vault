@@ -17,6 +17,7 @@ const NOTE_MAX_LEN = 500;
 const FILTER_SORTS = new Set(["newest", "oldest", "title_asc", "title_desc", "source_asc"]);
 const THEME_MODES = new Set(["system", "light", "dark"]);
 const HIDDEN_PASSWORD_KEY = "resource_vault_hidden_password_v1";
+const DEMO_PREFS_KEY = "resource_vault_demo_prefs_v1";
 
 const els = {
   langSelect: document.getElementById("langSelect"),
@@ -462,6 +463,31 @@ function isValidEmail(input) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized);
 }
 
+function loadDemoPrefs() {
+  try {
+    const raw = localStorage.getItem(DEMO_PREFS_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveDemoFavorite(id, favorite) {
+  const prefs = loadDemoPrefs();
+  prefs[String(id)] = !!favorite;
+  localStorage.setItem(DEMO_PREFS_KEY, JSON.stringify(prefs));
+}
+
+function applyDemoPrefs(items) {
+  const prefs = loadDemoPrefs();
+  return (items || []).map((item) => {
+    if (!item?.isDemo) return item;
+    if (!(item.id in prefs)) return item;
+    return { ...item, favorite: !!prefs[item.id] };
+  });
+}
+
 function bytesToHex(bytes) {
   return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
@@ -653,6 +679,7 @@ const actions = {
     }
     if (item.isDemo) {
       item.favorite = !!next;
+      saveDemoFavorite(id, !!next);
       pendingLinkOps.delete(id);
       renderApp();
       return;
@@ -1032,19 +1059,19 @@ async function bootstrap() {
         await loadData();
       }
       if (!state.items.length) {
-        state.items = makeDemoLinks();
+        state.items = applyDemoPrefs(makeDemoLinks());
         state.isUsingDemoData = true;
       } else {
         state.isUsingDemoData = false;
       }
     } catch (err) {
       console.warn("Load failed", err?.message || err);
-      state.items = makeDemoLinks();
+      state.items = applyDemoPrefs(makeDemoLinks());
       state.isUsingDemoData = true;
     }
   } else {
     state.currentUserId = "";
-    state.items = makeDemoLinks();
+    state.items = applyDemoPrefs(makeDemoLinks());
     state.isUsingDemoData = true;
     state.collections = [];
     state.savedFilters = [];
