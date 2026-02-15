@@ -87,10 +87,17 @@ create policy "links_select_own" on public.links for select to authenticated usi
     select 1
     from public.link_collections lc
     join public.collections c on c.id = lc.collection_id
-    join public.collection_invites ci on ci.collection_id = c.id
     where lc.link_id = links.id
       and c.is_shared = true
-      and lower(ci.invitee_email) = lower(coalesce(auth.jwt()->>'email', ''))
+      and (
+        c.user_id = auth.uid()
+        or exists (
+          select 1
+          from public.collection_invites ci
+          where ci.collection_id = c.id
+            and lower(ci.invitee_email) = lower(coalesce(auth.jwt()->>'email', ''))
+        )
+      )
   )
 );
 create policy "links_insert_own" on public.links for insert to authenticated with check (user_id = auth.uid());
@@ -126,10 +133,17 @@ create policy "link_collections_select_own" on public.link_collections for selec
   or exists (
     select 1
     from public.collections c
-    join public.collection_invites ci on ci.collection_id = c.id
     where c.id = link_collections.collection_id
       and c.is_shared = true
-      and lower(ci.invitee_email) = lower(coalesce(auth.jwt()->>'email', ''))
+      and (
+        c.user_id = auth.uid()
+        or exists (
+          select 1
+          from public.collection_invites ci
+          where ci.collection_id = c.id
+            and lower(ci.invitee_email) = lower(coalesce(auth.jwt()->>'email', ''))
+        )
+      )
   )
 );
 create policy "link_collections_insert_own" on public.link_collections for insert to authenticated with check (
