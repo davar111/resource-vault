@@ -678,10 +678,7 @@ const actions = {
       return;
     }
     if (item.isDemo) {
-      item.favorite = !!next;
-      saveDemoFavorite(id, !!next);
       pendingLinkOps.delete(id);
-      renderApp();
       return;
     }
     const updated = await updateLink(id, { ...item, favorite: !!next });

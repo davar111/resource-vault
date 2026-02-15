@@ -363,7 +363,7 @@ function renderGrid(state, els, onChange, actions, L) {
         <a class="card__preview-link" href="${item.url}" target="_blank" rel="noreferrer">
           <img class="card__preview" src="${escapeHtml(previewSrc)}" data-fallback="${escapeHtml(previewFallbackUrl(item.url))}" alt="${escapeHtml(item.title || "preview")}" loading="lazy" referrerpolicy="no-referrer" />
         </a>
-        <button class="card__fav-preview ${item.favorite ? "card__fav-preview--on" : ""}" type="button" title="${escapeHtml(t(L, "favorites"))}">&#10084;</button>
+        <button class="card__fav-preview ${item.favorite ? "card__fav-preview--on" : ""} ${item.isDemo ? "card__fav-preview--disabled" : ""}" type="button" title="${escapeHtml(t(L, "favorites"))}" ${item.isDemo ? "disabled" : ""}>&#10084;</button>
       </div>
 
       <div class="card__top">
@@ -387,11 +387,13 @@ function renderGrid(state, els, onChange, actions, L) {
       <div class="tags">${tags.map((tg, i) => `<span class="tag ${i === 0 ? "tag--accent" : ""}"><span class="tag__text">${escapeHtml(tg)}</span></span>`).join("")}</div>
     `;
 
-    card.querySelector(".card__fav-preview")?.addEventListener("click", async (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      await actions?.onToggleFavorite?.(item.id, !item.favorite);
-    });
+    if (!item.isDemo) {
+      card.querySelector(".card__fav-preview")?.addEventListener("click", async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        await actions?.onToggleFavorite?.(item.id, !item.favorite);
+      });
+    }
 
     if (!item.isDemo) {
       card.querySelector("[data-del]")?.addEventListener("click", async () => {

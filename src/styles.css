@@ -503,6 +503,11 @@ select option { background: var(--bg-surface-1); color: var(--text-primary); }
   color: #ff6b7a;
   border-color: rgba(255, 107, 122, 0.7);
 }
+.card__fav-preview--disabled {
+  opacity: 0.45 !important;
+  cursor: not-allowed;
+  pointer-events: none;
+}
 .card__top { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); }
 .card__left { display: flex; gap: var(--space-3); align-items: center; min-width: 0; }
 .card__left > div { min-width: 0; flex: 1 1 auto; }
