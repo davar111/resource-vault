@@ -16,7 +16,8 @@ export const state = {
   },
   ui: {
     filtersOpen: false,
-    mobileMenuOpen: false
+    mobileMenuOpen: false,
+    hiddenUnlocked: false
   },
   recentViewedIds: [],
   items: [],

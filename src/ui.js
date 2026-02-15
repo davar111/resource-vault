@@ -23,6 +23,10 @@ function renderNav(state, els, L) {
     els.navFav.textContent = t(L, "navFav");
     els.navFav.classList.toggle("nav-item--active", state.activeCollectionId === "fav");
   }
+  if (els.navHidden) {
+    els.navHidden.textContent = t(L, "navHidden");
+    els.navHidden.classList.toggle("nav-item--active", state.activeCollectionId === "hidden");
+  }
   if (els.navRecent) {
     els.navRecent.textContent = t(L, "navRecent");
     els.navRecent.classList.toggle("nav-item--active", state.activeCollectionId === "recent");
@@ -227,6 +231,11 @@ function renderHeader(state, els, L) {
     els.activeMeta.textContent = `${list.length} ${t(L, "items")}`;
     return;
   }
+  if (active.id === "hidden") {
+    els.activeTitle.textContent = t(L, "hidden");
+    els.activeMeta.textContent = `${list.length} ${t(L, "items")}`;
+    return;
+  }
 
   els.activeTitle.textContent = `${t(L, "collectionSingle")}: ${active.name}`;
   els.activeMeta.textContent = `${list.length} ${t(L, "items")} | ${t(L, "contextManual")}`;
@@ -310,6 +319,8 @@ function renderGrid(state, els, onChange, actions, L) {
       empty.innerHTML = `<div class="empty__title">${escapeHtml(t(L, "emptyFavTitle"))}</div><div class="empty__text">${escapeHtml(t(L, "emptyFavText"))}</div><div class="empty__actions"><button class="btn btn--primary" type="button" data-add-link="1">${escapeHtml(t(L, "quickAdd"))}</button></div>`;
     } else if (active.id === "recent") {
       empty.innerHTML = `<div class="empty__title">${escapeHtml(t(L, "emptyRecentTitle"))}</div><div class="empty__text">${escapeHtml(t(L, "emptyRecentText"))}</div>`;
+    } else if (active.id === "hidden") {
+      empty.innerHTML = `<div class="empty__title">${escapeHtml(t(L, "emptyHiddenTitle"))}</div><div class="empty__text">${escapeHtml(t(L, "emptyHiddenText"))}</div><div class="empty__actions"><button class="btn btn--primary" type="button" data-add-link="1">${escapeHtml(t(L, "quickAdd"))}</button></div>`;
     } else {
       empty.innerHTML = `<div class="empty__title">${escapeHtml(t(L, "emptyCollectionTitle"))}</div><div class="empty__text">${escapeHtml(t(L, "emptyCollectionText"))}</div><div class="empty__actions"><button class="btn btn--primary" type="button" data-add-link="1">${escapeHtml(t(L, "quickAdd"))}</button></div>`;
     }
@@ -453,20 +464,24 @@ function visibleItems(state, collection) {
 function getActiveCollection(state) {
   if (state.activeCollectionId === "all") return { id: "all", name: "All" };
   if (state.activeCollectionId === "fav") return { id: "fav", name: "Favorites" };
+  if (state.activeCollectionId === "hidden") return { id: "hidden", name: "Hidden" };
   if (state.activeCollectionId === "recent") return { id: "recent", name: "Recent", recentViewedIds: state.recentViewedIds || [] };
   return state.collections.find((c) => c.id === state.activeCollectionId) || { id: "all", name: "All" };
 }
 
 function itemInActiveContext(item, active) {
-  if (!active || active.id === "all") return true;
-  if (active.id === "fav") return !!item.favorite;
-  if (active.id === "recent") return Array.isArray(active.recentViewedIds) && active.recentViewedIds.includes(item.id);
+  if (active?.id === "hidden") return !!item.hidden;
+  if (!active || active.id === "all") return !item.hidden;
+  if (active.id === "fav") return !!item.favorite && !item.hidden;
+  if (active.id === "recent") return Array.isArray(active.recentViewedIds) && active.recentViewedIds.includes(item.id) && !item.hidden;
   return itemInCollectionView(item, active);
 }
 
 function itemInCollectionView(item, collection) {
-  if (!collection || collection.id === "all") return true;
-  if (collection.id === "fav") return !!item.favorite;
+  if (!collection || collection.id === "all") return !item.hidden;
+  if (collection.id === "fav") return !!item.favorite && !item.hidden;
+  if (collection.id === "hidden") return !!item.hidden;
+  if (item.hidden) return false;
   return Array.isArray(item.collectionIds) && item.collectionIds.includes(collection.id);
 }
 

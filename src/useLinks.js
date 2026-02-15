@@ -14,6 +14,7 @@ function mapRow(row) {
     type: normalizeTypeCode(row.type),
     source: normalizeSourceCode(row.source),
     favorite: !!row.favorite,
+    hidden: !!row.is_hidden,
     createdAt: Date.parse(row.created_at || "") || Date.now(),
     updatedAt: Date.parse(row.updated_at || row.created_at || "") || Date.now(),
     previewImage: ""
@@ -24,7 +25,7 @@ export async function listLinks() {
   const rows = await supabaseRequest(restPath(TABLE), {
     method: "GET",
     query: {
-      select: "id,url,title,note,tags,type,source,favorite,created_at,updated_at",
+      select: "id,url,title,note,tags,type,source,favorite,is_hidden,created_at,updated_at",
       order: "created_at.desc"
     }
   });
@@ -41,6 +42,7 @@ export async function createLink(input, userId) {
     type: normalizeTypeCode(input.type),
     source: normalizeSourceCode(input.source) || "other",
     favorite: !!input.favorite,
+    is_hidden: !!input.hidden,
     updated_at: new Date().toISOString()
   };
 
@@ -62,12 +64,13 @@ export async function updateLink(id, input) {
     type: normalizeTypeCode(input.type),
     source: normalizeSourceCode(input.source) || "other",
     favorite: !!input.favorite,
+    is_hidden: !!input.hidden,
     updated_at: new Date().toISOString()
   };
 
   const rows = await supabaseRequest(restPath(TABLE), {
     method: "PATCH",
-    query: { id: `eq.${id}`, select: "id,url,title,note,tags,type,source,favorite,created_at,updated_at" },
+    query: { id: `eq.${id}`, select: "id,url,title,note,tags,type,source,favorite,is_hidden,created_at,updated_at" },
     body: payload,
     prefer: "return=representation"
   });

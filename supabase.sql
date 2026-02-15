@@ -10,13 +10,16 @@ create table if not exists public.links (
   type text null,
   source text null,
   favorite boolean not null default false,
+  is_hidden boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+alter table public.links add column if not exists is_hidden boolean not null default false;
 
 create index if not exists links_user_id_idx on public.links (user_id);
 create index if not exists links_created_at_idx on public.links (created_at desc);
 create index if not exists links_favorite_idx on public.links (favorite);
+create index if not exists links_is_hidden_idx on public.links (is_hidden);
 create index if not exists links_source_idx on public.links (source);
 create index if not exists links_type_idx on public.links (type);
 

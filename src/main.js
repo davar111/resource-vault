@@ -15,6 +15,7 @@ const TITLE_MAX_LEN = 120;
 const NOTE_MAX_LEN = 500;
 const FILTER_SORTS = new Set(["newest", "oldest", "title_asc", "title_desc", "source_asc"]);
 const THEME_MODES = new Set(["system", "light", "dark"]);
+const HIDDEN_PASSWORD_KEY = "resource_vault_hidden_password_v1";
 
 const els = {
   langSelect: document.getElementById("langSelect"),
@@ -22,6 +23,7 @@ const els = {
   brand: document.getElementById("brand"),
   navAll: document.getElementById("navAll"),
   navFav: document.getElementById("navFav"),
+  navHidden: document.getElementById("navHidden"),
   navRecent: document.getElementById("navRecent"),
   labelNav: document.getElementById("labelNav"),
   labelCollections: document.getElementById("labelCollections"),
@@ -249,13 +251,18 @@ function openNewLinkModal(preset = {}) {
   sourceAutofillEnabled = true;
   activeTagMenuIndex = -1;
   els.formAddLink?.reset();
-  const inManualCollection = state.activeCollectionId !== "all"
+  const lockCollectionTarget = state.activeCollectionId === "hidden" || (
+    state.activeCollectionId !== "all"
     && state.activeCollectionId !== "fav"
     && state.activeCollectionId !== "recent"
     && !state.activeSavedFilterId
-    && state.collections.some((c) => c.id === state.activeCollectionId);
-  if (els.addToSection) els.addToSection.hidden = inManualCollection;
-  renderAddCollectionChoices(inManualCollection ? [state.activeCollectionId] : []);
+    && state.collections.some((c) => c.id === state.activeCollectionId)
+  );
+  if (els.addToSection) els.addToSection.hidden = lockCollectionTarget;
+  const presetCollections = state.activeCollectionId === "hidden"
+    ? []
+    : (lockCollectionTarget ? [state.activeCollectionId] : []);
+  renderAddCollectionChoices(presetCollections);
   renderTagSuggestions();
   if (els.inputAddUrl) els.inputAddUrl.value = String(preset.url || "");
   if (els.inputAddTitle) els.inputAddTitle.value = String(preset.title || "");
@@ -396,6 +403,50 @@ function normalizeEmail(input) {
 function isValidEmail(input) {
   const normalized = normalizeEmail(input);
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized);
+}
+
+function bytesToHex(bytes) {
+  return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function sha256Hex(input) {
+  const text = String(input || "");
+  if (!text) return "";
+  const data = new TextEncoder().encode(text);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return bytesToHex(new Uint8Array(digest));
+}
+
+async function ensureHiddenAccess() {
+  if (state.ui.hiddenUnlocked) return true;
+
+  const existingHash = localStorage.getItem(HIDDEN_PASSWORD_KEY) || "";
+  if (!existingHash) {
+    const first = String(prompt(t(state.lang, "hiddenSetPasswordPrompt"), "") || "");
+    if (first.length < 4) {
+      alert(t(state.lang, "hiddenPasswordTooShort"));
+      return false;
+    }
+    const confirmPwd = String(prompt(t(state.lang, "hiddenConfirmPasswordPrompt"), "") || "");
+    if (first !== confirmPwd) {
+      alert(t(state.lang, "hiddenPasswordMismatch"));
+      return false;
+    }
+    const hash = await sha256Hex(first);
+    localStorage.setItem(HIDDEN_PASSWORD_KEY, hash);
+    state.ui.hiddenUnlocked = true;
+    return true;
+  }
+
+  const entered = String(prompt(t(state.lang, "hiddenEnterPasswordPrompt"), "") || "");
+  if (!entered) return false;
+  const enteredHash = await sha256Hex(entered);
+  if (enteredHash !== existingHash) {
+    alert(t(state.lang, "hiddenWrongPassword"));
+    return false;
+  }
+  state.ui.hiddenUnlocked = true;
+  return true;
 }
 
 async function loadData() {
@@ -614,6 +665,15 @@ function setupEvents() {
   els.inputAddNote && (els.inputAddNote.maxLength = NOTE_MAX_LEN);
   els.navAll?.addEventListener("click", () => { state.activeSavedFilterId = null; state.activeCollectionId = "all"; renderApp(); closeMobileMenuIfNeeded(); });
   els.navFav?.addEventListener("click", () => { state.activeSavedFilterId = null; state.activeCollectionId = "fav"; renderApp(); closeMobileMenuIfNeeded(); });
+  els.navHidden?.addEventListener("click", async () => {
+    if (!ensureAuth()) return;
+    const ok = await ensureHiddenAccess();
+    if (!ok) return;
+    state.activeSavedFilterId = null;
+    state.activeCollectionId = "hidden";
+    renderApp();
+    closeMobileMenuIfNeeded();
+  });
   els.navRecent?.addEventListener("click", () => { state.activeSavedFilterId = null; state.activeCollectionId = "recent"; renderApp(); closeMobileMenuIfNeeded(); });
   els.searchInput?.addEventListener("input", (e) => { state.activeSavedFilterId = null; state.search = String(e.target.value || ""); renderApp(); });
   els.sortSelect?.addEventListener("change", (e) => { state.activeSavedFilterId = null; state.sortBy = FILTER_SORTS.has(String(e.target.value || "")) ? String(e.target.value) : "newest"; renderApp(); });
@@ -695,10 +755,14 @@ function setupEvents() {
 
     const activeCollectionIsManual = state.activeCollectionId !== "all"
       && state.activeCollectionId !== "fav"
+      && state.activeCollectionId !== "hidden"
       && state.activeCollectionId !== "recent"
       && !state.activeSavedFilterId
       && state.collections.some((c) => c.id === state.activeCollectionId);
-    const selectedCollections = activeCollectionIsManual
+    const inHiddenContext = state.activeCollectionId === "hidden";
+    const selectedCollections = inHiddenContext
+      ? []
+      : activeCollectionIsManual
       ? [state.activeCollectionId]
       : fd.getAll("collections").map((x) => String(x)).filter((id) => state.collections.some((c) => c.id === id));
     if (els.addSave) els.addSave.disabled = true;
@@ -710,7 +774,8 @@ function setupEvents() {
         tags: normalizeTags(fd.get("tags")),
         type: String(fd.get("type") || "") || null,
         source: String(fd.get("source") || "") || detectSourceFromUrl(url),
-        favorite: !!fd.get("favorite")
+        favorite: !!fd.get("favorite"),
+        hidden: inHiddenContext
       }, currentUser.id);
       if (created) {
         // For newly created links we only need INSERT into relation table.
