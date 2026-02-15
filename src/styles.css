@@ -718,11 +718,7 @@ select option { background: var(--bg-surface-1); color: var(--text-primary); }
 .card__delete svg {
   width: 14px;
   height: 14px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.8;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+  fill: currentColor;
 }
 
 .card__menu { position: relative; }
