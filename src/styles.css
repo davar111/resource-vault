@@ -490,10 +490,10 @@ select option { background: var(--bg-surface-1); color: var(--text-primary); }
 }
 .card__note-more:hover { background: var(--bg-surface-3); color: var(--text-primary); }
 .card__note--empty { color: var(--text-placeholder); }
-.tags { margin-top: var(--space-3); display: flex; flex-wrap: wrap; gap: 8px; max-height: 56px; overflow: hidden; }
+.tags { margin-top: var(--space-3); display: flex; flex-wrap: wrap; gap: 8px; max-height: none; overflow: visible; }
 .tag {
   font-size: 12px;
-  line-height: 1.2;
+  line-height: 1.25;
   color: var(--text-secondary);
   border: 1px solid var(--border-default);
   border-radius: 999px;
@@ -504,12 +504,12 @@ select option { background: var(--bg-surface-1); color: var(--text-primary); }
 }
 .tag__text {
   display: block;
-  max-width: 12ch;
+  max-width: 18ch;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  line-height: 1.2;
-  padding: 0 0 2px;
+  line-height: 1.25;
+  padding: 0;
   margin: 0;
 }
 .tag::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #6a6a6a; }
