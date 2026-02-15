@@ -240,6 +240,27 @@
       </div>
     </dialog>
 
+    <dialog id="modalHiddenAuth" class="modal">
+      <form method="dialog" class="modal__card modal__card--small" id="formHiddenAuth">
+        <div class="modal__header">
+          <div id="hiddenAuthTitle" class="modal__title">Hidden access</div>
+        </div>
+        <p id="hiddenAuthText" class="modal__text"></p>
+        <label class="field">
+          <span id="hiddenAuthPasswordLabel">Password</span>
+          <input id="hiddenAuthPassword" type="password" autocomplete="current-password" />
+        </label>
+        <label id="hiddenAuthConfirmField" class="field" hidden>
+          <span id="hiddenAuthConfirmLabel">Confirm password</span>
+          <input id="hiddenAuthConfirm" type="password" autocomplete="new-password" />
+        </label>
+        <div class="row row--end">
+          <button id="hiddenAuthCancel" class="btn btn--secondary" type="button">Cancel</button>
+          <button id="hiddenAuthSubmit" class="btn btn--primary" type="submit">Save</button>
+        </div>
+      </form>
+    </dialog>
+
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

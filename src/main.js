@@ -95,7 +95,18 @@ const els = {
   modalDeleteTitle: document.getElementById("modalDeleteTitle"),
   modalDeleteText: document.getElementById("modalDeleteText"),
   deleteCancel: document.getElementById("deleteCancel"),
-  deleteConfirm: document.getElementById("deleteConfirm")
+  deleteConfirm: document.getElementById("deleteConfirm"),
+  modalHiddenAuth: document.getElementById("modalHiddenAuth"),
+  formHiddenAuth: document.getElementById("formHiddenAuth"),
+  hiddenAuthTitle: document.getElementById("hiddenAuthTitle"),
+  hiddenAuthText: document.getElementById("hiddenAuthText"),
+  hiddenAuthPasswordLabel: document.getElementById("hiddenAuthPasswordLabel"),
+  hiddenAuthPassword: document.getElementById("hiddenAuthPassword"),
+  hiddenAuthConfirmField: document.getElementById("hiddenAuthConfirmField"),
+  hiddenAuthConfirmLabel: document.getElementById("hiddenAuthConfirmLabel"),
+  hiddenAuthConfirm: document.getElementById("hiddenAuthConfirm"),
+  hiddenAuthCancel: document.getElementById("hiddenAuthCancel"),
+  hiddenAuthSubmit: document.getElementById("hiddenAuthSubmit")
 };
 
 let currentUser = null;
@@ -417,17 +428,84 @@ async function sha256Hex(input) {
   return bytesToHex(new Uint8Array(digest));
 }
 
+function hiddenAuthCopy(mode) {
+  const isCreate = mode === "create";
+  return {
+    title: isCreate ? t(state.lang, "hiddenAuthCreateTitle") : t(state.lang, "hiddenAuthUnlockTitle"),
+    text: isCreate ? t(state.lang, "hiddenAuthCreateText") : t(state.lang, "hiddenAuthUnlockText"),
+    passwordLabel: t(state.lang, "hiddenAuthPasswordLabel"),
+    confirmLabel: t(state.lang, "hiddenAuthConfirmLabel"),
+    submit: isCreate ? t(state.lang, "save") : t(state.lang, "open"),
+    cancel: t(state.lang, "cancel")
+  };
+}
+
+function openHiddenAuthDialog(mode = "unlock") {
+  const dialog = els.modalHiddenAuth;
+  if (!dialog || !els.hiddenAuthPassword || !els.hiddenAuthCancel || !els.hiddenAuthSubmit) return Promise.resolve(null);
+  const isCreate = mode === "create";
+  const copy = hiddenAuthCopy(mode);
+  if (els.hiddenAuthTitle) els.hiddenAuthTitle.textContent = copy.title;
+  if (els.hiddenAuthText) els.hiddenAuthText.textContent = copy.text;
+  if (els.hiddenAuthPasswordLabel) els.hiddenAuthPasswordLabel.textContent = copy.passwordLabel;
+  if (els.hiddenAuthConfirmLabel) els.hiddenAuthConfirmLabel.textContent = copy.confirmLabel;
+  if (els.hiddenAuthCancel) els.hiddenAuthCancel.textContent = copy.cancel;
+  if (els.hiddenAuthSubmit) els.hiddenAuthSubmit.textContent = copy.submit;
+  if (els.hiddenAuthConfirmField) els.hiddenAuthConfirmField.hidden = !isCreate;
+  els.hiddenAuthPassword.value = "";
+  if (els.hiddenAuthConfirm) els.hiddenAuthConfirm.value = "";
+  els.hiddenAuthPassword.setAttribute("autocomplete", isCreate ? "new-password" : "current-password");
+  els.hiddenAuthConfirm?.setAttribute("autocomplete", "new-password");
+
+  return new Promise((resolve) => {
+    let done = false;
+    const cleanup = () => {
+      els.formHiddenAuth?.removeEventListener("submit", onSubmit);
+      els.hiddenAuthCancel?.removeEventListener("click", onCancel);
+      dialog.removeEventListener("cancel", onCancel);
+      dialog.removeEventListener("close", onClose);
+    };
+    const finish = (payload) => {
+      if (done) return;
+      done = true;
+      cleanup();
+      resolve(payload);
+    };
+    const onSubmit = (e) => {
+      e.preventDefault();
+      const password = String(els.hiddenAuthPassword?.value || "");
+      const confirm = String(els.hiddenAuthConfirm?.value || "");
+      dialog.close();
+      finish({ password, confirm });
+    };
+    const onCancel = (e) => {
+      if (e) e.preventDefault();
+      dialog.close();
+      finish(null);
+    };
+    const onClose = () => finish(null);
+    els.formHiddenAuth?.addEventListener("submit", onSubmit);
+    els.hiddenAuthCancel?.addEventListener("click", onCancel);
+    dialog.addEventListener("cancel", onCancel);
+    dialog.addEventListener("close", onClose, { once: true });
+    dialog.showModal();
+    setTimeout(() => els.hiddenAuthPassword?.focus(), 0);
+  });
+}
+
 async function ensureHiddenAccess() {
   if (state.ui.hiddenUnlocked) return true;
 
   const existingHash = localStorage.getItem(HIDDEN_PASSWORD_KEY) || "";
   if (!existingHash) {
-    const first = String(prompt(t(state.lang, "hiddenSetPasswordPrompt"), "") || "");
+    const created = await openHiddenAuthDialog("create");
+    if (!created) return false;
+    const first = String(created.password || "");
     if (first.length < 4) {
       alert(t(state.lang, "hiddenPasswordTooShort"));
       return false;
     }
-    const confirmPwd = String(prompt(t(state.lang, "hiddenConfirmPasswordPrompt"), "") || "");
+    const confirmPwd = String(created.confirm || "");
     if (first !== confirmPwd) {
       alert(t(state.lang, "hiddenPasswordMismatch"));
       return false;
@@ -438,7 +516,9 @@ async function ensureHiddenAccess() {
     return true;
   }
 
-  const entered = String(prompt(t(state.lang, "hiddenEnterPasswordPrompt"), "") || "");
+  const enteredData = await openHiddenAuthDialog("unlock");
+  if (!enteredData) return false;
+  const entered = String(enteredData.password || "");
   if (!entered) return false;
   const enteredHash = await sha256Hex(entered);
   if (enteredHash !== existingHash) {
