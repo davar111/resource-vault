@@ -24,6 +24,10 @@ const els = {
   btnTheme: document.getElementById("btnTheme"),
   appRoot: document.getElementById("appRoot"),
   authGate: document.getElementById("authGate"),
+  authGateBrandName: document.getElementById("authGateBrandName"),
+  authGateBrandInline: document.getElementById("authGateBrandInline"),
+  authGateShowcaseTitle: document.getElementById("authGateShowcaseTitle"),
+  authGateShowcaseText: document.getElementById("authGateShowcaseText"),
   authGateTitle: document.getElementById("authGateTitle"),
   authGateText: document.getElementById("authGateText"),
   authGateBtn: document.getElementById("authGateBtn"),
@@ -136,7 +140,35 @@ function ensureAuth() {
 }
 
 function persistUiSettings() {
-  saveUiSettings({ lang: state.lang, sortBy: state.sortBy, themeMode: state.themeMode });
+  saveUiSettings({
+    lang: state.lang,
+    sortBy: state.sortBy,
+    themeMode: state.themeMode,
+    collectionOrderIds: state.ui.collectionOrderIds,
+    pinnedCollectionIds: state.ui.pinnedCollectionIds
+  });
+}
+
+function normalizeCollectionUiSettings() {
+  const ids = new Set(state.collections.map((c) => c.id));
+  const ordered = [...new Set((state.ui.collectionOrderIds || []).filter((id) => ids.has(id)))];
+  const missing = state.collections.map((c) => c.id).filter((id) => !ordered.includes(id));
+  state.ui.collectionOrderIds = [...ordered, ...missing];
+  state.ui.pinnedCollectionIds = [...new Set((state.ui.pinnedCollectionIds || []).filter((id) => ids.has(id)))];
+}
+
+function applyCollectionUiSettings() {
+  normalizeCollectionUiSettings();
+  const byId = new Map(state.collections.map((c) => [c.id, c]));
+  const pinned = new Set(state.ui.pinnedCollectionIds || []);
+  const ordered = (state.ui.collectionOrderIds || [])
+    .map((id) => byId.get(id))
+    .filter(Boolean);
+
+  state.collections = [
+    ...ordered.filter((c) => pinned.has(c.id)),
+    ...ordered.filter((c) => !pinned.has(c.id))
+  ];
 }
 
 function syncSaveFilterButton() {
@@ -379,6 +411,10 @@ function applyI18n() {
     els.btnSaveFilterInline.textContent = t(L, "saveFilter");
   }
   if (els.localHint) els.localHint.textContent = t(L, "localHint");
+  if (els.authGateBrandName) els.authGateBrandName.textContent = t(L, "brand");
+  if (els.authGateBrandInline) els.authGateBrandInline.textContent = t(L, "brand");
+  if (els.authGateShowcaseTitle) els.authGateShowcaseTitle.textContent = t(L, "authGateShowcaseTitle");
+  if (els.authGateShowcaseText) els.authGateShowcaseText.textContent = t(L, "authGateShowcaseText");
   if (els.authGateTitle) els.authGateTitle.textContent = t(L, "authGateTitle");
   if (els.authGateText) els.authGateText.textContent = t(L, "authGateText");
   if (els.authGateBtn) els.authGateBtn.textContent = t(L, "authGateBtn");
@@ -619,6 +655,7 @@ async function loadData() {
   }
   state.items = links.map((x) => ({ ...x, isDemo: false, previewImage: previewFallbackUrl(x.url), collectionIds: relMap.get(x.id) || [] }));
   state.collections = collections;
+  applyCollectionUiSettings();
   state.savedFilters = savedFilters;
 }
 
@@ -719,6 +756,27 @@ const actions = {
     pendingLinkOps.delete(linkId);
     renderApp();
   },
+  onReorderCollections: async (draggedId, targetId) => {
+    const from = state.ui.collectionOrderIds.indexOf(draggedId);
+    const to = state.ui.collectionOrderIds.indexOf(targetId);
+    if (from < 0 || to < 0 || from === to) return;
+    const next = [...state.ui.collectionOrderIds];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    state.ui.collectionOrderIds = next;
+    applyCollectionUiSettings();
+    renderAddCollectionChoices();
+    renderApp();
+  },
+  onTogglePinCollection: async (collectionId) => {
+    const pins = new Set(state.ui.pinnedCollectionIds || []);
+    if (pins.has(collectionId)) pins.delete(collectionId);
+    else pins.add(collectionId);
+    state.ui.pinnedCollectionIds = [...pins];
+    applyCollectionUiSettings();
+    renderAddCollectionChoices();
+    renderApp();
+  },
   onRenameCollection: async (collectionId, name) => {
     if (!ensureAuth()) return;
     if (pendingCollectionOps.has(collectionId)) return;
@@ -775,9 +833,12 @@ const actions = {
     pendingCollectionOps.add(collectionId);
     await deleteCollection(collectionId);
     state.collections = state.collections.filter((x) => x.id !== collectionId);
+    state.ui.collectionOrderIds = (state.ui.collectionOrderIds || []).filter((id) => id !== collectionId);
+    state.ui.pinnedCollectionIds = (state.ui.pinnedCollectionIds || []).filter((id) => id !== collectionId);
     for (const item of state.items) item.collectionIds = (item.collectionIds || []).filter((id) => id !== collectionId);
     if (state.activeCollectionId === collectionId) state.activeCollectionId = "all";
     pendingCollectionOps.delete(collectionId);
+    applyCollectionUiSettings();
     renderAddCollectionChoices();
     renderApp();
   },
@@ -901,6 +962,8 @@ function setupEvents() {
     const created = await createCollection({ name, description, isShared }, currentUser.id);
     if (created) {
       state.collections.push(created);
+      state.ui.collectionOrderIds = [...(state.ui.collectionOrderIds || []), created.id];
+      applyCollectionUiSettings();
       state.activeCollectionId = created.id;
     }
     if (els.colCreate) els.colCreate.disabled = false;
@@ -1030,6 +1093,8 @@ async function bootstrap() {
   const settings = loadUiSettings();
   state.lang = settings.lang === "en" ? "en" : "ru";
   state.sortBy = FILTER_SORTS.has(settings.sortBy) ? settings.sortBy : "newest";
+  state.ui.collectionOrderIds = Array.isArray(settings.collectionOrderIds) ? settings.collectionOrderIds : [];
+  state.ui.pinnedCollectionIds = Array.isArray(settings.pinnedCollectionIds) ? settings.pinnedCollectionIds : [];
   applyTheme(THEME_MODES.has(settings.themeMode) ? settings.themeMode : "system");
   state.ui.filtersOpen = false;
   state.ui.mobileMenuOpen = false;

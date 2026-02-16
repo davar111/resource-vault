@@ -54,17 +54,20 @@ function renderCollections(state, els, onChange, L) {
     const canInvite = !!(isOwner && c.isShared);
     const canManage = !!isOwner;
     const hasMenu = canInvite || canManage;
+    const isPinned = (state.ui?.pinnedCollectionIds || []).includes(c.id);
     const sharedBadge = c.isShared ? `<span class="badge badge--smart">${escapeHtml(t(L, "sharedBadge"))}</span>` : "";
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "collection" + (state.activeCollectionId === c.id ? " collection--active" : "");
     btn.dataset.collectionId = c.id;
+    btn.draggable = true;
     btn.innerHTML = `
       <div class="collection__left">
         <div class="dot"></div>
         <div class="collection__name"><div>${escapeHtml(c.name)}</div>${sharedBadge}</div>
       </div>
       <div class="collection__right">
+        <button class="collection__pin ${isPinned ? "collection__pin--on" : ""}" type="button" data-col-pin="1" title="${escapeHtml(t(L, isPinned ? "unpinCollection" : "pinCollection"))}" aria-label="${escapeHtml(t(L, isPinned ? "unpinCollection" : "pinCollection"))}">&#128204;</button>
         <div class="badge">${count}</div>
         ${hasMenu ? `<div class="collection__menu">
           <button class="collection__menu-trigger" type="button" data-col-menu="1"><span class="collection__menu-dots">&#8943;</span></button>
@@ -83,6 +86,18 @@ function renderCollections(state, els, onChange, L) {
       render(state, els, onChange, activeActions);
     });
 
+    btn.addEventListener("dragstart", (e) => {
+      if (!e.dataTransfer) return;
+      e.dataTransfer.setData("text/resource-vault-collection-id", c.id);
+      e.dataTransfer.effectAllowed = "move";
+      btn.classList.add("collection--dragging");
+    });
+
+    btn.addEventListener("dragend", () => {
+      btn.classList.remove("collection--dragging");
+      document.querySelectorAll(".collection--dragover").forEach((el) => el.classList.remove("collection--dragover"));
+    });
+
     btn.addEventListener("dragover", (e) => e.preventDefault());
     btn.addEventListener("dragenter", (e) => {
       e.preventDefault();
@@ -93,9 +108,19 @@ function renderCollections(state, els, onChange, L) {
       e.preventDefault();
       e.stopPropagation();
       btn.classList.remove("collection--dragover");
+      const draggedCollectionId = String(e.dataTransfer?.getData("text/resource-vault-collection-id") || "").trim();
+      if (draggedCollectionId && draggedCollectionId !== c.id) {
+        await activeActions?.onReorderCollections?.(draggedCollectionId, c.id);
+        return;
+      }
       const itemId = String(e.dataTransfer?.getData("text/resource-vault-item-id") || "").trim();
       if (!itemId) return;
       await activeActions?.onAssignToCollection?.(itemId, c.id);
+    });
+
+    btn.querySelector("[data-col-pin]")?.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      await activeActions?.onTogglePinCollection?.(c.id);
     });
 
     const trigger = btn.querySelector("[data-col-menu]");

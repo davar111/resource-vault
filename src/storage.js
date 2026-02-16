@@ -9,18 +9,26 @@ const SOURCE_VALUES = ["site", "behance", "awwwards", "pinterest", "dribbble", "
 export function loadUiSettings() {
   try {
     const raw = localStorage.getItem(UI_SETTINGS_KEY);
-    if (!raw) return { lang: "ru", sortBy: "newest", themeMode: "system" };
+    if (!raw) return { lang: "ru", sortBy: "newest", themeMode: "system", collectionOrderIds: [], pinnedCollectionIds: [] };
     const parsed = JSON.parse(raw);
     const themeMode = parsed?.themeMode === "dark" || parsed?.themeMode === "light" || parsed?.themeMode === "system"
       ? parsed.themeMode
       : "system";
+    const collectionOrderIds = Array.isArray(parsed?.collectionOrderIds)
+      ? [...new Set(parsed.collectionOrderIds.map((id) => String(id || "").trim()).filter(Boolean))]
+      : [];
+    const pinnedCollectionIds = Array.isArray(parsed?.pinnedCollectionIds)
+      ? [...new Set(parsed.pinnedCollectionIds.map((id) => String(id || "").trim()).filter(Boolean))]
+      : [];
     return {
       lang: parsed?.lang === "en" ? "en" : "ru",
       sortBy: typeof parsed?.sortBy === "string" ? parsed.sortBy : "newest",
-      themeMode
+      themeMode,
+      collectionOrderIds,
+      pinnedCollectionIds
     };
   } catch {
-    return { lang: "ru", sortBy: "newest", themeMode: "system" };
+    return { lang: "ru", sortBy: "newest", themeMode: "system", collectionOrderIds: [], pinnedCollectionIds: [] };
   }
 }
 
@@ -30,7 +38,13 @@ export function saveUiSettings(settings) {
     sortBy: typeof settings?.sortBy === "string" ? settings.sortBy : "newest",
     themeMode: settings?.themeMode === "dark" || settings?.themeMode === "light" || settings?.themeMode === "system"
       ? settings.themeMode
-      : "system"
+      : "system",
+    collectionOrderIds: Array.isArray(settings?.collectionOrderIds)
+      ? [...new Set(settings.collectionOrderIds.map((id) => String(id || "").trim()).filter(Boolean))]
+      : [],
+    pinnedCollectionIds: Array.isArray(settings?.pinnedCollectionIds)
+      ? [...new Set(settings.pinnedCollectionIds.map((id) => String(id || "").trim()).filter(Boolean))]
+      : []
   };
   localStorage.setItem(UI_SETTINGS_KEY, JSON.stringify(payload));
 }

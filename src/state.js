@@ -19,7 +19,9 @@ export const state = {
   ui: {
     filtersOpen: false,
     mobileMenuOpen: false,
-    hiddenUnlocked: false
+    hiddenUnlocked: false,
+    collectionOrderIds: [],
+    pinnedCollectionIds: []
   },
   recentViewedIds: [],
   items: [],
