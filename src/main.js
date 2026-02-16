@@ -31,6 +31,7 @@ const els = {
   authGateTitle: document.getElementById("authGateTitle"),
   authGateText: document.getElementById("authGateText"),
   authGateBtn: document.getElementById("authGateBtn"),
+  authGateBtnLabel: document.getElementById("authGateBtnLabel"),
   authGateGuestBtn: document.getElementById("authGateGuestBtn"),
   brand: document.getElementById("brand"),
   navAll: document.getElementById("navAll"),
@@ -417,7 +418,8 @@ function applyI18n() {
   if (els.authGateShowcaseText) els.authGateShowcaseText.textContent = t(L, "authGateShowcaseText");
   if (els.authGateTitle) els.authGateTitle.textContent = t(L, "authGateTitle");
   if (els.authGateText) els.authGateText.textContent = t(L, "authGateText");
-  if (els.authGateBtn) els.authGateBtn.textContent = t(L, "authGateBtn");
+  if (els.authGateBtnLabel) els.authGateBtnLabel.textContent = t(L, "authGateBtn");
+  else if (els.authGateBtn) els.authGateBtn.textContent = t(L, "authGateBtn");
   if (els.authGateGuestBtn) els.authGateGuestBtn.textContent = t(L, "authGateGuestBtn");
   if (els.langSelect) els.langSelect.value = L === "en" ? "en" : "ru";
   if (els.searchInput) els.searchInput.placeholder = t(L, "searchPlaceholder");
