@@ -711,52 +711,56 @@ const actions = {
     if (!ensureAuth()) return;
     if (pendingLinkOps.has(id)) return;
     pendingLinkOps.add(id);
-    const item = state.items.find((x) => x.id === id);
-    if (!item) {
+    try {
+      const item = state.items.find((x) => x.id === id);
+      if (!item || item.isDemo) return;
+      const updated = await updateLink(id, { ...item, favorite: !!next });
+      if (updated) item.favorite = updated.favorite;
+      renderApp();
+    } catch (err) {
+      alert(err?.message || (state.lang === "ru" ? "Не удалось обновить избранное." : "Failed to update favorite."));
+    } finally {
       pendingLinkOps.delete(id);
-      return;
     }
-    if (item.isDemo) {
-      pendingLinkOps.delete(id);
-      return;
-    }
-    const updated = await updateLink(id, { ...item, favorite: !!next });
-    if (updated) item.favorite = updated.favorite;
-    pendingLinkOps.delete(id);
-    renderApp();
   },
   onDeleteItem: async (id) => {
     if (!ensureAuth()) return;
     if (pendingLinkOps.has(id)) return;
     pendingLinkOps.add(id);
-    const item = state.items.find((x) => x.id === id);
-    if (item?.isDemo) {
+    try {
+      const item = state.items.find((x) => x.id === id);
+      if (item?.isDemo) {
+        state.items = state.items.filter((x) => x.id !== id);
+        renderTagSuggestions();
+        renderApp();
+        return;
+      }
+      await deleteLink(id);
       state.items = state.items.filter((x) => x.id !== id);
-      pendingLinkOps.delete(id);
       renderTagSuggestions();
       renderApp();
-      return;
+    } catch (err) {
+      alert(err?.message || (state.lang === "ru" ? "Не удалось удалить ссылку." : "Failed to delete link."));
+    } finally {
+      pendingLinkOps.delete(id);
     }
-    await deleteLink(id);
-    state.items = state.items.filter((x) => x.id !== id);
-    renderTagSuggestions();
-    pendingLinkOps.delete(id);
-    renderApp();
   },
   onAssignToCollection: async (linkId, collectionId) => {
     if (!ensureAuth()) return;
     if (pendingLinkOps.has(linkId)) return;
     pendingLinkOps.add(linkId);
-    const item = state.items.find((x) => x.id === linkId);
-    if (!item) {
+    try {
+      const item = state.items.find((x) => x.id === linkId);
+      if (!item) return;
+      const next = [...new Set([...(item.collectionIds || []), collectionId])];
+      await replaceLinkCollections(linkId, next, currentUser.id);
+      item.collectionIds = next;
+      renderApp();
+    } catch (err) {
+      alert(err?.message || (state.lang === "ru" ? "Не удалось обновить коллекции." : "Failed to update collections."));
+    } finally {
       pendingLinkOps.delete(linkId);
-      return;
     }
-    const next = [...new Set([...(item.collectionIds || []), collectionId])];
-    await replaceLinkCollections(linkId, next, currentUser.id);
-    item.collectionIds = next;
-    pendingLinkOps.delete(linkId);
-    renderApp();
   },
   onReorderCollections: async (draggedId, targetId) => {
     const from = state.ui.collectionOrderIds.indexOf(draggedId);
@@ -783,24 +787,26 @@ const actions = {
     if (!ensureAuth()) return;
     if (pendingCollectionOps.has(collectionId)) return;
     pendingCollectionOps.add(collectionId);
-    const col = state.collections.find((x) => x.id === collectionId);
-    if (!col) {
+    try {
+      const col = state.collections.find((x) => x.id === collectionId);
+      if (!col) return;
+      const updated = await updateCollection(collectionId, {
+        name,
+        description: col.description,
+        isShared: !!col.isShared
+      });
+      if (updated) {
+        col.name = updated.name;
+        col.description = updated.description;
+        col.isShared = updated.isShared;
+      }
+      renderAddCollectionChoices();
+      renderApp();
+    } catch (err) {
+      alert(err?.message || (state.lang === "ru" ? "Не удалось переименовать коллекцию." : "Failed to rename collection."));
+    } finally {
       pendingCollectionOps.delete(collectionId);
-      return;
     }
-    const updated = await updateCollection(collectionId, {
-      name,
-      description: col.description,
-      isShared: !!col.isShared
-    });
-    if (updated) {
-      col.name = updated.name;
-      col.description = updated.description;
-      col.isShared = updated.isShared;
-    }
-    pendingCollectionOps.delete(collectionId);
-    renderAddCollectionChoices();
-    renderApp();
   },
   onInviteCollection: async (collectionId) => {
     if (!ensureAuth()) return;
@@ -833,29 +839,39 @@ const actions = {
     if (!ensureAuth()) return;
     if (pendingCollectionOps.has(collectionId)) return;
     pendingCollectionOps.add(collectionId);
-    await deleteCollection(collectionId);
-    state.collections = state.collections.filter((x) => x.id !== collectionId);
-    state.ui.collectionOrderIds = (state.ui.collectionOrderIds || []).filter((id) => id !== collectionId);
-    state.ui.pinnedCollectionIds = (state.ui.pinnedCollectionIds || []).filter((id) => id !== collectionId);
-    for (const item of state.items) item.collectionIds = (item.collectionIds || []).filter((id) => id !== collectionId);
-    if (state.activeCollectionId === collectionId) state.activeCollectionId = "all";
-    pendingCollectionOps.delete(collectionId);
-    applyCollectionUiSettings();
-    renderAddCollectionChoices();
-    renderApp();
+    try {
+      await deleteCollection(collectionId);
+      state.collections = state.collections.filter((x) => x.id !== collectionId);
+      state.ui.collectionOrderIds = (state.ui.collectionOrderIds || []).filter((id) => id !== collectionId);
+      state.ui.pinnedCollectionIds = (state.ui.pinnedCollectionIds || []).filter((id) => id !== collectionId);
+      for (const item of state.items) item.collectionIds = (item.collectionIds || []).filter((id) => id !== collectionId);
+      if (state.activeCollectionId === collectionId) state.activeCollectionId = "all";
+      applyCollectionUiSettings();
+      renderAddCollectionChoices();
+      renderApp();
+    } catch (err) {
+      alert(err?.message || (state.lang === "ru" ? "Не удалось удалить коллекцию." : "Failed to delete collection."));
+    } finally {
+      pendingCollectionOps.delete(collectionId);
+    }
   },
   onDeleteSavedFilter: async (id) => {
     if (!ensureAuth()) return;
     if (pendingSavedFilterOps.has(id)) return;
     pendingSavedFilterOps.add(id);
-    await deleteSavedFilter(id);
-    state.savedFilters = state.savedFilters.filter((x) => x.id !== id);
-    if (state.activeSavedFilterId === id) {
-      state.activeSavedFilterId = null;
-      state.activeCollectionId = "all";
+    try {
+      await deleteSavedFilter(id);
+      state.savedFilters = state.savedFilters.filter((x) => x.id !== id);
+      if (state.activeSavedFilterId === id) {
+        state.activeSavedFilterId = null;
+        state.activeCollectionId = "all";
+      }
+      renderApp();
+    } catch (err) {
+      alert(err?.message || (state.lang === "ru" ? "Не удалось удалить фильтр." : "Failed to delete filter."));
+    } finally {
+      pendingSavedFilterOps.delete(id);
     }
-    pendingSavedFilterOps.delete(id);
-    renderApp();
   }
 };
 
@@ -942,13 +958,18 @@ function setupEvents() {
     if (els.btnSaveFilterInline?.disabled) return;
     if (!isFilterActive()) { alert(state.lang === "ru" ? "Сначала установите фильтры." : "Set filters first."); return; }
     if (els.btnSaveFilterInline) els.btnSaveFilterInline.disabled = true;
-    const name = String(prompt(t(state.lang, "saveFilterPrompt"), "") || "").trim();
-    if (name) {
-      const created = await createSavedFilter({ name, filter: filterPayload() }, currentUser.id);
-      if (created) state.savedFilters.push(created);
+    try {
+      const name = String(prompt(t(state.lang, "saveFilterPrompt"), "") || "").trim();
+      if (name) {
+        const created = await createSavedFilter({ name, filter: filterPayload() }, currentUser.id);
+        if (created) state.savedFilters.push(created);
+      }
+      renderApp();
+    } catch (err) {
+      alert(err?.message || (state.lang === "ru" ? "Не удалось сохранить фильтр." : "Failed to save filter."));
+    } finally {
+      if (els.btnSaveFilterInline) els.btnSaveFilterInline.disabled = false;
     }
-    if (els.btnSaveFilterInline) els.btnSaveFilterInline.disabled = false;
-    renderApp();
   });
 
   els.formCollection?.addEventListener("submit", async (e) => {
@@ -961,17 +982,22 @@ function setupEvents() {
     const description = String(fd.get("description") || "").trim();
     const isShared = !!fd.get("shared");
     if (els.colCreate) els.colCreate.disabled = true;
-    const created = await createCollection({ name, description, isShared }, currentUser.id);
-    if (created) {
-      state.collections.push(created);
-      state.ui.collectionOrderIds = [...(state.ui.collectionOrderIds || []), created.id];
-      applyCollectionUiSettings();
-      state.activeCollectionId = created.id;
+    try {
+      const created = await createCollection({ name, description, isShared }, currentUser.id);
+      if (created) {
+        state.collections.push(created);
+        state.ui.collectionOrderIds = [...(state.ui.collectionOrderIds || []), created.id];
+        applyCollectionUiSettings();
+        state.activeCollectionId = created.id;
+      }
+      els.modalCollection?.close();
+      renderAddCollectionChoices();
+      renderApp();
+    } catch (err) {
+      alert(err?.message || (state.lang === "ru" ? "Не удалось создать коллекцию." : "Failed to create collection."));
+    } finally {
+      if (els.colCreate) els.colCreate.disabled = false;
     }
-    if (els.colCreate) els.colCreate.disabled = false;
-    els.modalCollection?.close();
-    renderAddCollectionChoices();
-    renderApp();
   });
 
   els.formAddLink?.addEventListener("submit", async (e) => {

@@ -1064,7 +1064,7 @@ select option { background: var(--bg-surface-1); color: var(--text-primary); }
 
 @keyframes app-enter {
   from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  to { opacity: 1; transform: none; }
 }
 
 @media (max-width: 1200px) {
@@ -1141,6 +1141,10 @@ select option { background: var(--bg-surface-1); color: var(--text-primary); }
   body.mobile-menu-open .mobile-overlay {
     opacity: 1;
     pointer-events: auto;
+    left: calc(
+      env(safe-area-inset-left) +
+      min(304px, calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right) - 12px))
+    );
   }
   body.mobile-menu-open { overflow: hidden; }
   .brand-row { align-items: center; }
@@ -1217,3 +1221,4 @@ select option { background: var(--bg-surface-1); color: var(--text-primary); }
   .topbar__right { gap: 6px; }
   #btnFilters, .sort { flex-basis: 100%; }
 }
+
