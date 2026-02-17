@@ -91,11 +91,12 @@ export function initOnboarding(options = {}) {
     input: modal.querySelector("[data-onboarding-input]"),
     send: modal.querySelector("[data-onboarding-send]"),
     skip: modal.querySelector("[data-onboarding-skip]"),
+    restart: modal.querySelector("[data-onboarding-restart]"),
     close: modal.querySelector("[data-onboarding-close]"),
     status: modal.querySelector("[data-onboarding-status]")
   };
 
-  let state = {
+  const initialState = {
     role: "",
     roleOptions: ["Frontend", "UI/UX", "Product Manager", "Backend", "Data Analyst"],
     answers: [],
@@ -105,6 +106,7 @@ export function initOnboarding(options = {}) {
     resources: [],
     loading: false
   };
+  let state = { ...initialState };
 
   function persist() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -118,6 +120,11 @@ export function initOnboarding(options = {}) {
       ...cached,
       loading: false
     };
+  }
+
+  function resetState() {
+    state = { ...initialState };
+    localStorage.removeItem(STORAGE_KEY);
   }
 
   function setLoading(next) {
@@ -144,6 +151,8 @@ export function initOnboarding(options = {}) {
   function renderRoleStep() {
     if (els.title) els.title.textContent = textByLang(getLang(), "AI-онбординг", "AI onboarding");
     if (els.subtitle) els.subtitle.textContent = textByLang(getLang(), "Выбери роль или введи свою", "Choose a role or type your own");
+    if (els.restart) els.restart.textContent = textByLang(getLang(), "Начать заново", "Restart");
+    if (els.skip) els.skip.textContent = textByLang(getLang(), "Пропустить", "Skip");
     if (els.chips) {
       els.chips.innerHTML = state.roleOptions
         .map((x) => `<button type="button" class="chip" data-role-option="${escapeHtml(x)}">${escapeHtml(x)}</button>`)
@@ -355,10 +364,18 @@ export function initOnboarding(options = {}) {
   function open() {
     if (!ensureAuth()) return;
     hydrate();
+    // Do not reopen stale completed onboarding from localStorage.
+    if (state.step === "result") resetState();
     if (!state.role) state.step = "role";
-    if (state.step === "questions" && state.answers.length >= state.questions.length) state.step = "result";
+    if (state.step === "questions" && state.answers.length >= state.questions.length) state.step = "role";
     render();
     modal.showModal();
+  }
+
+  function restart() {
+    resetState();
+    state.step = "role";
+    render();
   }
 
   function bind() {
@@ -366,6 +383,7 @@ export function initOnboarding(options = {}) {
     els.close?.addEventListener("click", () => modal.close());
     els.send?.addEventListener("click", onSend);
     els.skip?.addEventListener("click", skip);
+    els.restart?.addEventListener("click", restart);
     els.input?.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
         e.preventDefault();
@@ -377,3 +395,7 @@ export function initOnboarding(options = {}) {
   bind();
   return { open };
 }
+    if (els.restart) els.restart.textContent = textByLang(getLang(), "Начать заново", "Restart");
+    if (els.skip) els.skip.textContent = textByLang(getLang(), "Пропустить", "Skip");
+    if (els.restart) els.restart.textContent = textByLang(getLang(), "Начать заново", "Restart");
+    if (els.skip) els.skip.textContent = textByLang(getLang(), "Закрыть", "Close");
