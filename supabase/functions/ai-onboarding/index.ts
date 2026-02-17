@@ -246,6 +246,15 @@ function isTrustedHost(url: string) {
   return TRUSTED_HOSTS.some((x) => host === x || host.endsWith(`.${x}`));
 }
 
+function isRussianResource(item: { title?: string; snippet?: string; url?: string }) {
+  const host = hostnameOf(String(item?.url || ""));
+  const text = `${String(item?.title || "")} ${String(item?.snippet || "")}`.toLowerCase();
+  const hasCyrillic = /[а-яё]/i.test(text);
+  const ruHost = host.endsWith(".ru") || host.includes(".ru.");
+  const ruPath = /\/ru(\/|$)/i.test(String(item?.url || ""));
+  return hasCyrillic || ruHost || ruPath;
+}
+
 function extractQuestionText(input: string | null) {
   if (!input) return "";
   const json = parseJsonFromText(input);
@@ -499,9 +508,9 @@ function detectResourcesLang(answers: InterviewAnswer[]): "ru" | "en" | "both" {
 async function fetchExternalResources(query: string, tags: string[], resourcesLang: "ru" | "en" | "both") {
   const resources: Array<{ title: string; url: string; snippet: string; tags: string[]; source: string }> = [];
   const langSuffix = resourcesLang === "ru"
-    ? " russian language tutorial guide"
+    ? " на русском языке"
     : resourcesLang === "en"
-      ? " english language tutorial guide"
+      ? " in english language"
       : "";
   const finalQuery = `${query}${langSuffix}`.trim();
 
@@ -613,6 +622,14 @@ function rankResources(
   const trusted = ranked.filter((x) => x.trusted);
   const untrusted = ranked.filter((x) => !x.trusted);
   const blended = trusted.length ? [...trusted, ...untrusted] : ranked;
+
+  if (resourcesLang === "ru") {
+    const ruOnly = blended.filter((x) => isRussianResource(x));
+    if (ruOnly.length >= 4) return ruOnly.slice(0, 12);
+    const nonRu = blended.filter((x) => !isRussianResource(x));
+    return [...ruOnly, ...nonRu].slice(0, 12);
+  }
+
   return blended.slice(0, 12);
 }
 
