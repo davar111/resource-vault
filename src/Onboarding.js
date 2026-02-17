@@ -37,6 +37,41 @@ function getAnonKey() {
   return String(env.VITE_SUPABASE_ANON_KEY || "").trim();
 }
 
+function decodeJwtPayload(token) {
+  try {
+    const payload = String(token || "").split(".")[1] || "";
+    if (!payload) return null;
+    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = `${normalized}${"=".repeat((4 - (normalized.length % 4)) % 4)}`;
+    const decoded = atob(padded);
+    return JSON.parse(decoded);
+  } catch {
+    return null;
+  }
+}
+
+function projectRefFromUrl(url) {
+  try {
+    const host = new URL(String(url || "")).hostname;
+    return host.endsWith(".supabase.co") ? host.replace(".supabase.co", "") : "";
+  } catch {
+    return "";
+  }
+}
+
+function buildJwtDebug(functionUrl, token) {
+  const expectedRef = projectRefFromUrl(functionUrl);
+  const payload = decodeJwtPayload(token);
+  const tokenIss = String(payload?.iss || "");
+  const tokenIssRef = projectRefFromUrl(tokenIss);
+  return JSON.stringify({
+    expected_ref: expectedRef || "unknown",
+    token_iss: tokenIss || "missing",
+    token_iss_ref: tokenIssRef || "unknown",
+    iss_ref_match: !!(expectedRef && tokenIssRef && expectedRef === tokenIssRef)
+  });
+}
+
 export function initOnboarding(options = {}) {
   const modal = options.modal;
   const triggerButton = options.triggerButton;
@@ -200,8 +235,9 @@ export function initOnboarding(options = {}) {
 
   async function callFunction(payload) {
     const token = String(await getAccessToken() || "").trim();
+    const jwtDebug = buildJwtDebug(functionUrl, token);
     if (!token || token.split(".").length !== 3) {
-      throw new Error(textByLang(getLang(), "Сессия невалидна. Выйди и войди снова через Google.", "Session is invalid. Please sign out and sign in again."));
+      throw new Error(`${textByLang(getLang(), "Сессия невалидна. Выйди и войди снова через Google.", "Session is invalid. Please sign out and sign in again.")}\nDebug: ${jwtDebug}`);
     }
     const anonKey = getAnonKey();
     const headers = {
@@ -216,7 +252,11 @@ export function initOnboarding(options = {}) {
     });
     if (!res.ok) {
       const text = await res.text().catch(() => "");
-      throw new Error(text || `Function request failed (${res.status})`);
+      const raw = text || `Function request failed (${res.status})`;
+      if (res.status === 401 || raw.toLowerCase().includes("invalid jwt")) {
+        throw new Error(`${raw}\nDebug: ${jwtDebug}`);
+      }
+      throw new Error(raw);
     }
     return await res.json();
   }
