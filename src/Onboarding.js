@@ -268,15 +268,6 @@ export function initOnboarding(options = {}) {
     if (els.chips) {
       els.chips.dataset.mode = "result";
       els.chips.innerHTML = "";
-      const values = state.answers.map((x) => String(x.answer || "")).filter(Boolean).slice(0, 6);
-      for (const value of values) {
-        const tag = document.createElement("button");
-        tag.type = "button";
-        tag.className = "chip";
-        tag.disabled = true;
-        tag.textContent = value;
-        els.chips.appendChild(tag);
-      }
       if (state.resources.length) {
         const importBtn = document.createElement("button");
         importBtn.type = "button";
@@ -290,11 +281,6 @@ export function initOnboarding(options = {}) {
     if (!els.chat) return;
     els.chat.innerHTML = "";
     appendMessage(textByLang(getLang(), "Отлично, интервью завершено. Профиль собран.", "Great, interview is done. Profile is ready."), "bot");
-    const pre = document.createElement("pre");
-    pre.className = "onboarding-chat__json";
-    pre.textContent = JSON.stringify(state.profile || {}, null, 2);
-    els.chat.appendChild(pre);
-
     if (state.resources.length) {
       const wrap = document.createElement("div");
       wrap.className = "onboarding-chat__list";
