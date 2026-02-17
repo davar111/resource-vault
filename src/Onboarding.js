@@ -395,7 +395,3 @@ export function initOnboarding(options = {}) {
   bind();
   return { open };
 }
-    if (els.restart) els.restart.textContent = textByLang(getLang(), "Начать заново", "Restart");
-    if (els.skip) els.skip.textContent = textByLang(getLang(), "Пропустить", "Skip");
-    if (els.restart) els.restart.textContent = textByLang(getLang(), "Начать заново", "Restart");
-    if (els.skip) els.skip.textContent = textByLang(getLang(), "Закрыть", "Close");

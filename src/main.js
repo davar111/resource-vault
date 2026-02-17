@@ -11,7 +11,6 @@ import { createLink, deleteLink, listLinks, updateLink } from "./useLinks.js";
 import { addLinkCollections, createCollection, createCollectionInvite, deleteCollection, listCollections, listLinkCollections, replaceLinkCollections, updateCollection } from "./useCollections.js";
 import { createSavedFilter, deleteSavedFilter, listSavedFilters } from "./useSavedFilters.js";
 import { getSessionAccessToken } from "./supabase.js";
-import { initOnboarding } from "./Onboarding.js";
 
 const TITLE_MIN_LEN = 2;
 const TITLE_MAX_LEN = 120;
@@ -205,7 +204,7 @@ function syncAuthGate() {
 function syncGuestModeUi() {
   const guestReadOnly = !!(state.isGuestMode && !state.isAuthenticated);
   if (els.btnAddLink) els.btnAddLink.disabled = guestReadOnly;
-  if (els.btnAiOnboarding) els.btnAiOnboarding.disabled = guestReadOnly;
+  if (els.btnAiOnboarding) els.btnAiOnboarding.disabled = true;
   if (els.btnNewCollection) els.btnNewCollection.disabled = guestReadOnly;
   if (els.btnSaveFilterInline) els.btnSaveFilterInline.disabled = guestReadOnly;
   if (els.navHidden) els.navHidden.disabled = guestReadOnly;
@@ -412,7 +411,9 @@ function applyI18n() {
   if (els.labelCollections) els.labelCollections.textContent = t(L, "collections");
   if (els.labelSavedFilters) els.labelSavedFilters.textContent = t(L, "savedFilters");
   if (els.btnAddLink) els.btnAddLink.textContent = t(L, "addLink");
-  if (els.btnAiOnboarding) els.btnAiOnboarding.textContent = L === "ru" ? "AI интервью" : "AI interview";
+  if (els.btnAiOnboarding) {
+    els.btnAiOnboarding.textContent = L === "ru" ? "AI интервью (временно отключено)" : "AI interview (temporarily disabled)";
+  }
   if (els.btnNewCollection) els.btnNewCollection.setAttribute("aria-label", t(L, "newCollection"));
   if (els.btnSaveFilterInline) {
     els.btnSaveFilterInline.setAttribute("aria-label", t(L, "saveFilter"));
@@ -1251,21 +1252,9 @@ async function bootstrap() {
   renderTagSuggestions();
   renderApp();
 
-  if (!onboardingController && els.btnAiOnboarding && els.modalOnboarding) {
-    try {
-      onboardingController = initOnboarding({
-        triggerButton: els.btnAiOnboarding,
-        modal: els.modalOnboarding,
-        getLang: () => state.lang,
-        ensureAuth,
-        getAccessToken: async () => await getSessionAccessToken(),
-        onImportResources: importOnboardingResources
-      });
-    } catch (err) {
-      console.warn("Onboarding init failed", err?.message || err);
-      if (els.btnAiOnboarding) els.btnAiOnboarding.hidden = true;
-    }
-  }
+  void getSessionAccessToken;
+  void importOnboardingResources;
+  void onboardingController;
 }
 
 void bootstrap();
