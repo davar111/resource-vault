@@ -385,6 +385,7 @@ function renderGrid(state, els, onChange, actions, L) {
     card.innerHTML = `
       <div class="card__preview-wrap">
         ${item.isDemo ? `<span class="demo-badge">${escapeHtml(t(L, "demoBadge"))}</span>` : ""}
+        ${item.isAiNew ? `<span class="new-badge">NEW</span>` : ""}
         <a class="card__preview-link" href="${item.url}" target="_blank" rel="noreferrer">
           <img class="card__preview" src="${escapeHtml(previewSrc)}" data-fallback="${escapeHtml(previewFallbackUrl(item.url))}" alt="${escapeHtml(item.title || "preview")}" loading="lazy" referrerpolicy="no-referrer" />
         </a>

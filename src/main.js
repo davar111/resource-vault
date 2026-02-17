@@ -721,7 +721,7 @@ async function importOnboardingResources(resources, profile) {
         skipped += 1;
         continue;
       }
-      state.items.unshift({ ...created, isDemo: false, previewImage: previewFallbackUrl(created.url), collectionIds: [] });
+      state.items.unshift({ ...created, isDemo: false, isAiNew: true, previewImage: previewFallbackUrl(created.url), collectionIds: [] });
       imported += 1;
     } catch {
       skipped += 1;
@@ -782,6 +782,8 @@ async function migrateLegacyIfNeeded() {
 
 const actions = {
   onOpenItem: (id) => {
+    const item = state.items.find((x) => x.id === id);
+    if (item?.isAiNew) item.isAiNew = false;
     state.recentViewedIds = [id, ...state.recentViewedIds.filter((x) => x !== id)].slice(0, 100);
     renderApp();
   },

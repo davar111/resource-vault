@@ -582,6 +582,25 @@ select option { background: var(--bg-surface-1); color: var(--text-primary); }
   letter-spacing: 0.06em;
   padding: 3px 7px 4px;
 }
+.new-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 3;
+  border-radius: 999px;
+  border: 1px solid #9de4b4;
+  background: #e8fff0;
+  color: #1d6b37;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 3px 7px 4px;
+}
+:root[data-theme="dark"] .new-badge {
+  border-color: #2f8f52;
+  background: #183223;
+  color: #a4efc0;
+}
 .card--dragging { opacity: 0.62; }
 .card__preview-wrap {
   position: relative;

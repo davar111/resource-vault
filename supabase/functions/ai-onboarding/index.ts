@@ -343,6 +343,65 @@ function rankResources(
     .slice(0, 12);
 }
 
+async function buildProfileAndResources(
+  admin: ReturnType<typeof createClient>,
+  userId: string,
+  role: string,
+  answers: InterviewAnswer[]
+) {
+  const aiText = await askGemini(
+    "You produce a strict JSON profile for a technical learning app.",
+    [
+      `Role: ${role}`,
+      "Answers:",
+      ...answers.map((x, idx) => `${idx + 1}. ${x.question}: ${x.answer}`),
+      "Return JSON only in schema:",
+      `{"role":"string","level":"Junior|Middle|Senior","stack":["string"],"goals":["string"],"format_pref":["articles","tools","templates"]}`
+    ].join("\n")
+  );
+
+  const parsed = parseJsonFromText(aiText);
+  const fallbackProfile = deriveFallbackProfile(role, answers);
+  const parsedProfile = parsed ? normalizeProfile(parsed) : null;
+  const aiProfile: AiProfile = {
+    role: parsedProfile?.role || fallbackProfile.role,
+    level: parsedProfile?.level || fallbackProfile.level,
+    stack: parsedProfile?.stack?.length ? parsedProfile.stack : fallbackProfile.stack,
+    goals: parsedProfile?.goals?.length ? parsedProfile.goals : fallbackProfile.goals,
+    format_pref: parsedProfile?.format_pref?.length ? parsedProfile.format_pref : fallbackProfile.format_pref
+  };
+  const tags = normalizeList([aiProfile.role, ...aiProfile.stack, ...aiProfile.goals]).slice(0, 10);
+  const query = `${aiProfile.role} ${aiProfile.stack.join(" ")} ${aiProfile.level}`.trim();
+
+  const linksQuery = admin
+    .from("links")
+    .select("title,url,note,tags,source,type,created_at")
+    .limit(20);
+  const { data: internalLinks } = tags.length
+    ? await linksQuery.overlaps("tags", tags)
+    : await linksQuery.order("created_at", { ascending: false });
+
+  const internal = (internalLinks || []).map((x) => ({
+    title: String(x?.title || x?.url || ""),
+    url: String(x?.url || ""),
+    snippet: String(x?.note || ""),
+    tags: normalizeList(x?.tags),
+    source: String(x?.source || "internal")
+  }));
+
+  const external = await fetchExternalResources(query, tags);
+  const resources = rankResources([...internal, ...external], aiProfile);
+
+  await admin.from("users").upsert({
+    id: userId,
+    ai_profile: aiProfile,
+    onboarding_completed_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  }, { onConflict: "id" });
+
+  return { aiProfile, resources };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -367,6 +426,39 @@ Deno.serve(async (req) => {
   const action = String(body?.action || "");
   const role = String(body?.role || "").trim();
 
+  if (action === "chat_turn") {
+    if (!role) return jsonResponse(400, { error: "Role is required" });
+    const answers = Array.isArray(body?.answers) ? body.answers as InterviewAnswer[] : [];
+    const maxQuestions = 5;
+    const enoughData = answers.length >= 4;
+    if (enoughData || answers.length >= maxQuestions) {
+      const { aiProfile, resources } = await buildProfileAndResources(admin, authData.user.id, role, answers);
+      return jsonResponse(200, { done: true, ai_profile: aiProfile, resources });
+    }
+
+    const history = answers.map((x, idx) => `${idx + 1}. Q:${x.question} A:${x.answer}`).join("\n");
+    const qText = await askGemini(
+      "You are a technical interviewer. Return strict JSON only.",
+      [
+        `Role: ${role}`,
+        `Already asked: ${answers.length}`,
+        history ? `History:\n${history}` : "No history yet.",
+        "Return one adaptive follow-up question in JSON:",
+        `{"question":"string","options":["string","string","string"]}`,
+        "Question must help infer level, stack, goals or content format."
+      ].join("\n")
+    );
+    const parsedQuestion = parseJsonFromText(qText);
+    const fallback = fallbackQuestions(role)[answers.length] || fallbackQuestions(role)[fallbackQuestions(role).length - 1];
+    const question = {
+      question: String(parsedQuestion?.question || fallback.question),
+      options: Array.isArray(parsedQuestion?.options) && parsedQuestion.options.length
+        ? parsedQuestion.options.slice(0, 5).map((x: unknown) => String(x || ""))
+        : fallback.options
+    };
+    return jsonResponse(200, { done: false, question });
+  }
+
   if (action === "generate_questions") {
     if (!role) return jsonResponse(400, { error: "Role is required" });
 
@@ -386,57 +478,7 @@ Deno.serve(async (req) => {
     const answers = Array.isArray(body?.answers) ? body.answers as InterviewAnswer[] : [];
     if (!role) return jsonResponse(400, { error: "Role is required" });
     if (!answers.length) return jsonResponse(400, { error: "Answers are required" });
-
-    const aiText = await askGemini(
-      "You produce a strict JSON profile for a technical learning app.",
-      [
-        `Role: ${role}`,
-        "Answers:",
-        ...answers.map((x, idx) => `${idx + 1}. ${x.question}: ${x.answer}`),
-        "Return JSON only in schema:",
-        `{"role":"string","level":"Junior|Middle|Senior","stack":["string"],"goals":["string"],"format_pref":["articles","tools","templates"]}`
-      ].join("\n")
-    );
-
-    const parsed = parseJsonFromText(aiText);
-    const fallbackProfile = deriveFallbackProfile(role, answers);
-    const parsedProfile = parsed ? normalizeProfile(parsed) : null;
-    const aiProfile: AiProfile = {
-      role: parsedProfile?.role || fallbackProfile.role,
-      level: parsedProfile?.level || fallbackProfile.level,
-      stack: parsedProfile?.stack?.length ? parsedProfile.stack : fallbackProfile.stack,
-      goals: parsedProfile?.goals?.length ? parsedProfile.goals : fallbackProfile.goals,
-      format_pref: parsedProfile?.format_pref?.length ? parsedProfile.format_pref : fallbackProfile.format_pref
-    };
-    const tags = normalizeList([aiProfile.role, ...aiProfile.stack, ...aiProfile.goals]).slice(0, 10);
-    const query = `${aiProfile.role} ${aiProfile.stack.join(" ")} ${aiProfile.level}`.trim();
-
-    const linksQuery = admin
-      .from("links")
-      .select("title,url,note,tags,source,type,created_at")
-      .limit(20);
-    const { data: internalLinks } = tags.length
-      ? await linksQuery.overlaps("tags", tags)
-      : await linksQuery.order("created_at", { ascending: false });
-
-    const internal = (internalLinks || []).map((x) => ({
-      title: String(x?.title || x?.url || ""),
-      url: String(x?.url || ""),
-      snippet: String(x?.note || ""),
-      tags: normalizeList(x?.tags),
-      source: String(x?.source || "internal")
-    }));
-
-    const external = await fetchExternalResources(query, tags);
-    const resources = rankResources([...internal, ...external], aiProfile);
-
-    await admin.from("users").upsert({
-      id: authData.user.id,
-      ai_profile: aiProfile,
-      onboarding_completed_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    }, { onConflict: "id" });
-
+    const { aiProfile, resources } = await buildProfileAndResources(admin, authData.user.id, role, answers);
     return jsonResponse(200, { ai_profile: aiProfile, resources });
   }
 
