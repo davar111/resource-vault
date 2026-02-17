@@ -78,7 +78,6 @@ export function initOnboarding(options = {}) {
   const getLang = typeof options.getLang === "function" ? options.getLang : () => "ru";
   const ensureAuth = typeof options.ensureAuth === "function" ? options.ensureAuth : () => true;
   const getAccessToken = typeof options.getAccessToken === "function" ? options.getAccessToken : async () => "";
-  const onImportResources = typeof options.onImportResources === "function" ? options.onImportResources : async () => ({ imported: 0, skipped: 0 });
   const functionUrl = buildFunctionUrl(options.functionUrl);
 
   if (!modal || !triggerButton) return null;
@@ -98,15 +97,12 @@ export function initOnboarding(options = {}) {
 
   const initialState = {
     role: "",
-    roleOptions: ["Frontend", "UI/UX", "Product Manager", "Backend", "Data Analyst"],
     answers: [],
     currentQuestion: null,
     step: "role",
     profile: null,
     resources: [],
-    loading: false,
-    autoImported: false,
-    importSummary: null
+    loading: false
   };
 
   let state = { ...initialState };
@@ -161,25 +157,14 @@ export function initOnboarding(options = {}) {
     if (els.subtitle) els.subtitle.textContent = textByLang(getLang(), "Напиши роль и поехали в формате диалога", "Type your role and start a dialogue");
     applyButtonsText();
     if (els.chips) {
-      els.chips.innerHTML = state.roleOptions
-        .map((x) => `<button type="button" class="chip" data-role-option="${escapeHtml(x)}">${escapeHtml(x)}</button>`)
-        .join("");
-      els.chips.querySelectorAll("[data-role-option]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          const role = String(btn.getAttribute("data-role-option") || "").trim();
-          if (!role) return;
-          state.role = role;
-          persist();
-          submitRole(role);
-        });
-      });
+      els.chips.innerHTML = "";
     }
     if (els.chat) {
       els.chat.innerHTML = "";
       appendMessage(textByLang(
         getLang(),
-        "Привет. Я буду задавать вопросы по твоим ответам и сам добавлю подходящие ресурсы в Vault.",
-        "Hi. I will ask adaptive questions and auto-add matching resources to your Vault."
+        "Привет. Я буду задавать наводящие вопросы по твоим ответам. Пиши свободно, как в обычном чате.",
+        "Hi. I will ask adaptive questions based on your answers."
       ));
     }
   }
@@ -193,13 +178,7 @@ export function initOnboarding(options = {}) {
     }
     applyButtonsText();
     if (els.chips) {
-      const options = Array.isArray(question.options) ? question.options : [];
-      els.chips.innerHTML = options
-        .map((x) => `<button type="button" class="chip" data-answer-option="${escapeHtml(x)}">${escapeHtml(x)}</button>`)
-        .join("");
-      els.chips.querySelectorAll("[data-answer-option]").forEach((btn) => {
-        btn.addEventListener("click", () => submitAnswer(String(btn.getAttribute("data-answer-option") || "")));
-      });
+      els.chips.innerHTML = "";
     }
     if (els.input) {
       els.input.placeholder = textByLang(getLang(), "Напиши ответ в свободной форме", "Write your answer in free form");
@@ -213,29 +192,12 @@ export function initOnboarding(options = {}) {
     applyButtonsText();
     if (els.chips) {
       els.chips.innerHTML = "";
-      const rerunBtn = document.createElement("button");
-      rerunBtn.type = "button";
-      rerunBtn.className = "btn btn--secondary";
-      rerunBtn.textContent = textByLang(getLang(), "Добавить еще раз", "Import again");
-      rerunBtn.addEventListener("click", () => void importResources(false));
-      els.chips.appendChild(rerunBtn);
     }
     if (els.chat) {
       const profileLine = document.createElement("pre");
       profileLine.className = "onboarding-chat__json";
       profileLine.textContent = JSON.stringify(state.profile || {}, null, 2);
       els.chat.appendChild(profileLine);
-
-      if (state.importSummary) {
-        const summary = document.createElement("div");
-        summary.className = "onboarding-chat__msg onboarding-chat__msg--bot";
-        summary.textContent = textByLang(
-          getLang(),
-          `Ресурсы добавлены автоматически. Новых: ${state.importSummary.imported}, пропущено: ${state.importSummary.skipped}.`,
-          `Resources auto-added. New: ${state.importSummary.imported}, skipped: ${state.importSummary.skipped}.`
-        );
-        els.chat.appendChild(summary);
-      }
 
       if (state.resources.length) {
         const wrap = document.createElement("div");
@@ -304,7 +266,6 @@ export function initOnboarding(options = {}) {
       state.step = "result";
       persist();
       render();
-      if (!state.autoImported) await importResources(true);
       return;
     }
 
@@ -326,8 +287,6 @@ export function initOnboarding(options = {}) {
       state.role = role;
       state.answers = [];
       state.currentQuestion = null;
-      state.autoImported = false;
-      state.importSummary = null;
       await chatTurn();
     } catch (err) {
       appendMessage(err?.message || "Failed to start interview.", "bot");
@@ -348,35 +307,6 @@ export function initOnboarding(options = {}) {
       await chatTurn();
     } catch (err) {
       appendMessage(err?.message || "Failed to continue interview.", "bot");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function importResources(isAuto) {
-    if (isAuto && state.autoImported) return;
-    setLoading(true);
-    try {
-      const result = await onImportResources(state.resources, state.profile);
-      state.importSummary = {
-        imported: Number(result?.imported || 0),
-        skipped: Number(result?.skipped || 0)
-      };
-      state.autoImported = true;
-      persist();
-      if (!isAuto) {
-        appendMessage(
-          textByLang(
-            getLang(),
-            `Импорт завершен. Добавлено: ${state.importSummary.imported}, пропущено: ${state.importSummary.skipped}.`,
-            `Import finished. Added: ${state.importSummary.imported}, skipped: ${state.importSummary.skipped}.`
-          ),
-          "bot"
-        );
-      }
-      render();
-    } catch (err) {
-      appendMessage(err?.message || "Failed to import resources.", "bot");
     } finally {
       setLoading(false);
     }

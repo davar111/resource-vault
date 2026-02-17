@@ -11,7 +11,6 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || "";
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY") || "";
 const SERPER_API_KEY = Deno.env.get("SERPER_API_KEY") || "";
-const USE_ADAPTIVE_FALLBACK = String(Deno.env.get("USE_ADAPTIVE_FALLBACK") || "true").toLowerCase() !== "false";
 
 type InterviewAnswer = {
   question: string;
@@ -207,6 +206,19 @@ function parseJsonFromText(input: string | null) {
   } catch {
     return null;
   }
+}
+
+function buildOpenFallbackQuestion(role: string, answers: InterviewAnswer[], lang: string) {
+  const isEn = String(lang || "ru") === "en";
+  const last = answers.length ? String(answers[answers.length - 1]?.answer || "").trim() : "";
+  if (!last) {
+    return isEn
+      ? `Great. You wrote "${role}". What exactly do you want to achieve in the next 2-3 months?`
+      : `Отлично, ты написал "${role}". Чего конкретно хочешь достичь в ближайшие 2-3 месяца?`;
+  }
+  return isEn
+    ? `I got it. You said: "${last}". What is the next concrete step you want to take?`
+    : `Понял. Ты написал: "${last}". Какой следующий конкретный шаг ты хочешь сделать?`;
 }
 
 function fallbackQuestions(role: string) {
@@ -566,21 +578,16 @@ Deno.serve(async (req) => {
         `Role: ${role}`,
         `Already asked: ${answers.length}`,
         history ? `History:\n${history}` : "No history yet.",
-        "Return one adaptive follow-up question in JSON:",
-        `{"question":"string","options":["string","string","string"]}`,
-        "Question must help infer level, stack, goals or content format."
+        "Return one adaptive open-ended follow-up question in JSON:",
+        `{"question":"string"}`,
+        "Do not include answer options."
       ].join("\n")
     );
     const parsedQuestion = parseJsonFromText(qText);
-    const fallbackList = fallbackQuestionsByLang(role, lang);
-    const staticFallback = fallbackList[Math.min(answers.length, fallbackList.length - 1)];
-    const adaptiveFallback = buildFallbackFollowUp(role, answers, lang);
-    const fallback = USE_ADAPTIVE_FALLBACK ? adaptiveFallback : staticFallback;
+    const fallbackQuestion = buildOpenFallbackQuestion(role, answers, lang);
     const question = {
-      question: String(parsedQuestion?.question || fallback.question),
-      options: Array.isArray(parsedQuestion?.options) && parsedQuestion.options.length
-        ? parsedQuestion.options.slice(0, 5).map((x: unknown) => String(x || ""))
-        : fallback.options
+      question: String(parsedQuestion?.question || fallbackQuestion),
+      options: []
     };
     return jsonResponse(200, { done: false, question });
   }
@@ -590,12 +597,15 @@ Deno.serve(async (req) => {
 
     const aiText = await askGemini(
       "You generate interview questions for tech onboarding. Return strict JSON only.",
-      `Role: ${role}. Return JSON: {"questions":[{"question":"...","options":["..."]}]} with 3-5 questions, each with 3-5 short options.`
+      `Role: ${role}. Return JSON: {"questions":[{"question":"..."}]} with 3-5 adaptive open-ended questions and no answer options.`
     );
     const parsed = parseJsonFromText(aiText);
     const questions = Array.isArray(parsed?.questions) && parsed.questions.length
-      ? parsed.questions.slice(0, 5)
-      : fallbackQuestionsByLang(role, "ru");
+      ? parsed.questions.slice(0, 5).map((q: unknown) => ({
+        question: String((q as { question?: unknown })?.question || ""),
+        options: []
+      })).filter((q: { question: string }) => !!q.question)
+      : [{ question: buildOpenFallbackQuestion(role, [], "ru"), options: [] }];
 
     return jsonResponse(200, { questions });
   }
