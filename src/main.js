@@ -1252,14 +1252,19 @@ async function bootstrap() {
   renderApp();
 
   if (!onboardingController && els.btnAiOnboarding && els.modalOnboarding) {
-    onboardingController = initOnboarding({
-      triggerButton: els.btnAiOnboarding,
-      modal: els.modalOnboarding,
-      getLang: () => state.lang,
-      ensureAuth,
-      getAccessToken: async () => await getSessionAccessToken(),
-      onImportResources: importOnboardingResources
-    });
+    try {
+      onboardingController = initOnboarding({
+        triggerButton: els.btnAiOnboarding,
+        modal: els.modalOnboarding,
+        getLang: () => state.lang,
+        ensureAuth,
+        getAccessToken: async () => await getSessionAccessToken(),
+        onImportResources: importOnboardingResources
+      });
+    } catch (err) {
+      console.warn("Onboarding init failed", err?.message || err);
+      if (els.btnAiOnboarding) els.btnAiOnboarding.hidden = true;
+    }
   }
 }
 
