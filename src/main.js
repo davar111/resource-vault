@@ -415,8 +415,8 @@ function applyI18n() {
   if (els.btnAddLink) els.btnAddLink.textContent = t(L, "addLink");
   if (els.btnAiOnboarding) {
     els.btnAiOnboarding.textContent = ENABLE_AI_ONBOARDING
-      ? (L === "ru" ? "AI интервью" : "AI interview")
-      : (L === "ru" ? "AI интервью (временно отключено)" : "AI interview (temporarily disabled)");
+      ? (L === "ru" ? "AI-онбординг" : "AI onboarding")
+      : (L === "ru" ? "AI-онбординг (временно отключен)" : "AI onboarding (temporarily disabled)");
   }
   if (els.btnNewCollection) els.btnNewCollection.setAttribute("aria-label", t(L, "newCollection"));
   if (els.btnSaveFilterInline) {
@@ -1273,8 +1273,8 @@ async function bootstrap() {
       if (els.btnAiOnboarding) {
         els.btnAiOnboarding.disabled = true;
         els.btnAiOnboarding.textContent = state.lang === "ru"
-          ? "AI интервью (ошибка инициализации)"
-          : "AI interview (init error)";
+          ? "AI-онбординг (ошибка инициализации)"
+          : "AI onboarding (init error)";
       }
     }
   }

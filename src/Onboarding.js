@@ -437,7 +437,7 @@ export function initOnboarding(options = {}) {
       const result = await onImportResources(state.resources, state.profile);
       state.importSummary = { imported: Number(result?.imported || 0), skipped: Number(result?.skipped || 0) };
       persist();
-      appendMessage(textByLang(getLang(), `Импортировано: ${state.importSummary.imported}, пропущено: ${state.importSummary.skipped}.`, `Imported: ${state.importSummary.imported}, skipped: ${state.importSummary.skipped}.`), "bot");
+      appendMessage(textByLang(getLang(), `Готово: добавлено ${state.importSummary.imported}, пропущено ${state.importSummary.skipped}.`, `Done: imported ${state.importSummary.imported}, skipped ${state.importSummary.skipped}.`), "bot");
     } catch (err) {
       appendMessage(err?.message || "Import failed.", "bot");
     } finally {
@@ -447,8 +447,8 @@ export function initOnboarding(options = {}) {
 
   async function finalizeProfileAndResources() {
     setLoading(true);
-    setStatus(textByLang(getLang(), "Подбираю ресурсы...", "Selecting resources..."));
-    appendMessage(textByLang(getLang(), "Собираю персональные ресурсы для тебя...", "Collecting personal resources for you..."), "bot");
+    setStatus(textByLang(getLang(), "Подбираю лучшие ресурсы...", "Finding the best resources..."));
+    appendMessage(textByLang(getLang(), "Собираю подборку под твой профиль...", "Building a resource set for your profile..."), "bot");
     showSkeletonResources(5);
     try {
       const token = String(await getAccessToken() || "").trim();
@@ -484,7 +484,7 @@ export function initOnboarding(options = {}) {
   }
 
   function renderResult() {
-    if (els.subtitle) els.subtitle.textContent = textByLang(getLang(), "Готово — профиль и ресурсы", "Done — profile and resources");
+    if (els.subtitle) els.subtitle.textContent = textByLang(getLang(), "Готово: профиль и ресурсы", "Done: profile and resources");
     if (els.chips) {
       els.chips.dataset.mode = "result";
       els.chips.innerHTML = "";
@@ -494,7 +494,7 @@ export function initOnboarding(options = {}) {
     appendMessage(
       state.resources.length
         ? textByLang(getLang(), `Нашел ${state.resources.length} ресурсов:`, `Found ${state.resources.length} resources:`)
-        : textByLang(getLang(), "Профиль собран. Ресурсы пока не найдены.", "Profile is ready. No resources found yet."),
+        : textByLang(getLang(), "Профиль готов, но ресурсы пока не нашлись.", "Profile is ready, but no resources were found yet."),
       "bot"
     );
     renderResourceCards(state.resources);
@@ -509,10 +509,10 @@ export function initOnboarding(options = {}) {
     if (state.step === "questions") {
       const total = state.allQuestions.length || 1;
       const step = state.history.length + 1;
-      els.subtitle.textContent = textByLang(getLang(), `Вопрос ${step} из ${total}`, `Question ${step} of ${total}`);
+      els.subtitle.textContent = textByLang(getLang(), `Шаг ${step} из ${total}`, `Step ${step} of ${total}`);
       return;
     }
-    els.subtitle.textContent = textByLang(getLang(), "Готово — профиль и ресурсы", "Done — profile and resources");
+    els.subtitle.textContent = textByLang(getLang(), "Готово: профиль и ресурсы", "Done: profile and resources");
   }
 
   function askCurrentQuestion() {
@@ -580,8 +580,8 @@ export function initOnboarding(options = {}) {
       appendMessage(
         textByLang(
           getLang(),
-          "Привет. Выбери роль, отвечай на вопросы, и я подберу ресурсы.",
-          "Hi. Choose your role, answer a few questions, and I will pick resources."
+          "Привет! Выбери роль, ответь на пару вопросов, и я соберу релевантные ресурсы.",
+          "Hi! Pick your role, answer a few questions, and I will assemble relevant resources."
         ),
         "bot"
       );
