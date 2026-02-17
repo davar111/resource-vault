@@ -291,9 +291,7 @@ export function initOnboarding(options = {}) {
 
   function setLoading(next) {
     state.loading = !!next;
-    if (els.send) els.send.disabled = state.loading;
     if (els.skip) els.skip.disabled = state.loading;
-    if (els.input) els.input.disabled = state.loading;
   }
 
   function setStatus(text = "") {
@@ -313,12 +311,17 @@ export function initOnboarding(options = {}) {
     if (els.title) els.title.textContent = textByLang(getLang(), "AI-онбординг", "AI onboarding");
     if (els.restart) els.restart.textContent = textByLang(getLang(), "Начать заново", "Restart");
     if (els.skip) els.skip.textContent = state.step === "result" ? textByLang(getLang(), "Закрыть", "Close") : textByLang(getLang(), "Пропустить", "Skip");
-    if (els.send) els.send.textContent = "Send";
+  }
+
+  function hideFreeInput() {
     if (els.input) {
-      if (state.step === "role") els.input.placeholder = textByLang(getLang(), "Напиши роль или выбери ниже", "Type role or choose below");
-      else if (state.step === "questions") els.input.placeholder = textByLang(getLang(), "Напиши ответ или выбери ниже", "Type answer or choose below");
-      else els.input.placeholder = textByLang(getLang(), "Готово", "Done");
+      els.input.value = "";
+      els.input.disabled = true;
+      const row = els.input.closest(".row") || els.input.parentElement;
+      if (row) row.style.display = "none";
+      else els.input.style.display = "none";
     }
+    if (els.send) els.send.style.display = "none";
   }
 
   function renderBackButton() {
@@ -532,7 +535,7 @@ export function initOnboarding(options = {}) {
   }
 
   function submitAnswer(answerRaw) {
-    const answer = String(answerRaw || els.input?.value || "").trim();
+    const answer = String(answerRaw || "").trim();
     if (!answer || !state.currentQuestion) return;
     appendMessage(answer, "user");
     state.history.push({
@@ -542,7 +545,6 @@ export function initOnboarding(options = {}) {
     });
     const answeredIds = new Set(state.history.map((x) => x.questionId));
     state.currentQuestion = resolveNextQuestion(state.currentQuestion, answer, state.allQuestions, answeredIds);
-    if (els.input) els.input.value = "";
     askCurrentQuestion();
   }
 
@@ -557,11 +559,6 @@ export function initOnboarding(options = {}) {
       for (let i = 0; i < removeCount; i += 1) msgs[msgs.length - 1 - i]?.remove();
     }
     askCurrentQuestion();
-  }
-
-  function onSend() {
-    if (state.step === "role") submitRole(String(els.input?.value || "").trim());
-    else if (state.step === "questions") submitAnswer(String(els.input?.value || "").trim());
   }
 
   function renderRole() {
@@ -579,10 +576,6 @@ export function initOnboarding(options = {}) {
     renderRoleChips();
     updateSubtitle();
     setStatus("");
-    if (els.input) {
-      els.input.value = "";
-      els.input.focus();
-    }
   }
 
   function open() {
@@ -591,6 +584,7 @@ export function initOnboarding(options = {}) {
     if (cached && typeof cached === "object") state = { ...initialState, ...cached, loading: false };
     else resetState();
     applyButtonsText();
+    hideFreeInput();
     if (state.step === "result") renderResult();
     else if (state.step === "questions") askCurrentQuestion();
     else renderRole();
@@ -600,6 +594,7 @@ export function initOnboarding(options = {}) {
   function restart() {
     resetState();
     applyButtonsText();
+    hideFreeInput();
     renderRole();
   }
 
@@ -615,16 +610,11 @@ export function initOnboarding(options = {}) {
   function bind() {
     triggerButton.addEventListener("click", open);
     els.close?.addEventListener("click", () => modal.close());
-    els.send?.addEventListener("click", onSend);
     els.skip?.addEventListener("click", skip);
     els.restart?.addEventListener("click", restart);
-    els.input?.addEventListener("keydown", (e) => {
-      if (e.key !== "Enter") return;
-      e.preventDefault();
-      onSend();
-    });
   }
 
   bind();
   return { open };
 }
+
