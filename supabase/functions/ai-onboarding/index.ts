@@ -25,6 +25,56 @@ type AiProfile = {
   format_pref: Array<"articles" | "tools" | "templates">;
 };
 
+const STOP_WORDS = new Set([
+  "какой", "какая", "какие", "какие-то", "тебя", "твой", "твоя", "твоей", "уровень",
+  "чем", "фокус", "сейчас", "ответ", "формат", "материалов", "предпочитаешь", "или",
+  "и", "в", "на", "по", "для", "у", "из", "к", "как", "это", "that", "this", "with",
+  "from", "your", "you", "what", "which", "where", "when", "why", "how", "the", "and",
+  "или", "uiux"
+]);
+
+const STACK_ALIASES: Record<string, string> = {
+  "ui/ux": "ui/ux",
+  "ux/ui": "ui/ux",
+  "ux": "ux",
+  "ui": "ui",
+  "figma": "figma",
+  "sketch": "sketch",
+  "photoshop": "photoshop",
+  "illustrator": "illustrator",
+  "adobexd": "adobe_xd",
+  "adobe_xd": "adobe_xd",
+  "webflow": "webflow",
+  "framer": "framer",
+  "notion": "notion",
+  "miro": "miro",
+  "react": "react",
+  "vue": "vue",
+  "angular": "angular",
+  "typescript": "typescript",
+  "javascript": "javascript",
+  "node": "nodejs",
+  "nodejs": "nodejs",
+  "python": "python",
+  "sql": "sql",
+  "product": "product",
+  "analytics": "analytics",
+  "ga4": "ga4"
+};
+
+const GOAL_ALIASES: Record<string, string> = {
+  "найти работу": "find_job",
+  "job": "find_job",
+  "career": "find_job",
+  "интервью": "interview_prep",
+  "interview": "interview_prep",
+  "портфолио": "build_portfolio",
+  "portfolio": "build_portfolio",
+  "прокачать": "improve_skills",
+  "skills": "improve_skills",
+  "growth": "improve_skills"
+};
+
 function jsonResponse(status: number, payload: unknown) {
   return new Response(JSON.stringify(payload), {
     status,
@@ -43,6 +93,68 @@ function normalizeList(input: unknown) {
   return [...out];
 }
 
+function normalizeToken(raw: string) {
+  return String(raw || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[_\s]+/g, "_")
+    .replace(/[^\p{L}\p{N}_/+.-]/gu, "");
+}
+
+function cleanStack(input: unknown) {
+  const arr = Array.isArray(input) ? input : [];
+  const out = new Set<string>();
+  for (const raw of arr) {
+    const token = normalizeToken(String(raw || ""));
+    if (!token || token.length < 2 || token.length > 32) continue;
+    const compact = token.replaceAll("_", "");
+    if (STOP_WORDS.has(compact) || STOP_WORDS.has(token)) continue;
+    const normalized = STACK_ALIASES[token] || STACK_ALIASES[compact] || token;
+    if (STOP_WORDS.has(normalized)) continue;
+    out.add(normalized);
+  }
+  return [...out].slice(0, 10);
+}
+
+function cleanGoals(input: unknown) {
+  const arr = Array.isArray(input) ? input : [];
+  const out = new Set<string>();
+  for (const raw of arr) {
+    const token = normalizeToken(String(raw || ""));
+    if (!token) continue;
+    const normalized = GOAL_ALIASES[token] || token;
+    if (!normalized || STOP_WORDS.has(normalized)) continue;
+    out.add(normalized);
+  }
+  if (!out.size) out.add("improve_skills");
+  return [...out].slice(0, 6);
+}
+
+function detectGoalsFromAnswers(answerText: string) {
+  const lower = answerText.toLowerCase();
+  const goals = new Set<string>();
+  for (const [key, value] of Object.entries(GOAL_ALIASES)) {
+    if (lower.includes(key)) goals.add(value);
+  }
+  if (!goals.size) goals.add("improve_skills");
+  return [...goals];
+}
+
+function detectStackFromAnswers(answerText: string) {
+  const lower = answerText.toLowerCase();
+  const stack = new Set<string>();
+  for (const [key, value] of Object.entries(STACK_ALIASES)) {
+    if (lower.includes(key.replaceAll("_", " "))) stack.add(value);
+  }
+  for (const token of lower.split(/[\s,./:;()[\]{}!?'"`|\\-]+/g)) {
+    const normalized = normalizeToken(token);
+    if (!normalized) continue;
+    if (STOP_WORDS.has(normalized)) continue;
+    if (STACK_ALIASES[normalized]) stack.add(STACK_ALIASES[normalized]);
+  }
+  return [...stack].slice(0, 8);
+}
+
 function normalizeProfile(input: Partial<AiProfile>): AiProfile {
   const levelRaw = String(input?.level || "Junior");
   const level = levelRaw === "Senior" || levelRaw === "Middle" ? levelRaw : "Junior";
@@ -56,8 +168,8 @@ function normalizeProfile(input: Partial<AiProfile>): AiProfile {
   return {
     role: String(input?.role || "Generalist").trim(),
     level,
-    stack: normalizeList(input?.stack),
-    goals: normalizeList(input?.goals),
+    stack: cleanStack(input?.stack),
+    goals: cleanGoals(input?.goals),
     format_pref: [...formatSet]
   };
 }
@@ -118,21 +230,21 @@ function fallbackQuestions(role: string) {
 }
 
 function deriveFallbackProfile(role: string, answers: InterviewAnswer[]): AiProfile {
-  const joined = answers.map((x) => `${x.question} ${x.answer}`).join(" ").toLowerCase();
+  const answersText = answers.map((x) => String(x.answer || "")).join(" ").toLowerCase();
   let level: AiProfile["level"] = "Junior";
-  if (joined.includes("senior")) level = "Senior";
-  else if (joined.includes("middle")) level = "Middle";
+  if (answersText.includes("senior")) level = "Senior";
+  else if (answersText.includes("middle")) level = "Middle";
 
   const formatPref: AiProfile["format_pref"] = [];
-  if (joined.includes("tool")) formatPref.push("tools");
-  if (joined.includes("template")) formatPref.push("templates");
+  if (answersText.includes("tool")) formatPref.push("tools");
+  if (answersText.includes("template")) formatPref.push("templates");
   if (formatPref.length === 0) formatPref.push("articles");
 
   return normalizeProfile({
     role,
     level,
-    stack: joined.split(/[\s,./]+/).filter((x) => x.length >= 3).slice(0, 8),
-    goals: ["improve_skills"],
+    stack: detectStackFromAnswers(answersText),
+    goals: detectGoalsFromAnswers(answersText),
     format_pref: formatPref
   });
 }
@@ -287,7 +399,15 @@ Deno.serve(async (req) => {
     );
 
     const parsed = parseJsonFromText(aiText);
-    const aiProfile = normalizeProfile(parsed || deriveFallbackProfile(role, answers));
+    const fallbackProfile = deriveFallbackProfile(role, answers);
+    const parsedProfile = parsed ? normalizeProfile(parsed) : null;
+    const aiProfile: AiProfile = {
+      role: parsedProfile?.role || fallbackProfile.role,
+      level: parsedProfile?.level || fallbackProfile.level,
+      stack: parsedProfile?.stack?.length ? parsedProfile.stack : fallbackProfile.stack,
+      goals: parsedProfile?.goals?.length ? parsedProfile.goals : fallbackProfile.goals,
+      format_pref: parsedProfile?.format_pref?.length ? parsedProfile.format_pref : fallbackProfile.format_pref
+    };
     const tags = normalizeList([aiProfile.role, ...aiProfile.stack, ...aiProfile.goals]).slice(0, 10);
     const query = `${aiProfile.role} ${aiProfile.stack.join(" ")} ${aiProfile.level}`.trim();
 

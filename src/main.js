@@ -668,6 +668,16 @@ async function loadData() {
   state.savedFilters = savedFilters;
 }
 
+const ONBOARDING_TAG_BLACKLIST = new Set([
+  "какой", "какая", "какие", "тебя", "уровень", "чем", "фокус", "сейчас",
+  "what", "which", "your", "level", "focus", "now"
+]);
+
+function sanitizeOnboardingTags(input) {
+  const raw = normalizeTags(input || []);
+  return raw.filter((tag) => !ONBOARDING_TAG_BLACKLIST.has(String(tag || "").toLowerCase()));
+}
+
 async function importOnboardingResources(resources, profile) {
   if (!ensureAuth()) return { imported: 0, skipped: Array.isArray(resources) ? resources.length : 0 };
   const list = Array.isArray(resources) ? resources : [];
@@ -696,7 +706,7 @@ async function importOnboardingResources(resources, profile) {
         url,
         title: String(item?.title || "").trim() || domainFromUrl(url),
         note: String(item?.snippet || item?.note || "").trim().slice(0, NOTE_MAX_LEN),
-        tags: normalizeTags([...(profile?.stack || []), ...(item?.tags || []), detectSourceFromUrl(url)]),
+        tags: sanitizeOnboardingTags([...(profile?.stack || []), ...(profile?.goals || []), ...(item?.tags || []), detectSourceFromUrl(url)]),
         type: "article",
         source: detectSourceFromUrl(url),
         favorite: false,
