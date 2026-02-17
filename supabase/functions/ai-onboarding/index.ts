@@ -620,7 +620,8 @@ async function buildProfileAndResources(
   admin: ReturnType<typeof createClient>,
   userId: string,
   role: string,
-  answers: InterviewAnswer[]
+  answers: InterviewAnswer[],
+  resourcesLangOverride?: "ru" | "en" | "both"
 ) {
   const aiText = await askGroq(
     "You produce a strict JSON profile for a technical learning app.",
@@ -636,7 +637,9 @@ async function buildProfileAndResources(
   const parsed = parseJsonFromText(aiText);
   const fallbackProfile = deriveFallbackProfile(role, answers);
   const parsedProfile = parsed ? normalizeProfile(parsed) : null;
-  const resourcesLang = detectResourcesLang(answers);
+  const resourcesLang = resourcesLangOverride === "ru" || resourcesLangOverride === "en" || resourcesLangOverride === "both"
+    ? resourcesLangOverride
+    : detectResourcesLang(answers);
   const aiProfile: AiProfile = {
     role: parsedProfile?.role || fallbackProfile.role,
     level: parsedProfile?.level || fallbackProfile.level,
@@ -708,7 +711,10 @@ Deno.serve(async (req) => {
     const maxQuestions = 5;
     const enoughData = answers.length >= 4;
     if (enoughData || answers.length >= maxQuestions) {
-      const { aiProfile, resources } = await buildProfileAndResources(admin, authData.user.id, role, answers);
+      const override = body?.resources_lang === "ru" || body?.resources_lang === "en" || body?.resources_lang === "both"
+        ? body.resources_lang
+        : undefined;
+      const { aiProfile, resources } = await buildProfileAndResources(admin, authData.user.id, role, answers, override);
       return jsonResponse(200, { done: true, ai_profile: aiProfile, resources });
     }
 
@@ -759,7 +765,10 @@ Deno.serve(async (req) => {
     const answers = Array.isArray(body?.answers) ? body.answers as InterviewAnswer[] : [];
     if (!role) return jsonResponse(400, { error: "Role is required" });
     if (!answers.length) return jsonResponse(400, { error: "Answers are required" });
-    const { aiProfile, resources } = await buildProfileAndResources(admin, authData.user.id, role, answers);
+    const override = body?.resources_lang === "ru" || body?.resources_lang === "en" || body?.resources_lang === "both"
+      ? body.resources_lang
+      : undefined;
+    const { aiProfile, resources } = await buildProfileAndResources(admin, authData.user.id, role, answers, override);
     return jsonResponse(200, { ai_profile: aiProfile, resources });
   }
 

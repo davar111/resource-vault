@@ -128,6 +128,16 @@ function buildProfile(role, answers) {
   };
 }
 
+function detectResourcesLangFromAnswers(answers) {
+  const text = answers.map((x) => `${x.question} ${x.answer}`).join(" ").toLowerCase();
+  const ru = /рус|russian|на русском|кирилл/.test(text);
+  const en = /english|англ|на английском/.test(text);
+  if (ru && en) return "both";
+  if (ru) return "ru";
+  if (en) return "en";
+  return "both";
+}
+
 export function initOnboarding(options = {}) {
   const modal = options.modal;
   const triggerButton = options.triggerButton;
@@ -322,7 +332,12 @@ export function initOnboarding(options = {}) {
       const res = await fetch(functionUrl, {
         method: "POST",
         headers,
-        body: JSON.stringify({ action: "finalize_profile", role: state.role, answers: state.answers })
+        body: JSON.stringify({
+          action: "finalize_profile",
+          role: state.role,
+          answers: state.answers,
+          resources_lang: detectResourcesLangFromAnswers(state.answers)
+        })
       });
       if (!res.ok) throw new Error((await res.text().catch(() => "")) || `Finalize failed (${res.status})`);
       const data = await res.json();
