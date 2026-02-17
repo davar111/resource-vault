@@ -1081,6 +1081,42 @@ select option { background: var(--bg-surface-1); color: var(--text-primary); }
 .onboarding-chips[data-mode="result"] .chip {
   opacity: 0.85;
 }
+.onboarding-chips-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.ob-back-btn {
+  border: 1px solid var(--border-default);
+  background: var(--bg-surface-1);
+  color: var(--text-secondary);
+  border-radius: 999px;
+  padding: 6px 12px 8px;
+  cursor: pointer;
+}
+.ob-back-btn:hover {
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+.ob-skeleton {
+  background: linear-gradient(90deg, var(--bg-surface-1) 20%, var(--bg-surface-3) 40%, var(--bg-surface-1) 60%);
+  background-size: 200% 100%;
+  animation: obShimmer 1.2s infinite linear;
+}
+.ob-skeleton-card {
+  height: 44px;
+  border-radius: 10px;
+  margin-bottom: 8px;
+}
+.ob-resource-card small {
+  color: var(--text-muted);
+  margin-left: 8px;
+  font-size: 12px;
+}
+@keyframes obShimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
 @media (max-width: 700px) {
   .onboarding-chips[data-mode="roles"] {
     grid-template-columns: 1fr;
