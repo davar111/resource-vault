@@ -262,6 +262,7 @@ export function initOnboarding(options = {}) {
     send: modal.querySelector("[data-onboarding-send]"),
     skip: modal.querySelector("[data-onboarding-skip]"),
     restart: modal.querySelector("[data-onboarding-restart]"),
+    footer: modal.querySelector(".row.row--end"),
     close: modal.querySelector("[data-onboarding-close]"),
     status: modal.querySelector("[data-onboarding-status]")
   };
