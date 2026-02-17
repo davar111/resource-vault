@@ -12,6 +12,29 @@ const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || "";
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY") || "";
 const SERPER_API_KEY = Deno.env.get("SERPER_API_KEY") || "";
 
+const TRUSTED_HOSTS = [
+  "developer.mozilla.org",
+  "react.dev",
+  "nextjs.org",
+  "nodejs.org",
+  "typescriptlang.org",
+  "docs.python.org",
+  "python.org",
+  "supabase.com",
+  "web.dev",
+  "w3.org",
+  "nngroup.com",
+  "figma.com",
+  "material.io",
+  "uxdesign.cc",
+  "a11yproject.com",
+  "github.com",
+  "vercel.com",
+  "aws.amazon.com",
+  "cloud.google.com",
+  "microsoft.com"
+];
+
 type InterviewAnswer = {
   question: string;
   answer: string;
@@ -206,6 +229,20 @@ function parseJsonFromText(input: string | null) {
   } catch {
     return null;
   }
+}
+
+function hostnameOf(url: string) {
+  try {
+    return new URL(String(url || "")).hostname.toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
+function isTrustedHost(url: string) {
+  const host = hostnameOf(url);
+  if (!host) return false;
+  return TRUSTED_HOSTS.some((x) => host === x || host.endsWith(`.${x}`));
 }
 
 function extractQuestionText(input: string | null) {
@@ -518,7 +555,7 @@ function rankResources(
   const preferred = new Set(profile.format_pref);
   const stackTokens = new Set(profile.stack.map((x) => x.toLowerCase()));
 
-  return items
+  const ranked = items
     .filter((x) => x.url.startsWith("http"))
     .filter((x) => {
       const key = x.url.toLowerCase();
@@ -529,6 +566,7 @@ function rankResources(
     .map((x) => {
       const hay = `${x.title} ${x.snippet} ${(x.tags || []).join(" ")}`.toLowerCase();
       let score = 0;
+      const trusted = isTrustedHost(x.url);
       if (hay.includes(levelToken)) score += 2;
       for (const token of stackTokens) {
         if (token && hay.includes(token)) score += 2;
@@ -536,10 +574,16 @@ function rankResources(
       if (preferred.has("articles") && x.source !== "github") score += 1;
       if (preferred.has("tools") && x.source === "github") score += 1;
       if (preferred.has("templates") && hay.includes("template")) score += 1;
-      return { ...x, score };
+      if (trusted) score += 6;
+      else score -= 1;
+      return { ...x, score, trusted };
     })
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 12);
+    .sort((a, b) => b.score - a.score);
+
+  const trusted = ranked.filter((x) => x.trusted);
+  const untrusted = ranked.filter((x) => !x.trusted);
+  const blended = trusted.length ? [...trusted, ...untrusted] : ranked;
+  return blended.slice(0, 12);
 }
 
 async function buildProfileAndResources(

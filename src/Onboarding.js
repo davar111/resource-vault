@@ -1,4 +1,5 @@
 const STORAGE_KEY = "resource_vault_onboarding_state_v2";
+const DEFAULT_FUNCTION_PATH = "/functions/v1/ai-onboarding";
 
 function textByLang(lang, ru, en) {
   return String(lang || "ru") === "en" ? en : ru;
@@ -19,6 +20,19 @@ function safeJsonParse(raw, fallback) {
   } catch {
     return fallback;
   }
+}
+
+function buildFunctionUrl(explicit) {
+  const base = String(explicit || "").trim();
+  if (base) return base;
+  const env = typeof import.meta !== "undefined" && import.meta.env ? import.meta.env : {};
+  const supabaseUrl = String(env.VITE_SUPABASE_URL || "").trim();
+  return supabaseUrl ? `${supabaseUrl}${DEFAULT_FUNCTION_PATH}` : DEFAULT_FUNCTION_PATH;
+}
+
+function getAnonKey() {
+  const env = typeof import.meta !== "undefined" && import.meta.env ? import.meta.env : {};
+  return String(env.VITE_SUPABASE_ANON_KEY || "").trim();
 }
 
 function buildQuestionBank(lang) {
@@ -107,6 +121,8 @@ export function initOnboarding(options = {}) {
   const triggerButton = options.triggerButton;
   const getLang = typeof options.getLang === "function" ? options.getLang : () => "ru";
   const ensureAuth = typeof options.ensureAuth === "function" ? options.ensureAuth : () => true;
+  const getAccessToken = typeof options.getAccessToken === "function" ? options.getAccessToken : async () => "";
+  const functionUrl = buildFunctionUrl(options.functionUrl);
 
   if (!modal || !triggerButton) return null;
 
@@ -130,7 +146,9 @@ export function initOnboarding(options = {}) {
     questions: [],
     currentQuestion: null,
     answers: [],
-    profile: null
+    profile: null,
+    resources: [],
+    loading: false
   };
 
   let state = { ...initialState };
@@ -155,6 +173,13 @@ export function initOnboarding(options = {}) {
     msg.innerHTML = escapeHtml(text);
     els.chat.appendChild(msg);
     els.chat.scrollTop = els.chat.scrollHeight;
+  }
+
+  function setLoading(next) {
+    state.loading = !!next;
+    if (els.send) els.send.disabled = state.loading;
+    if (els.skip) els.skip.disabled = state.loading;
+    if (els.input) els.input.disabled = state.loading;
   }
 
   function setStatus(text = "") {
@@ -248,9 +273,61 @@ export function initOnboarding(options = {}) {
       pre.className = "onboarding-chat__json";
       pre.textContent = JSON.stringify(state.profile || {}, null, 2);
       els.chat.appendChild(pre);
+
+      if (Array.isArray(state.resources) && state.resources.length) {
+        const wrap = document.createElement("div");
+        wrap.className = "onboarding-chat__list";
+        wrap.innerHTML = state.resources
+          .slice(0, 10)
+          .map((r, idx) => {
+            const title = escapeHtml(r?.title || r?.url || `Resource ${idx + 1}`);
+            const url = escapeHtml(r?.url || "");
+            return `<a class="onboarding-chat__resource" href="${url}" target="_blank" rel="noreferrer">${idx + 1}. ${title}</a>`;
+          })
+          .join("");
+        els.chat.appendChild(wrap);
+      }
       els.chat.scrollTop = els.chat.scrollHeight;
     }
     if (els.input) els.input.value = "";
+  }
+
+  async function finalizeProfileAndResources() {
+    setLoading(true);
+    setStatus(textByLang(getLang(), "Подбираю качественные ресурсы...", "Selecting high-quality resources..."));
+    try {
+      const token = String(await getAccessToken() || "").trim();
+      if (!token) throw new Error(textByLang(getLang(), "Нет активной сессии.", "No active session."));
+      const anonKey = getAnonKey();
+      const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+      if (anonKey) headers.apikey = anonKey;
+
+      const res = await fetch(functionUrl, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          action: "finalize_profile",
+          role: state.role,
+          answers: state.answers
+        })
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(text || `Finalize failed (${res.status})`);
+      }
+      const data = await res.json();
+      state.profile = data?.ai_profile || buildProfile(state.role, state.answers);
+      state.resources = Array.isArray(data?.resources) ? data.resources : [];
+    } catch (err) {
+      state.profile = state.profile || buildProfile(state.role, state.answers);
+      state.resources = [];
+      appendMessage(err?.message || "Failed to fetch resources.", "bot");
+    } finally {
+      setLoading(false);
+      setStatus("");
+      persist();
+      render();
+    }
   }
 
   function askCurrentQuestion() {
@@ -258,8 +335,10 @@ export function initOnboarding(options = {}) {
       state.step = "result";
       state.currentQuestion = null;
       state.profile = buildProfile(state.role, state.answers);
+      state.resources = [];
       persist();
       render();
+      void finalizeProfileAndResources();
       return;
     }
     const q = state.questions[state.questionIndex];
@@ -280,6 +359,7 @@ export function initOnboarding(options = {}) {
     state.profile = null;
     state.questions = buildQuestionBank(getLang())[role] || buildDefaultQuestions(getLang());
     state.currentQuestion = null;
+    state.resources = [];
 
     appendMessage(role, "user");
     askCurrentQuestion();
@@ -379,6 +459,7 @@ export function initOnboarding(options = {}) {
     }
     state.step = "result";
     state.profile = state.profile || buildProfile(state.role, state.answers);
+    state.resources = state.resources || [];
     persist();
     render();
   }
