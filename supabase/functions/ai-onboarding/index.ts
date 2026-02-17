@@ -208,6 +208,33 @@ function parseJsonFromText(input: string | null) {
   }
 }
 
+function extractQuestionText(input: string | null) {
+  if (!input) return "";
+  const json = parseJsonFromText(input);
+  const fromJson = String(json?.question || "").trim();
+  if (fromJson) return fromJson;
+
+  const cleaned = String(input)
+    .replace(/^```json/i, "")
+    .replace(/^```/i, "")
+    .replace(/```$/i, "")
+    .trim();
+
+  const line = cleaned
+    .split(/\r?\n/g)
+    .map((x) => x.trim())
+    .find((x) => !!x && !x.startsWith("{") && !x.startsWith("[") && !x.startsWith("}")) || "";
+
+  const compact = line
+    .replace(/^[-*•]\s*/, "")
+    .replace(/^\d+[.)]\s*/, "")
+    .replace(/^["'`]|["'`]$/g, "")
+    .trim();
+
+  if (!compact) return "";
+  return /[?？]$/.test(compact) ? compact : `${compact}?`;
+}
+
 function buildOpenFallbackQuestion(role: string, answers: InterviewAnswer[], lang: string) {
   const isEn = String(lang || "ru") === "en";
   const last = answers.length ? String(answers[answers.length - 1]?.answer || "").trim() : "";
@@ -216,9 +243,14 @@ function buildOpenFallbackQuestion(role: string, answers: InterviewAnswer[], lan
       ? `Great. You wrote "${role}". What exactly do you want to achieve in the next 2-3 months?`
       : `Отлично, ты написал "${role}". Чего конкретно хочешь достичь в ближайшие 2-3 месяца?`;
   }
+  if (/ui|ux|design|дизайн/i.test(last)) {
+    return isEn
+      ? "What specific design skill do you want to improve first: visual, UX research, or prototyping?"
+      : "Какой конкретный скилл в дизайне хочешь прокачать первым: визуал, UX-исследования или прототипирование?";
+  }
   return isEn
-    ? `I got it. You said: "${last}". What is the next concrete step you want to take?`
-    : `Понял. Ты написал: "${last}". Какой следующий конкретный шаг ты хочешь сделать?`;
+    ? "What concrete result would you like to get by the end of this week?"
+    : "Какой конкретный результат ты хочешь получить уже к концу этой недели?";
 }
 
 function fallbackQuestions(role: string) {
@@ -573,20 +605,20 @@ Deno.serve(async (req) => {
 
     const history = answers.map((x, idx) => `${idx + 1}. Q:${x.question} A:${x.answer}`).join("\n");
     const qText = await askGemini(
-      "You are a technical interviewer. Return strict JSON only.",
+      "You are a senior mentor conducting a natural chat. Ask exactly one short follow-up question.",
       [
         `Role: ${role}`,
         `Already asked: ${answers.length}`,
         history ? `History:\n${history}` : "No history yet.",
-        "Return one adaptive open-ended follow-up question in JSON:",
-        `{"question":"string"}`,
-        "Do not include answer options."
+        `Language: ${lang === "en" ? "English" : "Russian"}`,
+        "Return plain text only.",
+        "No JSON, no lists, no answer options, no repetition."
       ].join("\n")
     );
-    const parsedQuestion = parseJsonFromText(qText);
+    const modelQuestion = extractQuestionText(qText);
     const fallbackQuestion = buildOpenFallbackQuestion(role, answers, lang);
     const question = {
-      question: String(parsedQuestion?.question || fallbackQuestion),
+      question: String(modelQuestion || fallbackQuestion),
       options: []
     };
     return jsonResponse(200, { done: false, question });
