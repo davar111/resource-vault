@@ -1064,6 +1064,28 @@ select option { background: var(--bg-surface-1); color: var(--text-primary); }
   flex-wrap: wrap;
   gap: 8px;
 }
+.onboarding-chips[data-mode="roles"] {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.onboarding-chips[data-mode="roles"] .chip {
+  justify-content: flex-start;
+  text-align: left;
+}
+.onboarding-chips[data-mode="answers"] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.onboarding-chips[data-mode="result"] .chip {
+  opacity: 0.85;
+}
+@media (max-width: 700px) {
+  .onboarding-chips[data-mode="roles"] {
+    grid-template-columns: 1fr;
+  }
+}
 .onboarding-input {
   flex: 1 1 auto;
   min-width: 0;

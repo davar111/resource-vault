@@ -1,18 +1,7 @@
-import { detectSourceFromUrl } from "./filter.js";
-
-const STORAGE_KEY = "resource_vault_onboarding_state_v1";
-const DEFAULT_FUNCTION_PATH = "/functions/v1/ai-onboarding";
+const STORAGE_KEY = "resource_vault_onboarding_state_v2";
 
 function textByLang(lang, ru, en) {
   return String(lang || "ru") === "en" ? en : ru;
-}
-
-function safeJsonParse(raw, fallback) {
-  try {
-    return JSON.parse(String(raw || ""));
-  } catch {
-    return fallback;
-  }
 }
 
 function escapeHtml(str) {
@@ -24,52 +13,93 @@ function escapeHtml(str) {
     .replaceAll("'", "&#039;");
 }
 
-function buildFunctionUrl(explicit) {
-  const base = String(explicit || "").trim();
-  if (base) return base;
-  const env = typeof import.meta !== "undefined" && import.meta.env ? import.meta.env : {};
-  const supabaseUrl = String(env.VITE_SUPABASE_URL || "").trim();
-  return supabaseUrl ? `${supabaseUrl}${DEFAULT_FUNCTION_PATH}` : DEFAULT_FUNCTION_PATH;
-}
-
-function getAnonKey() {
-  const env = typeof import.meta !== "undefined" && import.meta.env ? import.meta.env : {};
-  return String(env.VITE_SUPABASE_ANON_KEY || "").trim();
-}
-
-function decodeJwtPayload(token) {
+function safeJsonParse(raw, fallback) {
   try {
-    const payload = String(token || "").split(".")[1] || "";
-    if (!payload) return null;
-    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
-    const padded = `${normalized}${"=".repeat((4 - (normalized.length % 4)) % 4)}`;
-    const decoded = atob(padded);
-    return JSON.parse(decoded);
+    return JSON.parse(String(raw || ""));
   } catch {
-    return null;
+    return fallback;
   }
 }
 
-function projectRefFromUrl(url) {
-  try {
-    const host = new URL(String(url || "")).hostname;
-    return host.endsWith(".supabase.co") ? host.replace(".supabase.co", "") : "";
-  } catch {
-    return "";
+function buildQuestionBank(lang) {
+  const isEn = String(lang || "ru") === "en";
+  if (isEn) {
+    return {
+      "UX/UI Designer": [
+        { text: "What is your current level?", options: ["Junior", "Middle", "Senior", "Freelance"] },
+        { text: "What do you work on most often?", options: ["Mobile apps", "Websites", "Design systems", "SaaS products"] },
+        { text: "What is your primary tool?", options: ["Figma", "Adobe XD", "Sketch", "Framer"] },
+        { text: "What do you want to improve first?", options: ["Animation / Micro-UX", "Typography", "UX research", "Visual style"] }
+      ],
+      "Frontend Developer": [
+        { text: "What is your current level?", options: ["Junior", "Middle", "Senior", "Full Stack"] },
+        { text: "What is your primary stack?", options: ["React", "Vue", "Vanilla JS", "Next.js"] },
+        { text: "What is your focus right now?", options: ["Performance", "Animations", "CSS / design", "Architecture"] },
+        { text: "What projects do you usually do?", options: ["Startups", "Enterprise", "Pet projects", "Freelance"] }
+      ],
+      "Product Manager": [
+        { text: "At which stage is your product most often?", options: ["Pre-MVP", "MVP / launch", "Growth", "Scale"] },
+        { text: "What matters most now?", options: ["Metrics & analytics", "CustDev / research", "Roadmap & priorities", "Team & processes"] },
+        { text: "What type of product?", options: ["B2C app", "B2B SaaS", "Marketplace", "Internal tool"] }
+      ]
+    };
   }
+
+  return {
+    "UX/UI Designer": [
+      { text: "Какой у тебя уровень опыта?", options: ["Junior", "Middle", "Senior", "Freelance"] },
+      { text: "Над чем чаще всего работаешь?", options: ["Мобильные приложения", "Веб-сайты", "Дизайн-системы", "SaaS продукты"] },
+      { text: "Какой инструмент основной?", options: ["Figma", "Adobe XD", "Sketch", "Framer"] },
+      { text: "Что хочешь прокачать?", options: ["Анимации / Micro-UX", "Типографика", "UX-ресёрч", "Визуальный стиль"] }
+    ],
+    "Frontend Developer": [
+      { text: "Какой у тебя уровень?", options: ["Junior", "Middle", "Senior", "Full Stack"] },
+      { text: "Основной стек?", options: ["React", "Vue", "Vanilla JS", "Next.js"] },
+      { text: "Что сейчас в фокусе?", options: ["Производительность", "Анимации", "CSS / дизайн", "Архитектура"] },
+      { text: "Какой тип проектов?", options: ["Стартапы", "Корпоратив", "Свои пет-проекты", "Фриланс"] }
+    ],
+    "Product Manager": [
+      { text: "На каком этапе обычно продукт?", options: ["Pre-MVP", "MVP / старт", "Growth", "Scale"] },
+      { text: "Что сейчас важнее?", options: ["Метрики и аналитика", "CustDev / исследования", "Роадмап и приоритеты", "Команда и процессы"] },
+      { text: "Какой тип продукта?", options: ["B2C приложение", "B2B SaaS", "Маркетплейс", "Внутренний инструмент"] }
+    ]
+  };
 }
 
-function buildJwtDebug(functionUrl, token) {
-  const expectedRef = projectRefFromUrl(functionUrl);
-  const payload = decodeJwtPayload(token);
-  const tokenIss = String(payload?.iss || "");
-  const tokenIssRef = projectRefFromUrl(tokenIss);
-  return JSON.stringify({
-    expected_ref: expectedRef || "unknown",
-    token_iss: tokenIss || "missing",
-    token_iss_ref: tokenIssRef || "unknown",
-    iss_ref_match: !!(expectedRef && tokenIssRef && expectedRef === tokenIssRef)
-  });
+function buildDefaultQuestions(lang) {
+  const isEn = String(lang || "ru") === "en";
+  return isEn
+    ? [
+      { text: "How long have you been doing this?", options: ["Just started", "1-2 years", "3-5 years", "5+ years"] },
+      { text: "What is most important for you now?", options: ["Learn faster", "Build projects", "Find inspiration", "Follow trends"] },
+      { text: "What content format do you prefer?", options: ["Articles and guides", "Video tutorials", "Cases and examples", "Tools and resources"] }
+    ]
+    : [
+      { text: "Как давно ты этим занимаешься?", options: ["Только начинаю", "1-2 года", "3-5 лет", "5+ лет"] },
+      { text: "Что для тебя сейчас важнее всего?", options: ["Учиться новому", "Делать проекты", "Находить вдохновение", "Следить за трендами"] },
+      { text: "Какой формат материалов предпочитаешь?", options: ["Статьи и гайды", "Видео / туториалы", "Примеры и кейсы", "Инструменты / ресурсы"] }
+    ];
+}
+
+function buildRoleOptions(lang) {
+  const isEn = String(lang || "ru") === "en";
+  return isEn
+    ? ["UX/UI Designer", "Frontend Developer", "Product Manager", "Motion Designer", "Brand Designer", "Marketing / SMM", "3D / CGI Artist", "No-Code Developer"]
+    : ["UX/UI Designer", "Frontend Developer", "Product Manager", "Motion Designer", "Brand Designer", "Marketing / SMM", "3D / CGI Artist", "No-Code Developer"];
+}
+
+function buildProfile(role, answers) {
+  const lower = answers.map((x) => String(x.answer || "").toLowerCase()).join(" ");
+  let level = "Junior";
+  if (lower.includes("senior")) level = "Senior";
+  else if (lower.includes("middle")) level = "Middle";
+
+  return {
+    role: role || "Generalist",
+    level,
+    goals: answers.slice(0, 2).map((x) => String(x.answer || "")).filter(Boolean),
+    focus: answers.map((x) => String(x.answer || "")).filter(Boolean).slice(0, 5)
+  };
 }
 
 export function initOnboarding(options = {}) {
@@ -77,8 +107,6 @@ export function initOnboarding(options = {}) {
   const triggerButton = options.triggerButton;
   const getLang = typeof options.getLang === "function" ? options.getLang : () => "ru";
   const ensureAuth = typeof options.ensureAuth === "function" ? options.ensureAuth : () => true;
-  const getAccessToken = typeof options.getAccessToken === "function" ? options.getAccessToken : async () => "";
-  const functionUrl = buildFunctionUrl(options.functionUrl);
 
   if (!modal || !triggerButton) return null;
 
@@ -96,13 +124,13 @@ export function initOnboarding(options = {}) {
   };
 
   const initialState = {
-    role: "",
-    answers: [],
-    currentQuestion: null,
     step: "role",
-    profile: null,
-    resources: [],
-    loading: false
+    role: "",
+    questionIndex: 0,
+    questions: [],
+    currentQuestion: null,
+    answers: [],
+    profile: null
   };
 
   let state = { ...initialState };
@@ -111,210 +139,237 @@ export function initOnboarding(options = {}) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }
 
-  function hydrate() {
-    const cached = safeJsonParse(localStorage.getItem(STORAGE_KEY), null);
-    if (!cached || typeof cached !== "object") return;
-    state = {
-      ...state,
-      ...cached,
-      loading: false
-    };
+  function clearPersisted() {
+    localStorage.removeItem(STORAGE_KEY);
   }
 
   function resetState() {
     state = { ...initialState };
-    localStorage.removeItem(STORAGE_KEY);
-  }
-
-  function setLoading(next) {
-    state.loading = !!next;
-    if (els.send) els.send.disabled = state.loading;
-    if (els.skip) els.skip.disabled = state.loading;
-    if (els.input) els.input.disabled = state.loading;
-    if (els.status) {
-      els.status.textContent = state.loading ? textByLang(getLang(), "Загрузка...", "Loading...") : "";
-    }
+    clearPersisted();
   }
 
   function appendMessage(text, role = "bot") {
     if (!els.chat) return;
-    const item = document.createElement("div");
-    item.className = `onboarding-chat__msg onboarding-chat__msg--${role}`;
-    item.innerHTML = escapeHtml(text);
-    els.chat.appendChild(item);
+    const msg = document.createElement("div");
+    msg.className = `onboarding-chat__msg onboarding-chat__msg--${role}`;
+    msg.innerHTML = escapeHtml(text);
+    els.chat.appendChild(msg);
     els.chat.scrollTop = els.chat.scrollHeight;
   }
 
+  function setStatus(text = "") {
+    if (els.status) els.status.textContent = text;
+  }
+
+  function setInputPlaceholder() {
+    if (!els.input) return;
+    if (state.step === "role") {
+      els.input.placeholder = textByLang(getLang(), "Напиши роль или выбери ниже", "Type role or choose below");
+      return;
+    }
+    if (state.step === "questions") {
+      els.input.placeholder = textByLang(getLang(), "Напиши ответ...", "Write your answer...");
+      return;
+    }
+    els.input.placeholder = textByLang(getLang(), "Готово", "Done");
+  }
+
   function applyButtonsText() {
-    if (els.restart) els.restart.textContent = textByLang(getLang(), "Начать заново", "Restart");
-    if (els.skip) els.skip.textContent = state.step === "result"
-      ? textByLang(getLang(), "Закрыть", "Close")
-      : textByLang(getLang(), "Пропустить", "Skip");
-  }
-
-  function renderRoleStep() {
     if (els.title) els.title.textContent = textByLang(getLang(), "AI-онбординг", "AI onboarding");
-    if (els.subtitle) els.subtitle.textContent = textByLang(getLang(), "Напиши роль и поехали в формате диалога", "Type your role and start a dialogue");
-    applyButtonsText();
-    if (els.chips) {
-      els.chips.innerHTML = "";
+    if (els.restart) els.restart.textContent = textByLang(getLang(), "Начать заново", "Restart");
+    if (els.skip) {
+      els.skip.textContent = state.step === "result"
+        ? textByLang(getLang(), "Закрыть", "Close")
+        : textByLang(getLang(), "Пропустить", "Skip");
     }
-    if (els.chat) {
-      els.chat.innerHTML = "";
-      appendMessage(textByLang(
-        getLang(),
-        "Привет. Я буду задавать наводящие вопросы по твоим ответам. Пиши свободно, как в обычном чате.",
-        "Hi. I will ask adaptive questions based on your answers."
-      ));
-    }
+    if (els.send) els.send.textContent = textByLang(getLang(), "Send", "Send");
+    setInputPlaceholder();
   }
 
-  function renderQuestionStep() {
-    const question = state.currentQuestion;
-    if (!question) return;
+  function renderRoleChips() {
+    if (!els.chips) return;
+    els.chips.dataset.mode = "roles";
+    const roles = buildRoleOptions(getLang());
+    els.chips.innerHTML = roles
+      .map((x) => `<button type="button" class="chip" data-role="${escapeHtml(x)}">${escapeHtml(x)}</button>`)
+      .join("");
+    els.chips.querySelectorAll("[data-role]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const role = String(btn.getAttribute("data-role") || "").trim();
+        if (!role) return;
+        if (els.input) els.input.value = role;
+        submitRole(role);
+      });
+    });
+  }
+
+  function renderQuestionOptions(question) {
+    if (!els.chips) return;
+    els.chips.dataset.mode = "answers";
+    const options = Array.isArray(question?.options) ? question.options : [];
+    els.chips.innerHTML = options
+      .map((x) => `<button type="button" class="chip" data-answer="${escapeHtml(x)}">${escapeHtml(x)}</button>`)
+      .join("");
+    els.chips.querySelectorAll("[data-answer]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const answer = String(btn.getAttribute("data-answer") || "").trim();
+        if (!answer) return;
+        if (els.input) els.input.value = answer;
+        submitAnswer(answer);
+      });
+    });
+  }
+
+  function renderResult() {
     if (els.subtitle) {
-      const count = state.answers.length + 1;
-      els.subtitle.textContent = textByLang(getLang(), `Диалоговый шаг ${count}`, `Dialogue step ${count}`);
+      els.subtitle.textContent = textByLang(getLang(), "Готово: персональный профиль", "Done: personal profile");
     }
-    applyButtonsText();
     if (els.chips) {
+      els.chips.dataset.mode = "result";
       els.chips.innerHTML = "";
-    }
-    if (els.input) {
-      els.input.placeholder = textByLang(getLang(), "Напиши ответ в свободной форме", "Write your answer in free form");
-      els.input.value = "";
-      els.input.focus();
-    }
-  }
-
-  function renderResultStep() {
-    if (els.subtitle) els.subtitle.textContent = textByLang(getLang(), "Готово: профиль и ресурсы", "Done: profile and resources");
-    applyButtonsText();
-    if (els.chips) {
-      els.chips.innerHTML = "";
+      const values = (state.answers || []).map((x) => String(x.answer || "")).filter(Boolean).slice(0, 6);
+      for (const value of values) {
+        const tag = document.createElement("button");
+        tag.type = "button";
+        tag.className = "chip";
+        tag.textContent = value;
+        tag.disabled = true;
+        els.chips.appendChild(tag);
+      }
     }
     if (els.chat) {
-      const profileLine = document.createElement("pre");
-      profileLine.className = "onboarding-chat__json";
-      profileLine.textContent = JSON.stringify(state.profile || {}, null, 2);
-      els.chat.appendChild(profileLine);
-
-      if (state.resources.length) {
-        const wrap = document.createElement("div");
-        wrap.className = "onboarding-chat__list";
-        wrap.innerHTML = state.resources
-          .slice(0, 8)
-          .map((r, idx) => {
-            const title = escapeHtml(r.title || r.url || `Resource ${idx + 1}`);
-            const url = escapeHtml(r.url || "");
-            const source = escapeHtml(detectSourceFromUrl(r.url || ""));
-            return `<a class="onboarding-chat__resource" href="${url}" target="_blank" rel="noreferrer">${idx + 1}. ${title} <span>${source}</span></a>`;
-          })
-          .join("");
-        els.chat.appendChild(wrap);
-      }
+      const done = textByLang(
+        getLang(),
+        "Отлично, интервью завершено. Профиль собран.",
+        "Great, interview is done. Profile is ready."
+      );
+      appendMessage(done, "bot");
+      const pre = document.createElement("pre");
+      pre.className = "onboarding-chat__json";
+      pre.textContent = JSON.stringify(state.profile || {}, null, 2);
+      els.chat.appendChild(pre);
       els.chat.scrollTop = els.chat.scrollHeight;
     }
-    if (els.input) {
-      els.input.value = "";
-      els.input.placeholder = textByLang(getLang(), "Можешь закрыть окно", "You can close this window");
-    }
+    if (els.input) els.input.value = "";
   }
 
-  function render() {
-    if (state.step === "role") renderRoleStep();
-    if (state.step === "questions") renderQuestionStep();
-    if (state.step === "result") renderResultStep();
-  }
-
-  async function callFunction(payload) {
-    const token = String(await getAccessToken() || "").trim();
-    const jwtDebug = buildJwtDebug(functionUrl, token);
-    if (!token || token.split(".").length !== 3) {
-      throw new Error(`${textByLang(getLang(), "Сессия невалидна. Выйди и войди снова через Google.", "Session is invalid. Please sign out and sign in again.")}\nDebug: ${jwtDebug}`);
-    }
-    const anonKey = getAnonKey();
-    const headers = { "Content-Type": "application/json" };
-    if (anonKey) headers.apikey = anonKey;
-    headers.Authorization = `Bearer ${token}`;
-
-    const res = await fetch(functionUrl, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(payload)
-    });
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      const raw = text || `Function request failed (${res.status})`;
-      if (res.status === 401 || raw.toLowerCase().includes("invalid jwt")) throw new Error(`${raw}\nDebug: ${jwtDebug}`);
-      throw new Error(raw);
-    }
-    return await res.json();
-  }
-
-  async function chatTurn() {
-    const data = await callFunction({
-      action: "chat_turn",
-      role: state.role,
-      answers: state.answers,
-      lang: getLang()
-    });
-
-    if (data?.done) {
-      state.profile = data.ai_profile || null;
-      state.resources = Array.isArray(data.resources) ? data.resources : [];
+  function askCurrentQuestion() {
+    if (state.questionIndex >= state.questions.length) {
       state.step = "result";
+      state.currentQuestion = null;
+      state.profile = buildProfile(state.role, state.answers);
       persist();
       render();
       return;
     }
-
-    const q = data?.question || null;
-    if (!q?.question) throw new Error(textByLang(getLang(), "AI не вернул следующий вопрос.", "AI did not return next question."));
+    const q = state.questions[state.questionIndex];
     state.currentQuestion = q;
     state.step = "questions";
     persist();
-    appendMessage(String(q.question), "bot");
+    appendMessage(String(q.text || ""), "bot");
     render();
   }
 
-  async function submitRole(value) {
-    const role = String(value || "").trim();
+  function submitRole(value) {
+    const role = String(value || els.input?.value || "").trim();
     if (!role) return;
-    setLoading(true);
-    try {
-      appendMessage(role, "user");
-      state.role = role;
-      state.answers = [];
-      state.currentQuestion = null;
-      await chatTurn();
-    } catch (err) {
-      appendMessage(err?.message || "Failed to start interview.", "bot");
-    } finally {
-      setLoading(false);
-    }
+
+    state.role = role;
+    state.answers = [];
+    state.questionIndex = 0;
+    state.profile = null;
+    state.questions = buildQuestionBank(getLang())[role] || buildDefaultQuestions(getLang());
+    state.currentQuestion = null;
+
+    appendMessage(role, "user");
+    askCurrentQuestion();
   }
 
-  async function submitAnswer(value) {
+  function submitAnswer(value) {
     const answer = String(value || els.input?.value || "").trim();
-    if (!answer || !state.currentQuestion?.question) return;
-    setLoading(true);
-    try {
-      appendMessage(answer, "user");
-      state.answers.push({ question: String(state.currentQuestion.question || ""), answer });
-      state.currentQuestion = null;
-      persist();
-      await chatTurn();
-    } catch (err) {
-      appendMessage(err?.message || "Failed to continue interview.", "bot");
-    } finally {
-      setLoading(false);
-    }
+    if (!answer || !state.currentQuestion) return;
+
+    appendMessage(answer, "user");
+    state.answers.push({
+      question: String(state.currentQuestion.text || ""),
+      answer
+    });
+    state.questionIndex += 1;
+    state.currentQuestion = null;
+    persist();
+    askCurrentQuestion();
   }
 
   function onSend() {
-    if (state.step === "role") void submitRole(els.input?.value || "");
-    if (state.step === "questions") void submitAnswer(els.input?.value || "");
+    if (state.step === "role") {
+      submitRole(els.input?.value || "");
+      return;
+    }
+    if (state.step === "questions") {
+      submitAnswer(els.input?.value || "");
+    }
+  }
+
+  function render() {
+    applyButtonsText();
+    if (!els.chat) return;
+
+    if (state.step === "role") {
+      if (els.subtitle) {
+        els.subtitle.textContent = textByLang(getLang(), "Кто ты в диджитале?", "Who are you in digital?");
+      }
+      els.chat.innerHTML = "";
+      appendMessage(
+        textByLang(
+          getLang(),
+          "Привет. Выбери роль и отвечай на короткие вопросы. В конце соберу персональный профиль.",
+          "Hi. Choose a role and answer short questions. I will build a personal profile at the end."
+        ),
+        "bot"
+      );
+      renderRoleChips();
+      setStatus("");
+      if (els.input) {
+        els.input.value = "";
+        els.input.focus();
+      }
+      return;
+    }
+
+    if (state.step === "questions") {
+      if (els.subtitle) {
+        const total = Math.max(1, state.questions.length);
+        const step = Math.min(state.questionIndex + 1, total);
+        els.subtitle.textContent = textByLang(getLang(), `Диалоговый шаг ${step}/${total}`, `Dialogue step ${step}/${total}`);
+      }
+      renderQuestionOptions(state.currentQuestion);
+      setStatus("");
+      if (els.input) {
+        els.input.value = "";
+        els.input.focus();
+      }
+      return;
+    }
+
+    renderResult();
+    setStatus("");
+  }
+
+  function open() {
+    if (!ensureAuth()) return;
+    const cached = safeJsonParse(localStorage.getItem(STORAGE_KEY), null);
+    if (cached && typeof cached === "object" && cached.step === "questions" && cached.role) {
+      state = { ...initialState, ...cached };
+    } else {
+      resetState();
+    }
+    render();
+    modal.showModal();
+  }
+
+  function restart() {
+    resetState();
+    render();
   }
 
   function skip() {
@@ -323,30 +378,8 @@ export function initOnboarding(options = {}) {
       return;
     }
     state.step = "result";
-    state.profile = state.profile || {
-      role: state.role || "Generalist",
-      level: "Junior",
-      stack: [],
-      goals: [],
-      format_pref: ["articles"]
-    };
-    state.resources = state.resources || [];
+    state.profile = state.profile || buildProfile(state.role, state.answers);
     persist();
-    render();
-  }
-
-  function open() {
-    if (!ensureAuth()) return;
-    hydrate();
-    if (state.step === "result") resetState();
-    if (!state.role) state.step = "role";
-    render();
-    modal.showModal();
-  }
-
-  function restart() {
-    resetState();
-    state.step = "role";
     render();
   }
 
@@ -357,10 +390,9 @@ export function initOnboarding(options = {}) {
     els.skip?.addEventListener("click", skip);
     els.restart?.addEventListener("click", restart);
     els.input?.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        onSend();
-      }
+      if (e.key !== "Enter") return;
+      e.preventDefault();
+      onSend();
     });
   }
 
