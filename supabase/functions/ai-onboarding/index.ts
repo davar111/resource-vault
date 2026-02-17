@@ -229,6 +229,127 @@ function fallbackQuestions(role: string) {
   ];
 }
 
+function fallbackQuestionsByLang(role: string, lang: string) {
+  if (String(lang || "ru") !== "en") return fallbackQuestions(role);
+  return [
+    {
+      question: `What is your current level in ${role}?`,
+      options: ["Junior", "Middle", "Senior"]
+    },
+    {
+      question: "What is your main focus right now?",
+      options: ["Find a job", "Improve skills", "Build portfolio", "Prepare for interviews"]
+    },
+    {
+      question: "Which stack is the most important for you now?",
+      options: ["JavaScript/TypeScript", "React/Vue/Angular", "Node.js", "Figma/Product tools"]
+    },
+    {
+      question: "What content format do you prefer?",
+      options: ["articles", "tools", "templates"]
+    }
+  ];
+}
+
+function isGenericRole(role: string) {
+  const normalized = normalizeToken(role).replaceAll("_", "");
+  if (!normalized) return true;
+  const genericTokens = new Set([
+    "student",
+    "студент",
+    "learner",
+    "beginner",
+    "новичок",
+    "ученик",
+    "intern",
+    "trainee"
+  ]);
+  return genericTokens.has(normalized);
+}
+
+function hasLevelInText(input: string) {
+  const lower = input.toLowerCase();
+  return ["junior", "middle", "senior", "джуниор", "мидл", "сеньор"].some((x) => lower.includes(x));
+}
+
+function hasFormatInText(input: string) {
+  const lower = input.toLowerCase();
+  return [
+    "article",
+    "articles",
+    "tool",
+    "tools",
+    "template",
+    "templates",
+    "статья",
+    "статьи",
+    "инструмент",
+    "шаблон"
+  ].some((x) => lower.includes(x));
+}
+
+function hasMeaningfulGoalInText(input: string) {
+  const detected = detectGoalsFromAnswers(input);
+  if (detected.some((x) => x !== "improve_skills")) return true;
+  const lower = input.toLowerCase();
+  return ["job", "работ", "портфол", "interview", "интервью"].some((x) => lower.includes(x));
+}
+
+function buildFallbackFollowUp(role: string, answers: InterviewAnswer[], lang: string) {
+  const isEn = String(lang || "ru") === "en";
+  const allText = answers.map((x) => `${x.question} ${x.answer}`).join(" ").toLowerCase();
+  const hasLevel = hasLevelInText(allText);
+  const hasGoal = hasMeaningfulGoalInText(allText);
+  const hasStack = detectStackFromAnswers(allText).length > 0;
+  const hasFormat = hasFormatInText(allText);
+
+  if (!answers.length && isGenericRole(role)) {
+    return {
+      question: isEn
+        ? "Got it, student. Which direction do you want to start with?"
+        : "Ок, студент. В каком направлении хочешь развиваться в первую очередь?",
+      options: isEn
+        ? ["Frontend", "Backend", "Data Analytics", "UI/UX", "Not sure yet"]
+        : ["Frontend", "Backend", "Data Analytics", "UI/UX", "Пока не определился"]
+    };
+  }
+
+  if (!hasLevel) {
+    return {
+      question: isEn ? "What is your current level?" : "Какой у тебя текущий уровень?",
+      options: ["Junior", "Middle", "Senior"]
+    };
+  }
+
+  if (!hasGoal) {
+    return {
+      question: isEn ? "What is your goal for the next 2-3 months?" : "Какая у тебя цель на ближайшие 2-3 месяца?",
+      options: isEn
+        ? ["Find first job", "Get stronger fundamentals", "Build portfolio", "Prepare for interviews"]
+        : ["Найти первую работу", "Укрепить базу", "Собрать портфолио", "Подготовиться к интервью"]
+    };
+  }
+
+  if (!hasStack) {
+    return {
+      question: isEn ? "What technologies are you already using?" : "С какими технологиями ты уже работаешь?",
+      options: ["React/TypeScript", "Node.js", "Python/SQL", "Figma"]
+    };
+  }
+
+  if (!hasFormat) {
+    return {
+      question: isEn ? "How do you prefer to learn?" : "В каком формате тебе удобнее учиться?",
+      options: isEn
+        ? ["Guides and articles", "Tools and practice", "Templates/checklists", "Mixed format"]
+        : ["Гайды и статьи", "Инструменты и практика", "Шаблоны/чеклисты", "Смешанный формат"]
+    };
+  }
+
+  const fallbackList = fallbackQuestionsByLang(role, lang);
+  return fallbackList[Math.min(answers.length, fallbackList.length - 1)];
+}
+
 function deriveFallbackProfile(role: string, answers: InterviewAnswer[]): AiProfile {
   const answersText = answers.map((x) => String(x.answer || "")).join(" ").toLowerCase();
   let level: AiProfile["level"] = "Junior";
@@ -428,6 +549,7 @@ Deno.serve(async (req) => {
 
   if (action === "chat_turn") {
     if (!role) return jsonResponse(400, { error: "Role is required" });
+    const lang = String(body?.lang || "ru");
     const answers = Array.isArray(body?.answers) ? body.answers as InterviewAnswer[] : [];
     const maxQuestions = 5;
     const enoughData = answers.length >= 4;
@@ -449,7 +571,7 @@ Deno.serve(async (req) => {
       ].join("\n")
     );
     const parsedQuestion = parseJsonFromText(qText);
-    const fallback = fallbackQuestions(role)[answers.length] || fallbackQuestions(role)[fallbackQuestions(role).length - 1];
+    const fallback = buildFallbackFollowUp(role, answers, lang);
     const question = {
       question: String(parsedQuestion?.question || fallback.question),
       options: Array.isArray(parsedQuestion?.options) && parsedQuestion.options.length
@@ -469,7 +591,7 @@ Deno.serve(async (req) => {
     const parsed = parseJsonFromText(aiText);
     const questions = Array.isArray(parsed?.questions) && parsed.questions.length
       ? parsed.questions.slice(0, 5)
-      : fallbackQuestions(role);
+      : fallbackQuestionsByLang(role, "ru");
 
     return jsonResponse(200, { questions });
   }
