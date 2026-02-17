@@ -10,6 +10,8 @@ import { initAuth, loginWithGoogle, logout } from "./useAuth.js";
 import { createLink, deleteLink, listLinks, updateLink } from "./useLinks.js";
 import { addLinkCollections, createCollection, createCollectionInvite, deleteCollection, listCollections, listLinkCollections, replaceLinkCollections, updateCollection } from "./useCollections.js";
 import { createSavedFilter, deleteSavedFilter, listSavedFilters } from "./useSavedFilters.js";
+import { getSessionAccessToken } from "./supabase.js";
+import { initOnboarding } from "./Onboarding.js";
 
 const TITLE_MIN_LEN = 2;
 const TITLE_MAX_LEN = 120;
@@ -68,6 +70,7 @@ const els = {
   labelFilterFavorite: document.getElementById("labelFilterFavorite"),
   grid: document.getElementById("grid"),
   btnAddLink: document.getElementById("btnAddLink"),
+  btnAiOnboarding: document.getElementById("btnAiOnboarding"),
   btnNewCollection: document.getElementById("btnNewCollection"),
   btnSaveFilterInline: document.getElementById("btnSaveFilterInline"),
   btnAuth: document.getElementById("btnAuth"),
@@ -122,7 +125,8 @@ const els = {
   hiddenAuthConfirmLabel: document.getElementById("hiddenAuthConfirmLabel"),
   hiddenAuthConfirm: document.getElementById("hiddenAuthConfirm"),
   hiddenAuthCancel: document.getElementById("hiddenAuthCancel"),
-  hiddenAuthSubmit: document.getElementById("hiddenAuthSubmit")
+  hiddenAuthSubmit: document.getElementById("hiddenAuthSubmit"),
+  modalOnboarding: document.getElementById("modalOnboarding")
 };
 
 let currentUser = null;
@@ -133,6 +137,7 @@ let prevGateVisible = null;
 const pendingLinkOps = new Set();
 const pendingCollectionOps = new Set();
 const pendingSavedFilterOps = new Set();
+let onboardingController = null;
 
 function ensureAuth() {
   if (currentUser?.id) return true;
@@ -200,6 +205,7 @@ function syncAuthGate() {
 function syncGuestModeUi() {
   const guestReadOnly = !!(state.isGuestMode && !state.isAuthenticated);
   if (els.btnAddLink) els.btnAddLink.disabled = guestReadOnly;
+  if (els.btnAiOnboarding) els.btnAiOnboarding.disabled = guestReadOnly;
   if (els.btnNewCollection) els.btnNewCollection.disabled = guestReadOnly;
   if (els.btnSaveFilterInline) els.btnSaveFilterInline.disabled = guestReadOnly;
   if (els.navHidden) els.navHidden.disabled = guestReadOnly;
@@ -406,6 +412,7 @@ function applyI18n() {
   if (els.labelCollections) els.labelCollections.textContent = t(L, "collections");
   if (els.labelSavedFilters) els.labelSavedFilters.textContent = t(L, "savedFilters");
   if (els.btnAddLink) els.btnAddLink.textContent = t(L, "addLink");
+  if (els.btnAiOnboarding) els.btnAiOnboarding.textContent = L === "ru" ? "AI интервью" : "AI interview";
   if (els.btnNewCollection) els.btnNewCollection.setAttribute("aria-label", t(L, "newCollection"));
   if (els.btnSaveFilterInline) {
     els.btnSaveFilterInline.setAttribute("aria-label", t(L, "saveFilter"));
@@ -659,6 +666,62 @@ async function loadData() {
   state.collections = collections;
   applyCollectionUiSettings();
   state.savedFilters = savedFilters;
+}
+
+async function importOnboardingResources(resources, profile) {
+  if (!ensureAuth()) return { imported: 0, skipped: Array.isArray(resources) ? resources.length : 0 };
+  const list = Array.isArray(resources) ? resources : [];
+  let imported = 0;
+  let skipped = 0;
+
+  for (const item of list) {
+    const rawUrl = String(item?.url || "").trim();
+    if (!rawUrl) {
+      skipped += 1;
+      continue;
+    }
+    let url = "";
+    try {
+      url = new URL(rawUrl).toString();
+    } catch {
+      skipped += 1;
+      continue;
+    }
+    if (findDuplicateLink(url)) {
+      skipped += 1;
+      continue;
+    }
+    try {
+      const created = await createLink({
+        url,
+        title: String(item?.title || "").trim() || domainFromUrl(url),
+        note: String(item?.snippet || item?.note || "").trim().slice(0, NOTE_MAX_LEN),
+        tags: normalizeTags([...(profile?.stack || []), ...(item?.tags || []), detectSourceFromUrl(url)]),
+        type: "article",
+        source: detectSourceFromUrl(url),
+        favorite: false,
+        hidden: false
+      }, currentUser.id);
+      if (!created) {
+        skipped += 1;
+        continue;
+      }
+      state.items.unshift({ ...created, isDemo: false, previewImage: previewFallbackUrl(created.url), collectionIds: [] });
+      imported += 1;
+    } catch {
+      skipped += 1;
+    }
+  }
+
+  if (imported > 0) {
+    if (state.isUsingDemoData) {
+      state.items = state.items.filter((x) => !x.isDemo);
+      state.isUsingDemoData = false;
+    }
+    renderTagSuggestions();
+    renderApp();
+  }
+  return { imported, skipped };
 }
 
 async function migrateLegacyIfNeeded() {
@@ -1177,6 +1240,17 @@ async function bootstrap() {
   if (els.filtersPanel) els.filtersPanel.hidden = !state.ui.filtersOpen;
   renderTagSuggestions();
   renderApp();
+
+  if (!onboardingController && els.btnAiOnboarding && els.modalOnboarding) {
+    onboardingController = initOnboarding({
+      triggerButton: els.btnAiOnboarding,
+      modal: els.modalOnboarding,
+      getLang: () => state.lang,
+      ensureAuth,
+      getAccessToken: async () => await getSessionAccessToken(),
+      onImportResources: importOnboardingResources
+    });
+  }
 }
 
 void bootstrap();

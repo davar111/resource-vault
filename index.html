@@ -50,6 +50,7 @@
 
         <div class="sidebar__bottom sidebar__bottom--stack">
           <button id="btnAddLink" class="btn btn--primary" type="button">+ Add link</button>
+          <button id="btnAiOnboarding" class="btn btn--secondary" type="button">AI onboarding</button>
           <button id="btnAuth" class="btn btn--secondary btn-auth" type="button">
             <span class="btn-auth__icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" focusable="false">
@@ -299,6 +300,26 @@
           <button id="hiddenAuthSubmit" class="btn btn--primary" type="submit">Save</button>
         </div>
       </form>
+    </dialog>
+
+    <dialog id="modalOnboarding" class="modal">
+      <div class="modal__card modal__card--onboarding">
+        <div class="modal__header">
+          <div data-onboarding-title class="modal__title">AI onboarding</div>
+          <button data-onboarding-close class="btn btn--icon btn--ghost" type="button" aria-label="Close"><span class="btn-icon-cross">×</span></button>
+        </div>
+        <p data-onboarding-subtitle class="modal__text">Choose role and answer a few questions.</p>
+        <div data-onboarding-chat class="onboarding-chat"></div>
+        <div data-onboarding-chips class="onboarding-chips"></div>
+        <div class="row">
+          <input data-onboarding-input class="search onboarding-input" placeholder="Type answer..." />
+          <button data-onboarding-send class="btn btn--primary" type="button">Send</button>
+        </div>
+        <div class="row row--end">
+          <div data-onboarding-status class="hint"></div>
+          <button data-onboarding-skip class="btn btn--secondary" type="button">Skip</button>
+        </div>
+      </div>
     </dialog>
 
     <script type="module" src="/src/main.js"></script>

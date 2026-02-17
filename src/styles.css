@@ -929,6 +929,7 @@ select option { background: var(--bg-surface-1); color: var(--text-primary); }
   padding: var(--space-4);
 }
 .modal__card--small { width: min(420px, 94vw); }
+.modal__card--onboarding { width: min(760px, 96vw); }
 .modal__text { margin: 0 0 var(--space-4); color: var(--text-secondary); font-size: 14px; }
 .modal__card::-webkit-scrollbar { width: 0; height: 0; }
 .modal__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-2); }
@@ -978,6 +979,76 @@ select option { background: var(--bg-surface-1); color: var(--text-primary); }
 
 .multi { min-inline-size: 0; border: 0; padding: 0; }
 .multi__chips { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; }
+
+.onboarding-chat {
+  min-height: 260px;
+  max-height: 360px;
+  overflow: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface-2);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.onboarding-chat__msg {
+  width: fit-content;
+  max-width: min(88%, 520px);
+  border: 1px solid var(--border-default);
+  border-radius: 12px;
+  padding: 8px 10px;
+  line-height: 1.35;
+}
+.onboarding-chat__msg--bot {
+  align-self: flex-start;
+  background: var(--bg-surface-1);
+}
+.onboarding-chat__msg--user {
+  align-self: flex-end;
+  background: var(--bg-surface-3);
+}
+.onboarding-chat__json {
+  margin: 0;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-surface-1);
+  white-space: pre-wrap;
+  font-size: 12px;
+}
+.onboarding-chat__list {
+  display: grid;
+  gap: 6px;
+}
+.onboarding-chat__resource {
+  border: 1px solid var(--border-default);
+  border-radius: 10px;
+  padding: 7px 10px 8px;
+  color: var(--text-primary);
+  text-decoration: none;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+.onboarding-chat__resource span {
+  color: var(--text-muted);
+  text-transform: uppercase;
+  font-size: 11px;
+}
+.onboarding-chat__resource:hover {
+  background: var(--bg-surface-3);
+}
+.onboarding-chips {
+  margin: 10px 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.onboarding-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
 .chip-check { position: relative; cursor: pointer; }
 .chip-check input { position: absolute; opacity: 0; pointer-events: none; }
 .chip-check span {
