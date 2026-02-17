@@ -11,6 +11,7 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || "";
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY") || "";
 const SERPER_API_KEY = Deno.env.get("SERPER_API_KEY") || "";
+const USE_ADAPTIVE_FALLBACK = String(Deno.env.get("USE_ADAPTIVE_FALLBACK") || "true").toLowerCase() !== "false";
 
 type InterviewAnswer = {
   question: string;
@@ -571,7 +572,10 @@ Deno.serve(async (req) => {
       ].join("\n")
     );
     const parsedQuestion = parseJsonFromText(qText);
-    const fallback = buildFallbackFollowUp(role, answers, lang);
+    const fallbackList = fallbackQuestionsByLang(role, lang);
+    const staticFallback = fallbackList[Math.min(answers.length, fallbackList.length - 1)];
+    const adaptiveFallback = buildFallbackFollowUp(role, answers, lang);
+    const fallback = USE_ADAPTIVE_FALLBACK ? adaptiveFallback : staticFallback;
     const question = {
       question: String(parsedQuestion?.question || fallback.question),
       options: Array.isArray(parsedQuestion?.options) && parsedQuestion.options.length
