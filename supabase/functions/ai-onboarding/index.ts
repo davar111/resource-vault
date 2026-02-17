@@ -46,6 +46,7 @@ type AiProfile = {
   stack: string[];
   goals: string[];
   format_pref: Array<"articles" | "tools" | "templates">;
+  resources_lang?: "ru" | "en" | "both";
 };
 
 const STOP_WORDS = new Set([
@@ -485,8 +486,24 @@ function deriveFallbackProfile(role: string, answers: InterviewAnswer[]): AiProf
   });
 }
 
-async function fetchExternalResources(query: string, tags: string[]) {
+function detectResourcesLang(answers: InterviewAnswer[]): "ru" | "en" | "both" {
+  const text = answers.map((x) => `${x.question} ${x.answer}`).join(" ").toLowerCase();
+  const ru = /рус|russian|на русском|ru\b|кирилл/.test(text);
+  const en = /english|англ|на английском|en\b/.test(text);
+  if (ru && en) return "both";
+  if (ru) return "ru";
+  if (en) return "en";
+  return "both";
+}
+
+async function fetchExternalResources(query: string, tags: string[], resourcesLang: "ru" | "en" | "both") {
   const resources: Array<{ title: string; url: string; snippet: string; tags: string[]; source: string }> = [];
+  const langSuffix = resourcesLang === "ru"
+    ? " russian language tutorial guide"
+    : resourcesLang === "en"
+      ? " english language tutorial guide"
+      : "";
+  const finalQuery = `${query}${langSuffix}`.trim();
 
   if (TAVILY_API_KEY) {
     const tavilyRes = await fetch("https://api.tavily.com/search", {
@@ -496,7 +513,7 @@ async function fetchExternalResources(query: string, tags: string[]) {
       },
       body: JSON.stringify({
         api_key: TAVILY_API_KEY,
-        query,
+        query: finalQuery,
         search_depth: "advanced",
         max_results: 10
       })
@@ -532,7 +549,7 @@ async function fetchExternalResources(query: string, tags: string[]) {
     }
   }
 
-  const githubRes = await fetch(`https://api.github.com/search/repositories?q=${encodeURIComponent(query)}&sort=stars&order=desc&per_page=5`);
+  const githubRes = await fetch(`https://api.github.com/search/repositories?q=${encodeURIComponent(finalQuery)}&sort=stars&order=desc&per_page=5`);
   if (githubRes.ok) {
     const data = await githubRes.json();
     const items = Array.isArray(data?.items) ? data.items : [];
@@ -552,7 +569,8 @@ async function fetchExternalResources(query: string, tags: string[]) {
 
 function rankResources(
   items: Array<{ title: string; url: string; snippet: string; tags: string[]; source: string }>,
-  profile: AiProfile
+  profile: AiProfile,
+  resourcesLang: "ru" | "en" | "both"
 ) {
   const seen = new Set<string>();
   const levelToken = profile.level.toLowerCase();
@@ -571,6 +589,7 @@ function rankResources(
       const hay = `${x.title} ${x.snippet} ${(x.tags || []).join(" ")}`.toLowerCase();
       let score = 0;
       const trusted = isTrustedHost(x.url);
+      const host = hostnameOf(x.url);
       if (hay.includes(levelToken)) score += 2;
       for (const token of stackTokens) {
         if (token && hay.includes(token)) score += 2;
@@ -580,6 +599,13 @@ function rankResources(
       if (preferred.has("templates") && hay.includes("template")) score += 1;
       if (trusted) score += 6;
       else score -= 1;
+      if (resourcesLang === "ru") {
+        if (/[а-яё]/i.test(hay) || host.endsWith(".ru")) score += 3;
+        else score -= 2;
+      }
+      if (resourcesLang === "en") {
+        if (/[a-z]/i.test(hay) && !/[а-яё]/i.test(hay)) score += 2;
+      }
       return { ...x, score, trusted };
     })
     .sort((a, b) => b.score - a.score);
@@ -610,12 +636,14 @@ async function buildProfileAndResources(
   const parsed = parseJsonFromText(aiText);
   const fallbackProfile = deriveFallbackProfile(role, answers);
   const parsedProfile = parsed ? normalizeProfile(parsed) : null;
+  const resourcesLang = detectResourcesLang(answers);
   const aiProfile: AiProfile = {
     role: parsedProfile?.role || fallbackProfile.role,
     level: parsedProfile?.level || fallbackProfile.level,
     stack: parsedProfile?.stack?.length ? parsedProfile.stack : fallbackProfile.stack,
     goals: parsedProfile?.goals?.length ? parsedProfile.goals : fallbackProfile.goals,
-    format_pref: parsedProfile?.format_pref?.length ? parsedProfile.format_pref : fallbackProfile.format_pref
+    format_pref: parsedProfile?.format_pref?.length ? parsedProfile.format_pref : fallbackProfile.format_pref,
+    resources_lang: resourcesLang
   };
   const tags = normalizeList([aiProfile.role, ...aiProfile.stack, ...aiProfile.goals]).slice(0, 10);
   const query = `${aiProfile.role} ${aiProfile.stack.join(" ")} ${aiProfile.level}`.trim();
@@ -636,8 +664,8 @@ async function buildProfileAndResources(
     source: String(x?.source || "internal")
   }));
 
-  const external = await fetchExternalResources(query, tags);
-  const resources = rankResources([...internal, ...external], aiProfile);
+  const external = await fetchExternalResources(query, tags, resourcesLang);
+  const resources = rankResources([...internal, ...external], aiProfile, resourcesLang);
 
   await admin.from("users").upsert({
     id: userId,
