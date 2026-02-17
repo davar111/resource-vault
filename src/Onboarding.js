@@ -32,6 +32,11 @@ function buildFunctionUrl(explicit) {
   return supabaseUrl ? `${supabaseUrl}${DEFAULT_FUNCTION_PATH}` : DEFAULT_FUNCTION_PATH;
 }
 
+function getAnonKey() {
+  const env = typeof import.meta !== "undefined" && import.meta.env ? import.meta.env : {};
+  return String(env.VITE_SUPABASE_ANON_KEY || "").trim();
+}
+
 export function initOnboarding(options = {}) {
   const modal = options.modal;
   const triggerButton = options.triggerButton;
@@ -194,11 +199,16 @@ export function initOnboarding(options = {}) {
   }
 
   async function callFunction(payload) {
-    const token = await getAccessToken();
+    const token = String(await getAccessToken() || "").trim();
+    if (!token || token.split(".").length !== 3) {
+      throw new Error(textByLang(getLang(), "Сессия невалидна. Выйди и войди снова через Google.", "Session is invalid. Please sign out and sign in again."));
+    }
+    const anonKey = getAnonKey();
     const headers = {
       "Content-Type": "application/json"
     };
-    if (token) headers.Authorization = `Bearer ${token}`;
+    if (anonKey) headers.apikey = anonKey;
+    headers.Authorization = `Bearer ${token}`;
     const res = await fetch(functionUrl, {
       method: "POST",
       headers,
