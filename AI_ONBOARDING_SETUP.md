@@ -1,12 +1,12 @@
-# AI Onboarding Setup (Gemini + Supabase + Serper)
+# AI Onboarding Setup (Groq + Supabase + Tavily)
 
-## 1) Free API keys
-- Gemini (Google AI Studio):
-  - Open: https://aistudio.google.com/app/apikey
+## 1) API keys
+- Groq:
+  - Open: https://console.groq.com/keys
   - Create API key and copy it.
-- Serper:
-  - Open: https://serper.dev
-  - Sign up and create API key from dashboard.
+- Tavily:
+  - Open: https://app.tavily.com
+  - Create API key and copy it.
 
 ## 2) Apply DB schema
 1. Open Supabase project.
@@ -35,8 +35,8 @@ values
    - `supabase login`
    - `supabase link --project-ref <your-project-ref>`
 3. Set function secrets:
-   - `supabase secrets set GEMINI_API_KEY=...`
-   - `supabase secrets set SERPER_API_KEY=...`
+   - `supabase secrets set GROQ_API_KEY=...`
+   - `supabase secrets set TAVILY_API_KEY=...`
 4. Deploy:
    - `supabase functions deploy ai-onboarding --no-verify-jwt=false`
 
@@ -52,10 +52,10 @@ VITE_SUPABASE_ANON_KEY=<your-publishable-anon-key>
 - User opens `AI interview` button in sidebar.
 - Frontend calls `ai-onboarding` function with JWT.
 - Function:
-  - Generates questions with Gemini.
+  - Generates questions with Groq.
   - Builds final JSON profile.
   - Pulls internal resources from `links` by tags.
-  - Pulls external resources via Serper (or Dev.to/GitHub fallback).
+  - Pulls external resources via Tavily (or Dev.to/GitHub fallback).
   - Ranks and returns resources.
   - Saves `ai_profile` into `public.users`.
 - Frontend can import returned resources into Vault.

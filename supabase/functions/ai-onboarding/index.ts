@@ -9,8 +9,8 @@ const corsHeaders = {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || "";
-const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY") || "";
-const SERPER_API_KEY = Deno.env.get("SERPER_API_KEY") || "";
+const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY") || "";
+const TAVILY_API_KEY = Deno.env.get("TAVILY_API_KEY") || "";
 
 const TRUSTED_HOSTS = [
   "developer.mozilla.org",
@@ -197,27 +197,27 @@ function normalizeProfile(input: Partial<AiProfile>): AiProfile {
   };
 }
 
-async function askGemini(systemPrompt: string, userPrompt: string) {
-  if (!GEMINI_API_KEY) return null;
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}`;
-  const body = {
-    system_instruction: {
-      parts: [{ text: systemPrompt }]
-    },
-    contents: [{ role: "user", parts: [{ text: userPrompt }] }],
-    generationConfig: {
-      temperature: 0.4,
-      maxOutputTokens: 900
-    }
-  };
-  const res = await fetch(url, {
+async function askGroq(systemPrompt: string, userPrompt: string) {
+  if (!GROQ_API_KEY) return null;
+  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body)
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${GROQ_API_KEY}`
+    },
+    body: JSON.stringify({
+      model: "llama-3.1-70b-versatile",
+      temperature: 0.3,
+      max_tokens: 900,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt }
+      ]
+    })
   });
   if (!res.ok) return null;
   const data = await res.json();
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  const text = data?.choices?.[0]?.message?.content;
   return typeof text === "string" ? text : null;
 }
 
@@ -488,25 +488,29 @@ function deriveFallbackProfile(role: string, answers: InterviewAnswer[]): AiProf
 async function fetchExternalResources(query: string, tags: string[]) {
   const resources: Array<{ title: string; url: string; snippet: string; tags: string[]; source: string }> = [];
 
-  if (SERPER_API_KEY) {
-    const serperRes = await fetch("https://google.serper.dev/search", {
+  if (TAVILY_API_KEY) {
+    const tavilyRes = await fetch("https://api.tavily.com/search", {
       method: "POST",
       headers: {
-        "X-API-KEY": SERPER_API_KEY,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({ q: query, num: 8 })
+      body: JSON.stringify({
+        api_key: TAVILY_API_KEY,
+        query,
+        search_depth: "advanced",
+        max_results: 10
+      })
     });
-    if (serperRes.ok) {
-      const data = await serperRes.json();
-      const organic = Array.isArray(data?.organic) ? data.organic : [];
-      for (const row of organic.slice(0, 8)) {
+    if (tavilyRes.ok) {
+      const data = await tavilyRes.json();
+      const results = Array.isArray(data?.results) ? data.results : [];
+      for (const row of results.slice(0, 10)) {
         resources.push({
           title: String(row?.title || ""),
-          url: String(row?.link || ""),
-          snippet: String(row?.snippet || ""),
+          url: String(row?.url || ""),
+          snippet: String(row?.content || ""),
           tags,
-          source: "serper"
+          source: "tavily"
         });
       }
     }
@@ -592,7 +596,7 @@ async function buildProfileAndResources(
   role: string,
   answers: InterviewAnswer[]
 ) {
-  const aiText = await askGemini(
+  const aiText = await askGroq(
     "You produce a strict JSON profile for a technical learning app.",
     [
       `Role: ${role}`,
@@ -681,7 +685,7 @@ Deno.serve(async (req) => {
     }
 
     const history = answers.map((x, idx) => `${idx + 1}. Q:${x.question} A:${x.answer}`).join("\n");
-    const qText = await askGemini(
+    const qText = await askGroq(
       "You are a senior mentor conducting a natural chat. Ask exactly one short follow-up question.",
       [
         `Role: ${role}`,
@@ -708,7 +712,7 @@ Deno.serve(async (req) => {
   if (action === "generate_questions") {
     if (!role) return jsonResponse(400, { error: "Role is required" });
 
-    const aiText = await askGemini(
+    const aiText = await askGroq(
       "You generate interview questions for tech onboarding. Return strict JSON only.",
       `Role: ${role}. Return JSON: {"questions":[{"question":"..."}]} with 3-5 adaptive open-ended questions and no answer options.`
     );
