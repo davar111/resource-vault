@@ -235,6 +235,39 @@ function extractQuestionText(input: string | null) {
   return /[?？]$/.test(compact) ? compact : `${compact}?`;
 }
 
+function buildGuidedQuestion(role: string, answers: InterviewAnswer[], lang: string) {
+  const isEn = String(lang || "ru") === "en";
+  const text = answers.map((x) => `${x.question} ${x.answer}`).join(" ").toLowerCase();
+  const hasLevel = /(junior|middle|senior|intern|trainee|джун|джуниор|мидл|сеньор|стажер)/i.test(text);
+  const hasFocus = /(работ|job|portfolio|портфол|interview|интервью|project|проект|growth|рост)/i.test(text);
+  const hasTools = /(figma|photoshop|illustrator|after effects|framer|webflow|react|vue|angular|typescript|javascript|node|python|sql)/i.test(text);
+  const hasGoal = /(недел|месяц|week|month|цель|goal|результат|result|kpi)/i.test(text);
+
+  if (!hasLevel) {
+    return isEn
+      ? `What is your current level in ${role}: beginner, junior, middle, or senior?`
+      : `Какой у тебя сейчас уровень в ${role}: beginner, junior, middle или senior?`;
+  }
+  if (!hasFocus) {
+    return isEn
+      ? "What are you focused on right now: finding work, improving skills, or building portfolio?"
+      : "На чем ты сейчас сфокусирован: поиск работы, прокачка навыков или сборка портфолио?";
+  }
+  if (!hasTools) {
+    return isEn
+      ? "What tools or stack do you actually use every week?"
+      : "Какие инструменты или стек ты реально используешь каждую неделю?";
+  }
+  if (!hasGoal) {
+    return isEn
+      ? "What concrete result do you want by the end of this month?"
+      : "Какой конкретный результат ты хочешь получить к концу этого месяца?";
+  }
+  return isEn
+    ? "What blocks you most right now, and what kind of resource would help immediately?"
+    : "Что сейчас тебя сильнее всего тормозит и какой тип ресурса помог бы сразу?";
+}
+
 function buildOpenFallbackQuestion(role: string, answers: InterviewAnswer[], lang: string) {
   const isEn = String(lang || "ru") === "en";
   const last = answers.length ? String(answers[answers.length - 1]?.answer || "").trim() : "";
@@ -612,13 +645,17 @@ Deno.serve(async (req) => {
         history ? `History:\n${history}` : "No history yet.",
         `Language: ${lang === "en" ? "English" : "Russian"}`,
         "Return plain text only.",
-        "No JSON, no lists, no answer options, no repetition."
+        "No JSON, no lists, no answer options, no repetition.",
+        "Do not say phrases like 'you said' or repeat user's message verbatim."
       ].join("\n")
     );
     const modelQuestion = extractQuestionText(qText);
-    const fallbackQuestion = buildOpenFallbackQuestion(role, answers, lang);
+    const fallbackQuestion = buildGuidedQuestion(role, answers, lang);
+    const weakQuestion = !modelQuestion ||
+      modelQuestion.length < 12 ||
+      /ты написал|you said|i got it|понял|i understand/i.test(modelQuestion.toLowerCase());
     const question = {
-      question: String(modelQuestion || fallbackQuestion),
+      question: String(weakQuestion ? fallbackQuestion : modelQuestion),
       options: []
     };
     return jsonResponse(200, { done: false, question });
