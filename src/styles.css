@@ -1018,6 +1018,8 @@ select option { background: var(--bg-surface-1); color: var(--text-primary); }
   border-radius: 12px;
   padding: 8px 10px;
   line-height: 1.35;
+  opacity: 0;
+  animation: onboardingFadeUp 180ms ease forwards;
 }
 .onboarding-chat__msg--bot {
   align-self: flex-start;
@@ -1049,6 +1051,8 @@ select option { background: var(--bg-surface-1); color: var(--text-primary); }
   display: flex;
   justify-content: space-between;
   gap: 10px;
+  opacity: 0;
+  animation: onboardingFadeUp 200ms ease forwards;
 }
 .onboarding-chat__resource span {
   color: var(--text-muted);
@@ -1125,6 +1129,33 @@ select option { background: var(--bg-surface-1); color: var(--text-primary); }
 .onboarding-input {
   flex: 1 1 auto;
   min-width: 0;
+}
+.onboarding-footer {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.onboarding-footer [data-onboarding-status] {
+  margin-right: auto;
+}
+.onboarding-footer [data-onboarding-status]:empty {
+  display: none;
+}
+.onboarding-footer .btn {
+  white-space: nowrap;
+}
+@keyframes onboardingFadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 .chip-check { position: relative; cursor: pointer; }
 .chip-check input { position: absolute; opacity: 0; pointer-events: none; }

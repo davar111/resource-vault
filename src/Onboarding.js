@@ -323,6 +323,24 @@ export function initOnboarding(options = {}) {
       else els.input.style.display = "none";
     }
     if (els.send) els.send.style.display = "none";
+    if (els.footer) els.footer.classList.add("onboarding-footer");
+  }
+
+  function removeInlineImportButton() {
+    els.footer?.querySelector(".ob-inline-import")?.remove();
+  }
+
+  function renderInlineImportButton() {
+    if (!els.footer || !state.resources.length) return;
+    removeInlineImportButton();
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "btn btn--primary ob-inline-import";
+    btn.textContent = textByLang(getLang(), "Добавить ссылки в Vault", "Add links to Vault");
+    btn.addEventListener("click", () => void importResources());
+    if (els.restart) els.footer.insertBefore(btn, els.restart);
+    else if (els.skip) els.footer.insertBefore(btn, els.skip);
+    else els.footer.appendChild(btn);
   }
 
   function renderBackButton() {
@@ -402,6 +420,7 @@ export function initOnboarding(options = {}) {
       })();
       const card = document.createElement("a");
       card.className = "onboarding-chat__resource ob-resource-card";
+      card.style.animationDelay = `${Math.min(idx, 8) * 28}ms`;
       card.href = url;
       card.target = "_blank";
       card.rel = "noreferrer";
@@ -469,15 +488,8 @@ export function initOnboarding(options = {}) {
     if (els.chips) {
       els.chips.dataset.mode = "result";
       els.chips.innerHTML = "";
-      if (state.resources.length) {
-        const importBtn = document.createElement("button");
-        importBtn.type = "button";
-        importBtn.className = "btn btn--primary";
-        importBtn.textContent = textByLang(getLang(), "Добавить ссылки в Vault", "Add links to Vault");
-        importBtn.addEventListener("click", () => void importResources());
-        els.chips.appendChild(importBtn);
-      }
     }
+    renderInlineImportButton();
     if (!els.chat) return;
     appendMessage(
       state.resources.length
@@ -575,6 +587,7 @@ export function initOnboarding(options = {}) {
       );
     }
     renderRoleChips();
+    removeInlineImportButton();
     updateSubtitle();
     setStatus("");
   }
