@@ -362,18 +362,8 @@ function stopFeedbackSpinner(key) {
 
 function ensureStatusLine() {
   if (els.statusLine?.isConnected) return els.statusLine;
-  let line = document.getElementById("statusLine");
-  if (!line) {
-    line = document.createElement("div");
-    line.id = "statusLine";
-    line.className = "status-line mono status-info";
-    line.setAttribute("aria-live", "polite");
-  }
-  if (!line.isConnected && els.grid?.parentElement) {
-    els.grid.parentElement.insertBefore(line, els.grid);
-  }
-  els.statusLine = line;
-  return line;
+  els.statusLine = document.getElementById("statusLine");
+  return els.statusLine || null;
 }
 
 function ensureModalStatusLine(form, id) {
@@ -1400,10 +1390,12 @@ async function bootstrap() {
   if (currentUser?.id) {
     const statusLine = ensureStatusLine();
     stopFeedbackSpinner("pageSpinner");
-    feedback.pageSpinner = startSpinner(
-      statusLine,
-      state.lang === "ru" ? "Загружаю..." : "Loading..."
-    );
+    if (statusLine) {
+      feedback.pageSpinner = startSpinner(
+        statusLine,
+        state.lang === "ru" ? "Загружаю..." : "Loading..."
+      );
+    }
     try {
       await loadData();
       if (!state.items.length && !state.collections.length) {
