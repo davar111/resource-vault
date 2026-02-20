@@ -70,21 +70,13 @@ export async function listLinkCollections() {
 }
 
 export async function replaceLinkCollections(linkId, collectionIds, userId) {
-  await supabaseRequest(restPath(LINK_COLLECTIONS_TABLE), {
-    method: "DELETE",
-    query: { link_id: `eq.${linkId}` }
-  });
-
   const uniqueIds = [...new Set((collectionIds || []).map((x) => String(x)).filter(Boolean))];
-  if (!uniqueIds.length) return;
-
-  await supabaseRequest(restPath(LINK_COLLECTIONS_TABLE), {
+  await supabaseRequest(restPath("rpc/replace_link_collections"), {
     method: "POST",
-    body: uniqueIds.map((collectionId) => ({
-      user_id: userId,
-      link_id: linkId,
-      collection_id: collectionId
-    })),
+    body: {
+      p_link_id: linkId,
+      p_collection_ids: uniqueIds
+    },
     prefer: "return=minimal"
   });
 }

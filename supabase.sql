@@ -63,6 +63,34 @@ create index if not exists link_collections_user_id_idx on public.link_collectio
 create index if not exists link_collections_link_id_idx on public.link_collections (link_id);
 create index if not exists link_collections_collection_id_idx on public.link_collections (collection_id);
 
+create or replace function public.replace_link_collections(
+  p_link_id uuid,
+  p_collection_ids uuid[]
+)
+returns void
+language plpgsql
+security invoker
+as $$
+declare
+  v_ids uuid[];
+begin
+  v_ids := coalesce(p_collection_ids, array[]::uuid[]);
+
+  delete from public.link_collections
+  where link_id = p_link_id;
+
+  if array_length(v_ids, 1) is null then
+    return;
+  end if;
+
+  insert into public.link_collections (user_id, link_id, collection_id)
+  select auth.uid(), p_link_id, x
+  from unnest(v_ids) as x
+  where x is not null
+  on conflict (link_id, collection_id) do nothing;
+end;
+$$;
+
 create table if not exists public.saved_filters (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null,

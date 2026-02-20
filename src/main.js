@@ -6,13 +6,16 @@ import { TAG_MAX_LEN, TAG_MIN_LEN, detectSourceFromUrl, domainFromUrl, normalize
 import { t } from "./i18n.js";
 import { render } from "./ui.js";
 import { flashStatus, startSpinner } from "./ui/monoFeedback.js";
+import { promptDialog, toast } from "./ui/feedback.js";
+import { scheduleRender } from "./renderScheduler.js";
+import { debounce } from "./utils/debounce.js";
 import { SOURCE_CODES, TYPE_CODES } from "./domain.js";
 import { makeDemoLinks } from "./demo-data.js";
 import { initAuth, loginWithGoogle, logout } from "./useAuth.js";
 import { createLink, deleteLink, listLinks, updateLink } from "./useLinks.js";
 import { addLinkCollections, createCollection, createCollectionInvite, deleteCollection, listCollections, listLinkCollections, replaceLinkCollections, updateCollection } from "./useCollections.js";
 import { createSavedFilter, deleteSavedFilter, listSavedFilters } from "./useSavedFilters.js";
-import { getSessionAccessToken } from "./supabase.js";
+import { getAuthIssue, getSessionAccessToken } from "./supabase.js";
 import { initOnboarding } from "./Onboarding.js";
 
 const TITLE_MIN_LEN = 2;
@@ -153,10 +156,15 @@ const feedback = {
   savedFilterFlashCancel: null
 };
 let onboardingController = null;
+let authIssueNotice = "";
+
+function notify(text, kind = "info", target = null) {
+  return toast(target || els.authStatus, text, { kind, timeoutMs: 1500 });
+}
 
 function ensureAuth() {
   if (currentUser?.id) return true;
-  alert(t(state.lang, state.isGuestMode ? "authRequiredGuest" : "authRequired"));
+  notify(t(state.lang, state.isGuestMode ? "authRequiredGuest" : "authRequired"), "error");
   return false;
 }
 
@@ -236,6 +244,10 @@ function renderApp() {
   render(state, els, persistUiSettings, actions);
 }
 
+function requestRender() {
+  scheduleRender(renderApp);
+}
+
 function authEmail(user) {
   return String(user?.email || user?.user_metadata?.email || "").trim();
 }
@@ -274,12 +286,15 @@ function renderAuthStatus() {
   const email = authEmail(currentUser);
   if (!email && state.isGuestMode && !state.isAuthenticated) {
     if (els.btnAuthLabel) els.btnAuthLabel.textContent = t(state.lang, "signInGoogle");
-    if (els.authStatus) els.authStatus.textContent = t(state.lang, "guestModeStatus");
+    if (els.authStatus) els.authStatus.textContent = authIssueNotice || t(state.lang, "guestModeStatus");
     return;
   }
   if (els.btnAuthLabel) els.btnAuthLabel.textContent = email ? t(state.lang, "signOut") : t(state.lang, "signInGoogle");
   if (els.authStatus) {
-    els.authStatus.textContent = email ? `${t(state.lang, "authSignedInAs")}: ${email}` : t(state.lang, "authSignedOut");
+    els.authStatus.textContent = email ? `${t(state.lang, "authSignedInAs")}: ${email}` : (authIssueNotice || t(state.lang, "authSignedOut"));
+  }
+  if (!email && els.authGateText && authIssueNotice) {
+    els.authGateText.textContent = authIssueNotice;
   }
 }
 
@@ -300,7 +315,7 @@ function renderFilterChips() {
     input.addEventListener("change", () => {
       state.activeSavedFilterId = null;
       state.filters.types = [...els.filterTypes.querySelectorAll("input:checked")].map((x) => x.value);
-      renderApp();
+      requestRender();
     });
   });
   els.filterSources?.querySelectorAll("input").forEach((input) => {
@@ -308,7 +323,7 @@ function renderFilterChips() {
     input.addEventListener("change", () => {
       state.activeSavedFilterId = null;
       state.filters.sources = [...els.filterSources.querySelectorAll("input:checked")].map((x) => x.value);
-      renderApp();
+      requestRender();
     });
   });
 }
@@ -684,12 +699,12 @@ async function ensureHiddenAccess() {
     if (!created) return false;
     const first = String(created.password || "");
     if (first.length < 4) {
-      alert(t(state.lang, "hiddenPasswordTooShort"));
+      notify(t(state.lang, "hiddenPasswordTooShort"), "error", els.hiddenAuthText);
       return false;
     }
     const confirmPwd = String(created.confirm || "");
     if (first !== confirmPwd) {
-      alert(t(state.lang, "hiddenPasswordMismatch"));
+      notify(t(state.lang, "hiddenPasswordMismatch"), "error", els.hiddenAuthText);
       return false;
     }
     const hash = await sha256Hex(first);
@@ -704,7 +719,7 @@ async function ensureHiddenAccess() {
   if (!entered) return false;
   const enteredHash = await sha256Hex(entered);
   if (enteredHash !== existingHash) {
-    alert(t(state.lang, "hiddenWrongPassword"));
+    notify(t(state.lang, "hiddenWrongPassword"), "error", els.hiddenAuthText);
     return false;
   }
   state.ui.hiddenUnlocked = true;
@@ -794,7 +809,7 @@ async function importOnboardingResources(resources, profile) {
       state.isUsingDemoData = false;
     }
     renderTagSuggestions();
-    renderApp();
+    requestRender();
   }
   return { imported, skipped };
 }
@@ -845,7 +860,7 @@ const actions = {
     const item = state.items.find((x) => x.id === id);
     if (item?.isAiNew) item.isAiNew = false;
     state.recentViewedIds = [id, ...state.recentViewedIds.filter((x) => x !== id)].slice(0, 100);
-    renderApp();
+    requestRender();
   },
   onToggleFavorite: async (id, next) => {
     if (!ensureAuth()) return;
@@ -856,9 +871,9 @@ const actions = {
       if (!item || item.isDemo) return;
       const updated = await updateLink(id, { ...item, favorite: !!next });
       if (updated) item.favorite = updated.favorite;
-      renderApp();
+      requestRender();
     } catch (err) {
-      alert(err?.message || (state.lang === "ru" ? "Не удалось обновить избранное." : "Failed to update favorite."));
+      notify(err?.message || (state.lang === "ru" ? "Не удалось обновить избранное." : "Failed to update favorite."), "error");
     } finally {
       pendingLinkOps.delete(id);
     }
@@ -872,15 +887,15 @@ const actions = {
       if (item?.isDemo) {
         state.items = state.items.filter((x) => x.id !== id);
         renderTagSuggestions();
-        renderApp();
+        requestRender();
         return;
       }
       await deleteLink(id);
       state.items = state.items.filter((x) => x.id !== id);
       renderTagSuggestions();
-      renderApp();
+      requestRender();
     } catch (err) {
-      alert(err?.message || (state.lang === "ru" ? "Не удалось удалить ссылку." : "Failed to delete link."));
+      notify(err?.message || (state.lang === "ru" ? "Не удалось удалить ссылку." : "Failed to delete link."), "error");
     } finally {
       pendingLinkOps.delete(id);
     }
@@ -895,9 +910,9 @@ const actions = {
       const next = [...new Set([...(item.collectionIds || []), collectionId])];
       await replaceLinkCollections(linkId, next, currentUser.id);
       item.collectionIds = next;
-      renderApp();
+      requestRender();
     } catch (err) {
-      alert(err?.message || (state.lang === "ru" ? "Не удалось обновить коллекции." : "Failed to update collections."));
+      notify(err?.message || (state.lang === "ru" ? "Не удалось обновить коллекции." : "Failed to update collections."), "error");
     } finally {
       pendingLinkOps.delete(linkId);
     }
@@ -912,7 +927,7 @@ const actions = {
     state.ui.collectionOrderIds = next;
     applyCollectionUiSettings();
     renderAddCollectionChoices();
-    renderApp();
+    requestRender();
   },
   onTogglePinCollection: async (collectionId) => {
     const pins = new Set(state.ui.pinnedCollectionIds || []);
@@ -921,7 +936,7 @@ const actions = {
     state.ui.pinnedCollectionIds = [...pins];
     applyCollectionUiSettings();
     renderAddCollectionChoices();
-    renderApp();
+    requestRender();
   },
   onRenameCollection: async (collectionId, name) => {
     if (!ensureAuth()) return;
@@ -941,9 +956,9 @@ const actions = {
         col.isShared = updated.isShared;
       }
       renderAddCollectionChoices();
-      renderApp();
+      requestRender();
     } catch (err) {
-      alert(err?.message || (state.lang === "ru" ? "Не удалось переименовать коллекцию." : "Failed to rename collection."));
+      notify(err?.message || (state.lang === "ru" ? "Не удалось переименовать коллекцию." : "Failed to rename collection."), "error");
     } finally {
       pendingCollectionOps.delete(collectionId);
     }
@@ -952,26 +967,33 @@ const actions = {
     if (!ensureAuth()) return;
     const col = state.collections.find((x) => x.id === collectionId);
     if (!col || !col.isShared || col.ownerId !== currentUser?.id) return;
-    const emailRaw = prompt(t(state.lang, "invitePrompt"), "") || "";
+    const emailRaw = await promptDialog({
+      title: t(state.lang, "inviteToCollection"),
+      message: t(state.lang, "invitePrompt"),
+      placeholder: "teammate@example.com",
+      submitText: t(state.lang, "save"),
+      cancelText: t(state.lang, "cancel")
+    });
+    if (emailRaw == null) return;
     const email = normalizeEmail(emailRaw);
     if (!email) return;
     if (!isValidEmail(email)) {
-      alert(t(state.lang, "inviteInvalidEmail"));
+      notify(t(state.lang, "inviteInvalidEmail"), "error");
       return;
     }
     if (email === normalizeEmail(authEmail(currentUser))) {
-      alert(t(state.lang, "inviteSelfError"));
+      notify(t(state.lang, "inviteSelfError"), "error");
       return;
     }
     try {
       await createCollectionInvite(collectionId, email, currentUser.id);
-      alert(t(state.lang, "inviteSent"));
+      notify(t(state.lang, "inviteSent"), "ok");
     } catch (err) {
       const msg = String(err?.message || "");
       if (msg.includes("duplicate key")) {
-        alert(t(state.lang, "inviteSent"));
+        notify(t(state.lang, "inviteSent"), "ok");
       } else {
-        alert(msg || "Invite failed");
+        notify(msg || "Invite failed", "error");
       }
     }
   },
@@ -988,9 +1010,9 @@ const actions = {
       if (state.activeCollectionId === collectionId) state.activeCollectionId = "all";
       applyCollectionUiSettings();
       renderAddCollectionChoices();
-      renderApp();
+      requestRender();
     } catch (err) {
-      alert(err?.message || (state.lang === "ru" ? "Не удалось удалить коллекцию." : "Failed to delete collection."));
+      notify(err?.message || (state.lang === "ru" ? "Не удалось удалить коллекцию." : "Failed to delete collection."), "error");
     } finally {
       pendingCollectionOps.delete(collectionId);
     }
@@ -1006,9 +1028,9 @@ const actions = {
         state.activeSavedFilterId = null;
         state.activeCollectionId = "all";
       }
-      renderApp();
+      requestRender();
     } catch (err) {
-      alert(err?.message || (state.lang === "ru" ? "Не удалось удалить фильтр." : "Failed to delete filter."));
+      notify(err?.message || (state.lang === "ru" ? "Не удалось удалить фильтр." : "Failed to delete filter."), "error");
     } finally {
       pendingSavedFilterOps.delete(id);
     }
@@ -1037,6 +1059,7 @@ function firstHttpUrl(input) {
 
 function setupEvents() {
   const mobileMq = window.matchMedia("(max-width: 700px)");
+  const debouncedSearchRender = debounce(() => requestRender(), 150);
   const setMobileMenu = (open) => {
     state.ui.mobileMenuOpen = !!open;
     document.body.classList.toggle("mobile-menu-open", !!open);
@@ -1046,34 +1069,38 @@ function setupEvents() {
 
   els.inputAddTitle && (els.inputAddTitle.maxLength = TITLE_MAX_LEN);
   els.inputAddNote && (els.inputAddNote.maxLength = NOTE_MAX_LEN);
-  els.navAll?.addEventListener("click", () => { state.activeSavedFilterId = null; state.activeCollectionId = "all"; renderApp(); closeMobileMenuIfNeeded(); });
-  els.navFav?.addEventListener("click", () => { state.activeSavedFilterId = null; state.activeCollectionId = "fav"; renderApp(); closeMobileMenuIfNeeded(); });
+  els.navAll?.addEventListener("click", () => { state.activeSavedFilterId = null; state.activeCollectionId = "all"; requestRender(); closeMobileMenuIfNeeded(); });
+  els.navFav?.addEventListener("click", () => { state.activeSavedFilterId = null; state.activeCollectionId = "fav"; requestRender(); closeMobileMenuIfNeeded(); });
   els.navHidden?.addEventListener("click", async () => {
     if (!ensureAuth()) return;
     const ok = await ensureHiddenAccess();
     if (!ok) return;
     state.activeSavedFilterId = null;
     state.activeCollectionId = "hidden";
-    renderApp();
+    requestRender();
     closeMobileMenuIfNeeded();
   });
-  els.navRecent?.addEventListener("click", () => { state.activeSavedFilterId = null; state.activeCollectionId = "recent"; renderApp(); closeMobileMenuIfNeeded(); });
-  els.searchInput?.addEventListener("input", (e) => { state.activeSavedFilterId = null; state.search = String(e.target.value || ""); renderApp(); });
-  els.sortSelect?.addEventListener("change", (e) => { state.activeSavedFilterId = null; state.sortBy = FILTER_SORTS.has(String(e.target.value || "")) ? String(e.target.value) : "newest"; renderApp(); });
+  els.navRecent?.addEventListener("click", () => { state.activeSavedFilterId = null; state.activeCollectionId = "recent"; requestRender(); closeMobileMenuIfNeeded(); });
+  els.searchInput?.addEventListener("input", (e) => {
+    state.activeSavedFilterId = null;
+    state.search = String(e.target.value || "");
+    debouncedSearchRender();
+  });
+  els.sortSelect?.addEventListener("change", (e) => { state.activeSavedFilterId = null; state.sortBy = FILTER_SORTS.has(String(e.target.value || "")) ? String(e.target.value) : "newest"; requestRender(); });
   els.btnFilters?.addEventListener("click", () => { state.ui.filtersOpen = !state.ui.filtersOpen; if (els.filtersPanel) els.filtersPanel.hidden = !state.ui.filtersOpen; });
-  els.filterTagInput?.addEventListener("input", (e) => { state.activeSavedFilterId = null; state.filters.tag = normalizeSearchText(e.target.value); renderApp(); });
-  els.filterFavoriteOnly?.addEventListener("change", (e) => { state.activeSavedFilterId = null; state.filters.favoriteOnly = !!e.target.checked; renderApp(); });
+  els.filterTagInput?.addEventListener("input", (e) => { state.activeSavedFilterId = null; state.filters.tag = normalizeSearchText(e.target.value); requestRender(); });
+  els.filterFavoriteOnly?.addEventListener("change", (e) => { state.activeSavedFilterId = null; state.filters.favoriteOnly = !!e.target.checked; requestRender(); });
 
   els.langSelect?.addEventListener("change", (e) => {
     state.lang = String(e.target?.value || "") === "en" ? "en" : "ru";
     applyI18n();
     syncLanguageSelect();
-    renderApp();
+    requestRender();
   });
   els.btnTheme?.addEventListener("click", () => {
     applyTheme(state.theme === "dark" ? "light" : "dark");
     syncThemeToggle();
-    renderApp();
+    requestRender();
   });
 
   els.btnAuth?.addEventListener("click", async () => {
@@ -1087,7 +1114,7 @@ function setupEvents() {
   els.authGateBtn?.addEventListener("click", () => loginWithGoogle());
   els.authGateGuestBtn?.addEventListener("click", () => {
     state.isGuestMode = true;
-    renderApp();
+    requestRender();
   });
 
   els.btnAddLink?.addEventListener("click", () => { openNewLinkModal(); closeMobileMenuIfNeeded(); });
@@ -1106,7 +1133,13 @@ function setupEvents() {
     }
     if (els.btnSaveFilterInline) els.btnSaveFilterInline.disabled = true;
     try {
-      const name = String(prompt(t(state.lang, "saveFilterPrompt"), "") || "").trim();
+      const nextName = await promptDialog({
+        title: t(state.lang, "saveFilterTitle"),
+        message: t(state.lang, "saveFilterPrompt"),
+        submitText: t(state.lang, "save"),
+        cancelText: t(state.lang, "cancel")
+      });
+      const name = String(nextName || "").trim();
       if (name) {
         feedback.savedFilterSpinner = startSpinner(
           els.btnSaveFilterInline,
@@ -1121,7 +1154,7 @@ function setupEvents() {
           "ok"
         );
       }
-      renderApp();
+      requestRender();
     } catch (err) {
       stopFeedbackSpinner("savedFilterSpinner");
       feedback.savedFilterFlashCancel = flashStatus(
@@ -1172,7 +1205,7 @@ function setupEvents() {
         els.modalCollection?.close();
       }, 220);
       renderAddCollectionChoices();
-      renderApp();
+      requestRender();
     } catch (err) {
       stopFeedbackSpinner("collectionSpinner");
       feedback.collectionFlashCancel = flashStatus(
@@ -1285,7 +1318,7 @@ function setupEvents() {
         feedback.addCloseTimer = setTimeout(() => closeAddModal(), 220);
         renderTagSuggestions();
       }
-      renderApp();
+      requestRender();
     } catch (err) {
       stopFeedbackSpinner("addSpinner");
       feedback.addFlashCancel = flashStatus(
@@ -1385,6 +1418,8 @@ async function bootstrap() {
 
   setupEvents();
   try { currentUser = await initAuth(); } catch (err) { console.warn("Auth failed", err?.message || err); }
+  const authIssue = getAuthIssue();
+  authIssueNotice = authIssue?.code === "SESSION_EXPIRED" ? t(state.lang, "sessionExpired") : "";
   state.isAuthenticated = !!currentUser?.id;
   state.currentUserId = currentUser?.id || "";
   if (currentUser?.id) {
@@ -1412,16 +1447,33 @@ async function bootstrap() {
       if (statusLine) statusLine.textContent = state.lang === "ru" ? "✓ загружено" : "✓ loaded";
     } catch (err) {
       console.warn("Load failed", err?.message || err);
-      state.items = applyDemoPrefs(makeDemoLinks());
-      state.isUsingDemoData = true;
+      if (err?.code === "SESSION_EXPIRED") {
+        authIssueNotice = t(state.lang, "sessionExpired");
+        currentUser = null;
+        state.isAuthenticated = false;
+        state.currentUserId = "";
+        state.items = [];
+        state.collections = [];
+        state.savedFilters = [];
+        state.activeSavedFilterId = null;
+        state.isUsingDemoData = false;
+      } else {
+        state.items = applyDemoPrefs(makeDemoLinks());
+        state.isUsingDemoData = true;
+      }
       stopFeedbackSpinner("pageSpinner");
       if (statusLine) statusLine.textContent = state.lang === "ru" ? "✕ ошибка загрузки" : "✕ load error";
     }
   } else {
     stopFeedbackSpinner("pageSpinner");
     state.currentUserId = "";
-    state.items = applyDemoPrefs(makeDemoLinks());
-    state.isUsingDemoData = true;
+    if (authIssueNotice) {
+      state.items = [];
+      state.isUsingDemoData = false;
+    } else {
+      state.items = applyDemoPrefs(makeDemoLinks());
+      state.isUsingDemoData = true;
+    }
     state.collections = [];
     state.savedFilters = [];
     state.activeSavedFilterId = null;

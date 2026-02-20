@@ -323,6 +323,22 @@
       </div>
     </dialog>
 
+    <dialog id="rv-feedback-dialog" class="modal">
+      <form method="dialog" class="modal__card modal__card--small">
+        <div class="modal__header">
+          <div id="rvFeedbackTitle" class="modal__title"></div>
+        </div>
+        <p id="rvFeedbackMessage" class="modal__text"></p>
+        <label id="rvFeedbackInputWrap" class="field" hidden>
+          <input id="rvFeedbackInput" type="text" />
+        </label>
+        <div class="row row--end">
+          <button id="rvFeedbackCancel" class="btn btn--secondary" type="button">Cancel</button>
+          <button id="rvFeedbackSubmit" class="btn btn--primary" type="submit">OK</button>
+        </div>
+      </form>
+    </dialog>
+
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

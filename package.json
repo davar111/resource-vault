@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node --test"
+    "test": "node --test",
+    "check": "node scripts/check-mojibake.mjs && node scripts/check-no-native-dialogs.mjs"
   },
   "devDependencies": {
     "vite": "^7.3.1"

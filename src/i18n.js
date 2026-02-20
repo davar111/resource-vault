@@ -157,7 +157,8 @@
     ,
     authRequired: "Сначала войдите через Google."
     ,
-    authRequiredGuest: "В гостевом режиме создание и изменение недоступны. Войдите через Google."
+    authRequiredGuest: "В гостевом режиме создание и изменение недоступны. Войдите через Google.",
+    sessionExpired: "Сессия истекла, войдите снова."
   },
 
   en: {
@@ -316,7 +317,8 @@
     source_dribbble: "Dribbble",
     source_other: "Other",
     authRequired: "Sign in with Google first.",
-    authRequiredGuest: "Guest mode is read-only. Sign in with Google to create or edit."
+    authRequiredGuest: "Guest mode is read-only. Sign in with Google to create or edit.",
+    sessionExpired: "Session expired. Please sign in again."
   }
 };
 

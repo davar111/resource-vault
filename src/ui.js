@@ -1,5 +1,6 @@
 import { matchesLink, domainFromUrl, faviconUrl, previewFallbackUrl } from "./filter.js";
 import { t } from "./i18n.js";
+import { confirmDialog, promptDialog } from "./ui/feedback.js";
 
 let activeActions = {};
 
@@ -138,9 +139,15 @@ function renderCollections(state, els, onChange, L) {
     btn.querySelector("[data-col-rename]")?.addEventListener("click", async (e) => {
       e.stopPropagation();
       closeAllCollectionMenus();
-      const next = prompt(t(L, "renameCollectionPrompt"), c.name || "");
-      if (!next) return;
-      const name = String(next).trim();
+      const next = await promptDialog({
+        title: t(L, "renameCollection"),
+        message: t(L, "renameCollectionPrompt"),
+        defaultValue: c.name || "",
+        submitText: t(L, "save"),
+        cancelText: t(L, "cancel")
+      });
+      if (next == null) return;
+      const name = String(next || "").trim();
       if (!name) return;
       await activeActions?.onRenameCollection?.(c.id, name);
     });
@@ -626,7 +633,12 @@ function confirmDelete(els, L) {
 function confirmAction(els, L, options = {}) {
   const dialog = els.modalDeleteLink;
   if (!dialog || !els.deleteCancel || !els.deleteConfirm || !els.modalDeleteTitle || !els.modalDeleteText) {
-    return Promise.resolve(confirm(String(options.text || t(L, "deleteLinkText"))));
+    return confirmDialog({
+      title: String(options.title || t(L, "deleteLinkTitle")),
+      message: String(options.text || t(L, "deleteLinkText")),
+      confirmText: String(options.confirm || t(L, "del")),
+      cancelText: t(L, "cancel")
+    });
   }
 
   const title = String(options.title || t(L, "deleteLinkTitle"));

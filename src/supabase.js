@@ -4,6 +4,66 @@ const SUPABASE_PUBLISHABLE_KEY = String(ENV.VITE_SUPABASE_ANON_KEY || "").trim()
 const TABLE = "vault_states";
 const AUTH_SESSION_KEY = "resource_vault_auth_session";
 const API_PREFIX = "/rest/v1/";
+const FETCH_TIMEOUT_MS = 9000;
+const RETRY_BASE_MS = 220;
+const RETRY_ATTEMPTS_GET = 3;
+let lastAuthIssue = null;
+
+function setAuthIssue(code, message) {
+  lastAuthIssue = {
+    code: String(code || "AUTH_ERROR"),
+    message: String(message || "Authentication failed")
+  };
+}
+
+function clearAuthIssue() {
+  lastAuthIssue = null;
+}
+
+export function getAuthIssue() {
+  return lastAuthIssue;
+}
+
+function makeSupabaseError(code, message, retriable = false, details = "") {
+  const err = new Error(String(message || "Supabase error"));
+  err.code = String(code || "SUPABASE_ERROR");
+  err.retriable = !!retriable;
+  err.details = String(details || "");
+  return err;
+}
+
+function normalizeRequestError(err) {
+  if (!err) return makeSupabaseError("SUPABASE_ERROR", "Unknown Supabase error", false);
+  if (err.code) return err;
+  const message = String(err.message || "Unknown Supabase error");
+  if (err.name === "AbortError") return makeSupabaseError("NETWORK_TIMEOUT", "Request timed out", true, message);
+  return makeSupabaseError("NETWORK_ERROR", message, true, message);
+}
+
+function canRetryRequest(method, err, attempt) {
+  if (String(method || "GET").toUpperCase() !== "GET") return false;
+  if (attempt >= RETRY_ATTEMPTS_GET) return false;
+  return !!err?.retriable;
+}
+
+function waitMs(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function retryDelayMs(attempt) {
+  const jitter = Math.floor(Math.random() * 120);
+  return RETRY_BASE_MS * (2 ** Math.max(0, attempt - 1)) + jitter;
+}
+
+async function fetchWithTimeout(url, options = {}, timeoutMs = FETCH_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 function canUseBrowserStorage() {
   return typeof localStorage !== "undefined";
@@ -115,6 +175,7 @@ export async function completeAuthFromUrl() {
     expires_at: Date.now() + Math.max(1, expiresIn - 30) * 1000
   };
   setSession(session);
+  clearAuthIssue();
 
   const cleanUrl = `${window.location.pathname}${window.location.search}`;
   window.history.replaceState({}, "", cleanUrl);
@@ -127,14 +188,20 @@ export async function ensureValidSession() {
   if (session.expires_at && session.expires_at > Date.now()) return session;
 
   const url = `${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: supabaseHeaders(),
-    body: JSON.stringify({ refresh_token: session.refresh_token })
-  });
+  let res = null;
+  try {
+    res = await fetchWithTimeout(url, {
+      method: "POST",
+      headers: supabaseHeaders(),
+      body: JSON.stringify({ refresh_token: session.refresh_token })
+    });
+  } catch (err) {
+    throw normalizeRequestError(err);
+  }
 
   if (!res.ok) {
     clearSession();
+    setAuthIssue("SESSION_EXPIRED", "Session expired, please sign in again.");
     return null;
   }
 
@@ -149,10 +216,12 @@ export async function ensureValidSession() {
 
   if (!refreshed.access_token) {
     clearSession();
+    setAuthIssue("SESSION_EXPIRED", "Session expired, please sign in again.");
     return null;
   }
 
   setSession(refreshed);
+  clearAuthIssue();
   return refreshed;
 }
 
@@ -161,19 +230,28 @@ export async function getCurrentUser() {
   const session = await ensureValidSession();
   if (!session?.access_token) return null;
 
-  const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-    method: "GET",
-    headers: {
-      ...supabaseHeaders(),
-      Authorization: `Bearer ${session.access_token}`
-    }
-  });
+  let res = null;
+  try {
+    res = await fetchWithTimeout(`${SUPABASE_URL}/auth/v1/user`, {
+      method: "GET",
+      headers: {
+        ...supabaseHeaders(),
+        Authorization: `Bearer ${session.access_token}`
+      }
+    });
+  } catch (err) {
+    throw normalizeRequestError(err);
+  }
 
   if (!res.ok) {
     clearSession();
+    if (res.status === 401 || res.status === 403) {
+      setAuthIssue("SESSION_EXPIRED", "Session expired, please sign in again.");
+    }
     return null;
   }
 
+  clearAuthIssue();
   return await res.json();
 }
 
@@ -188,7 +266,9 @@ export async function getSessionUserId() {
 }
 
 export async function supabaseRequest(path, options = {}) {
-  if (!isSupabaseConfigured()) throw new Error("Supabase is not configured");
+  if (!isSupabaseConfigured()) {
+    throw makeSupabaseError("SUPABASE_CONFIG", "Supabase is not configured", false);
+  }
 
   const {
     method = "GET",
@@ -201,7 +281,10 @@ export async function supabaseRequest(path, options = {}) {
   let token = "";
   if (!allowAnonymous) {
     token = await getSessionAccessToken();
-    if (!token) throw new Error("Not authenticated");
+    if (!token) {
+      setAuthIssue("SESSION_EXPIRED", "Session expired, please sign in again.");
+      throw makeSupabaseError("SESSION_EXPIRED", "Session expired, please sign in again.", false);
+    }
   }
 
   const url = `${SUPABASE_URL}${path}${toQueryString(query)}`;
@@ -211,21 +294,48 @@ export async function supabaseRequest(path, options = {}) {
     ...(prefer ? { Prefer: prefer } : {})
   };
 
-  const res = await fetch(url, {
-    method,
-    headers,
-    body: body == null ? undefined : JSON.stringify(body)
-  });
+  const runOnce = async () => {
+    let res = null;
+    try {
+      res = await fetchWithTimeout(url, {
+        method,
+        headers,
+        body: body == null ? undefined : JSON.stringify(body)
+      });
+    } catch (err) {
+      throw normalizeRequestError(err);
+    }
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`Supabase ${method} ${path} failed (${res.status}): ${text || "Unknown error"}`);
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      const details = text || "Unknown error";
+      if (res.status === 401 || res.status === 403) {
+        setAuthIssue("SESSION_EXPIRED", "Session expired, please sign in again.");
+        clearSession();
+        throw makeSupabaseError("SESSION_EXPIRED", "Session expired, please sign in again.", false, details);
+      }
+      if (res.status >= 500) {
+        throw makeSupabaseError("SUPABASE_SERVER", `Server error (${res.status})`, true, details);
+      }
+      throw makeSupabaseError("SUPABASE_HTTP", `Supabase request failed (${res.status})`, false, details);
+    }
+
+    if (res.status === 204) return null;
+    const ctype = res.headers.get("content-type") || "";
+    if (!ctype.includes("application/json")) return null;
+    return await res.json();
+  };
+
+  for (let attempt = 1; attempt <= RETRY_ATTEMPTS_GET; attempt += 1) {
+    try {
+      return await runOnce();
+    } catch (err) {
+      const normalized = normalizeRequestError(err);
+      if (!canRetryRequest(method, normalized, attempt)) throw normalized;
+      await waitMs(retryDelayMs(attempt));
+    }
   }
-
-  if (res.status === 204) return null;
-  const ctype = res.headers.get("content-type") || "";
-  if (!ctype.includes("application/json")) return null;
-  return await res.json();
+  throw makeSupabaseError("NETWORK_ERROR", "Request failed after retries", true);
 }
 
 export function restPath(tableName) {
@@ -235,6 +345,7 @@ export function restPath(tableName) {
 export async function signOut() {
   const session = getSession();
   clearSession();
+  clearAuthIssue();
   if (!session?.access_token || !isSupabaseConfigured()) return;
 
   await fetch(`${SUPABASE_URL}/auth/v1/logout`, {
