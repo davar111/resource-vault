@@ -557,7 +557,7 @@ select option { background: var(--bg-surface-1); color: var(--text-primary); }
   padding: var(--space-5);
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: clamp(12px, 1.4vw, 18px);
+  gap: clamp(14px, 1.6vw, 20px);
   align-items: start;
   overflow-y: auto;
   overflow-x: hidden;
@@ -592,7 +592,6 @@ select option { background: var(--bg-surface-1); color: var(--text-primary); }
 .card:hover {
   border-color: var(--border-default);
   background: var(--bg-surface-2);
-  transform: translateY(-2px);
   box-shadow: 0 10px 26px rgba(10, 12, 18, 0.14);
 }
 :root[data-theme="dark"] .card {
@@ -700,7 +699,7 @@ select option { background: var(--bg-surface-1); color: var(--text-primary); }
 .card__title { font-size: 16px; font-weight: 700; line-height: 1.25; }
 .card__title-link {
   display: block;
-  overflow: hidden;
+  overflow: clip;
   font-size: clamp(16px, 1.15vw, 18px);
   font-weight: 700;
   line-height: 1.3;
