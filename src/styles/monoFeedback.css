@@ -1,0 +1,30 @@
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+.status-line {
+  min-height: 18px;
+  margin: 4px 0 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-muted);
+  opacity: 0.9;
+}
+
+.status-line--inline {
+  margin: 6px 0 0;
+}
+
+.status-ok {
+  font-weight: 500;
+  opacity: 0.95;
+}
+
+.status-error {
+  font-weight: 500;
+  opacity: 0.95;
+}
+
+.status-info {
+  opacity: 0.85;
+}

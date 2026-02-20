@@ -1,9 +1,11 @@
 ﻿import "./styles.css";
+import "./styles/monoFeedback.css";
 import { state } from "./state.js";
 import { loadLegacyVault, loadUiSettings, saveUiSettings } from "./storage.js";
 import { TAG_MAX_LEN, TAG_MIN_LEN, detectSourceFromUrl, domainFromUrl, normalizeSearchText, normalizeTags, previewFallbackUrl } from "./filter.js";
 import { t } from "./i18n.js";
 import { render } from "./ui.js";
+import { flashStatus, startSpinner } from "./ui/monoFeedback.js";
 import { SOURCE_CODES, TYPE_CODES } from "./domain.js";
 import { makeDemoLinks } from "./demo-data.js";
 import { initAuth, loginWithGoogle, logout } from "./useAuth.js";
@@ -53,6 +55,7 @@ const els = {
   mobileOverlay: document.getElementById("mobileOverlay"),
   activeTitle: document.getElementById("activeTitle"),
   activeMeta: document.getElementById("activeMeta"),
+  statusLine: document.getElementById("statusLine"),
   searchInput: document.getElementById("searchInput"),
   sortSelect: document.getElementById("sortSelect"),
   btnFilters: document.getElementById("btnFilters"),
@@ -138,6 +141,17 @@ let prevGateVisible = null;
 const pendingLinkOps = new Set();
 const pendingCollectionOps = new Set();
 const pendingSavedFilterOps = new Set();
+const feedback = {
+  pageSpinner: null,
+  addSpinner: null,
+  addFlashCancel: null,
+  addCloseTimer: null,
+  collectionSpinner: null,
+  collectionFlashCancel: null,
+  collectionCloseTimer: null,
+  savedFilterSpinner: null,
+  savedFilterFlashCancel: null
+};
 let onboardingController = null;
 
 function ensureAuth() {
@@ -334,7 +348,63 @@ function updateAddSourceUi() {
   els.inputAddSource.value = SOURCE_CODES.includes(detected) ? detected : "other";
 }
 
+function clearFeedbackTimer(key) {
+  if (!feedback[key]) return;
+  clearTimeout(feedback[key]);
+  feedback[key] = null;
+}
+
+function stopFeedbackSpinner(key) {
+  if (!feedback[key]) return;
+  feedback[key].stop();
+  feedback[key] = null;
+}
+
+function ensureStatusLine() {
+  if (els.statusLine?.isConnected) return els.statusLine;
+  let line = document.getElementById("statusLine");
+  if (!line) {
+    line = document.createElement("div");
+    line.id = "statusLine";
+    line.className = "status-line mono status-info";
+    line.setAttribute("aria-live", "polite");
+  }
+  if (!line.isConnected && els.grid?.parentElement) {
+    els.grid.parentElement.insertBefore(line, els.grid);
+  }
+  els.statusLine = line;
+  return line;
+}
+
+function ensureModalStatusLine(form, id) {
+  if (!form) return null;
+  let line = form.querySelector(`#${id}`);
+  if (!line) {
+    line = document.createElement("div");
+    line.id = id;
+    line.className = "status-line status-line--inline mono status-info";
+    line.setAttribute("aria-live", "polite");
+    form.append(line);
+  }
+  return line;
+}
+
+function clearAddModalFeedback() {
+  stopFeedbackSpinner("addSpinner");
+  if (typeof feedback.addFlashCancel === "function") feedback.addFlashCancel();
+  feedback.addFlashCancel = null;
+  clearFeedbackTimer("addCloseTimer");
+}
+
+function clearCollectionModalFeedback() {
+  stopFeedbackSpinner("collectionSpinner");
+  if (typeof feedback.collectionFlashCancel === "function") feedback.collectionFlashCancel();
+  feedback.collectionFlashCancel = null;
+  clearFeedbackTimer("collectionCloseTimer");
+}
+
 function closeAddModal() {
+  clearAddModalFeedback();
   sourceAutofillEnabled = true;
   activeTagMenuIndex = -1;
   if (els.addTagsMenu) els.addTagsMenu.hidden = true;
@@ -1036,18 +1106,42 @@ function setupEvents() {
   els.btnSaveFilterInline?.addEventListener("click", async () => {
     if (!ensureAuth()) return;
     if (els.btnSaveFilterInline?.disabled) return;
-    if (!isFilterActive()) { alert(state.lang === "ru" ? "Сначала установите фильтры." : "Set filters first."); return; }
+    if (!isFilterActive()) {
+      feedback.savedFilterFlashCancel = flashStatus(
+        els.btnSaveFilterInline,
+        state.lang === "ru" ? "сначала установите фильтры" : "set filters first",
+        "info"
+      );
+      return;
+    }
     if (els.btnSaveFilterInline) els.btnSaveFilterInline.disabled = true;
     try {
       const name = String(prompt(t(state.lang, "saveFilterPrompt"), "") || "").trim();
       if (name) {
+        feedback.savedFilterSpinner = startSpinner(
+          els.btnSaveFilterInline,
+          state.lang === "ru" ? "Сохраняю фильтр..." : "Saving filter..."
+        );
         const created = await createSavedFilter({ name, filter: filterPayload() }, currentUser.id);
         if (created) state.savedFilters.push(created);
+        stopFeedbackSpinner("savedFilterSpinner");
+        feedback.savedFilterFlashCancel = flashStatus(
+          els.btnSaveFilterInline,
+          state.lang === "ru" ? "фильтр сохранён" : "filter saved",
+          "ok"
+        );
       }
       renderApp();
     } catch (err) {
-      alert(err?.message || (state.lang === "ru" ? "Не удалось сохранить фильтр." : "Failed to save filter."));
+      stopFeedbackSpinner("savedFilterSpinner");
+      feedback.savedFilterFlashCancel = flashStatus(
+        els.btnSaveFilterInline,
+        state.lang === "ru" ? "не удалось сохранить" : "save failed",
+        "error"
+      );
+      console.warn("Save filter failed", err?.message || err);
     } finally {
+      stopFeedbackSpinner("savedFilterSpinner");
       if (els.btnSaveFilterInline) els.btnSaveFilterInline.disabled = false;
     }
   });
@@ -1062,6 +1156,12 @@ function setupEvents() {
     const description = String(fd.get("description") || "").trim();
     const isShared = !!fd.get("shared");
     if (els.colCreate) els.colCreate.disabled = true;
+    stopFeedbackSpinner("collectionSpinner");
+    feedback.collectionSpinner = startSpinner(
+      els.colCreate,
+      state.lang === "ru" ? "Создаю..." : "Creating..."
+    );
+    const collectionStatusLine = ensureModalStatusLine(els.formCollection, "collectionStatusLine");
     try {
       const created = await createCollection({ name, description, isShared }, currentUser.id);
       if (created) {
@@ -1070,12 +1170,30 @@ function setupEvents() {
         applyCollectionUiSettings();
         state.activeCollectionId = created.id;
       }
-      els.modalCollection?.close();
+      stopFeedbackSpinner("collectionSpinner");
+      feedback.collectionFlashCancel = flashStatus(
+        collectionStatusLine,
+        state.lang === "ru" ? "создано" : "created",
+        "ok"
+      );
+      clearFeedbackTimer("collectionCloseTimer");
+      feedback.collectionCloseTimer = setTimeout(() => {
+        clearCollectionModalFeedback();
+        els.modalCollection?.close();
+      }, 220);
       renderAddCollectionChoices();
       renderApp();
     } catch (err) {
-      alert(err?.message || (state.lang === "ru" ? "Не удалось создать коллекцию." : "Failed to create collection."));
+      stopFeedbackSpinner("collectionSpinner");
+      feedback.collectionFlashCancel = flashStatus(
+        collectionStatusLine,
+        state.lang === "ru" ? "ошибка" : "error",
+        "error",
+        1400
+      );
+      console.warn("Create collection failed", err?.message || err);
     } finally {
+      stopFeedbackSpinner("collectionSpinner");
       if (els.colCreate) els.colCreate.disabled = false;
     }
   });
@@ -1084,15 +1202,50 @@ function setupEvents() {
     e.preventDefault();
     if (!ensureAuth()) return;
     if (els.addSave?.disabled) return;
+    const addStatusLine = ensureModalStatusLine(els.formAddLink, "addStatusLine");
     const fd = new FormData(els.formAddLink);
     const rawUrl = String(fd.get("url") || "").trim();
     const title = String(fd.get("title") || "").trim().slice(0, TITLE_MAX_LEN);
     const note = String(fd.get("note") || "").trim().slice(0, NOTE_MAX_LEN);
-    if (title && title.length < TITLE_MIN_LEN) { alert(state.lang === "ru" ? `Название: ${TITLE_MIN_LEN}-${TITLE_MAX_LEN} символов.` : `Title must be ${TITLE_MIN_LEN}-${TITLE_MAX_LEN} characters.`); return; }
-    if (invalidTagChunks(fd.get("tags")).length) { alert(state.lang === "ru" ? `Теги: ${TAG_MIN_LEN}-${TAG_MAX_LEN} символов.` : `Tags must be ${TAG_MIN_LEN}-${TAG_MAX_LEN} chars.`); return; }
+    if (title && title.length < TITLE_MIN_LEN) {
+      feedback.addFlashCancel = flashStatus(
+        addStatusLine,
+        state.lang === "ru" ? `название: ${TITLE_MIN_LEN}-${TITLE_MAX_LEN} символов` : `title: ${TITLE_MIN_LEN}-${TITLE_MAX_LEN} chars`,
+        "error",
+        1400
+      );
+      return;
+    }
+    if (invalidTagChunks(fd.get("tags")).length) {
+      feedback.addFlashCancel = flashStatus(
+        addStatusLine,
+        state.lang === "ru" ? `теги: ${TAG_MIN_LEN}-${TAG_MAX_LEN} символов` : `tags: ${TAG_MIN_LEN}-${TAG_MAX_LEN} chars`,
+        "error",
+        1400
+      );
+      return;
+    }
     let url = "";
-    try { url = new URL(rawUrl).toString(); } catch { alert(state.lang === "ru" ? "Некорректный URL." : "Invalid URL."); return; }
-    if (findDuplicateLink(url)) { alert(state.lang === "ru" ? "Такая ссылка уже есть." : "Link already exists."); return; }
+    try {
+      url = new URL(rawUrl).toString();
+    } catch {
+      feedback.addFlashCancel = flashStatus(
+        addStatusLine,
+        state.lang === "ru" ? "некорректный URL" : "invalid URL",
+        "error",
+        1400
+      );
+      return;
+    }
+    if (findDuplicateLink(url)) {
+      feedback.addFlashCancel = flashStatus(
+        addStatusLine,
+        state.lang === "ru" ? "такая ссылка уже есть" : "link already exists",
+        "info",
+        1400
+      );
+      return;
+    }
 
     const activeCollectionIsManual = state.activeCollectionId !== "all"
       && state.activeCollectionId !== "fav"
@@ -1107,6 +1260,11 @@ function setupEvents() {
       ? [state.activeCollectionId]
       : fd.getAll("collections").map((x) => String(x)).filter((id) => state.collections.some((c) => c.id === id));
     if (els.addSave) els.addSave.disabled = true;
+    stopFeedbackSpinner("addSpinner");
+    feedback.addSpinner = startSpinner(
+      els.addSave,
+      state.lang === "ru" ? "Сохраняю..." : "Saving..."
+    );
     try {
       const created = await createLink({
         url,
@@ -1126,13 +1284,29 @@ function setupEvents() {
         // For newly created links we only need INSERT into relation table.
         await addLinkCollections(created.id, selectedCollections, currentUser.id);
         state.items.unshift({ ...created, isDemo: false, previewImage: previewFallbackUrl(created.url), collectionIds: selectedCollections });
-        closeAddModal();
+        stopFeedbackSpinner("addSpinner");
+        feedback.addFlashCancel = flashStatus(
+          addStatusLine,
+          state.lang === "ru" ? "сохранено" : "saved",
+          "ok",
+          1000
+        );
+        clearFeedbackTimer("addCloseTimer");
+        feedback.addCloseTimer = setTimeout(() => closeAddModal(), 220);
         renderTagSuggestions();
       }
       renderApp();
     } catch (err) {
-      alert(err?.message || (state.lang === "ru" ? "Не удалось добавить ссылку." : "Failed to add link."));
+      stopFeedbackSpinner("addSpinner");
+      feedback.addFlashCancel = flashStatus(
+        addStatusLine,
+        state.lang === "ru" ? "не удалось сохранить" : "save failed",
+        "error",
+        1400
+      );
+      console.warn("Create link failed", err?.message || err);
     } finally {
+      stopFeedbackSpinner("addSpinner");
       if (els.addSave) els.addSave.disabled = false;
     }
   });
@@ -1164,10 +1338,12 @@ function setupEvents() {
     activeTagMenuIndex = -1;
     els.addTagsMenu.hidden = true;
   });
+  els.modalAddLink?.addEventListener("close", clearAddModalFeedback);
+  els.modalCollection?.addEventListener("close", clearCollectionModalFeedback);
   els.addCloseX?.addEventListener("click", closeAddModal);
   els.addCancel?.addEventListener("click", closeAddModal);
-  els.colCloseX?.addEventListener("click", () => els.modalCollection?.close());
-  els.colCancel?.addEventListener("click", () => els.modalCollection?.close());
+  els.colCloseX?.addEventListener("click", () => { clearCollectionModalFeedback(); els.modalCollection?.close(); });
+  els.colCancel?.addEventListener("click", () => { clearCollectionModalFeedback(); els.modalCollection?.close(); });
 
   window.addEventListener("dragover", (e) => {
     const types = e.dataTransfer?.types;
@@ -1222,6 +1398,12 @@ async function bootstrap() {
   state.isAuthenticated = !!currentUser?.id;
   state.currentUserId = currentUser?.id || "";
   if (currentUser?.id) {
+    const statusLine = ensureStatusLine();
+    stopFeedbackSpinner("pageSpinner");
+    feedback.pageSpinner = startSpinner(
+      statusLine,
+      state.lang === "ru" ? "Загружаю..." : "Loading..."
+    );
     try {
       await loadData();
       if (!state.items.length && !state.collections.length) {
@@ -1234,12 +1416,17 @@ async function bootstrap() {
       } else {
         state.isUsingDemoData = false;
       }
+      stopFeedbackSpinner("pageSpinner");
+      if (statusLine) statusLine.textContent = state.lang === "ru" ? "✓ загружено" : "✓ loaded";
     } catch (err) {
       console.warn("Load failed", err?.message || err);
       state.items = applyDemoPrefs(makeDemoLinks());
       state.isUsingDemoData = true;
+      stopFeedbackSpinner("pageSpinner");
+      if (statusLine) statusLine.textContent = state.lang === "ru" ? "✕ ошибка загрузки" : "✕ load error";
     }
   } else {
+    stopFeedbackSpinner("pageSpinner");
     state.currentUserId = "";
     state.items = applyDemoPrefs(makeDemoLinks());
     state.isUsingDemoData = true;
@@ -1281,4 +1468,7 @@ async function bootstrap() {
 }
 
 void bootstrap();
+
+
+
 
