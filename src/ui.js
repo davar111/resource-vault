@@ -42,6 +42,10 @@ function renderNav(state, els, L) {
     els.navRecent.textContent = t(L, "navRecent");
     els.navRecent.classList.toggle("nav-item--active", state.activeCollectionId === "recent");
   }
+  if (els.navLiquid) {
+    els.navLiquid.textContent = t(L, "navLiquid");
+    els.navLiquid.classList.toggle("nav-item--active", state.activeCollectionId === "liquid");
+  }
 }
 
 function renderCollections(state, els, onChange, L) {
@@ -273,6 +277,11 @@ function renderHeader(state, els, L) {
     els.activeMeta.textContent = `${list.length} ${t(L, "items")}`;
     return;
   }
+  if (active.id === "liquid") {
+    els.activeTitle.textContent = t(L, "liquidTitle");
+    els.activeMeta.textContent = t(L, "liquidMeta");
+    return;
+  }
   if (active.id === "hidden") {
     els.activeTitle.textContent = t(L, "hidden");
     els.activeMeta.textContent = `${list.length} ${t(L, "items")}`;
@@ -346,6 +355,11 @@ function renderActiveFilters(state, els, onChange, L) {
 }
 
 function renderGrid(state, els, onChange, actions, L) {
+  if (state.activeCollectionId === "liquid") {
+    els.grid.innerHTML = "";
+    els.grid.classList.remove("grid--empty");
+    return;
+  }
   const list = filteredItems(state);
   els.grid.innerHTML = "";
   els.grid.classList.toggle("grid--empty", !list.length);
@@ -513,6 +527,7 @@ function getActiveCollection(state) {
   if (state.activeCollectionId === "fav") return { id: "fav", name: "Favorites" };
   if (state.activeCollectionId === "hidden") return { id: "hidden", name: "Hidden" };
   if (state.activeCollectionId === "recent") return { id: "recent", name: "Recent", recentViewedIds: state.recentViewedIds || [] };
+  if (state.activeCollectionId === "liquid") return { id: "liquid", name: "Liquid Lab" };
   return state.collections.find((c) => c.id === state.activeCollectionId) || { id: "all", name: "All" };
 }
 

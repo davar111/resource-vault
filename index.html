@@ -29,6 +29,7 @@
               <button id="navFav" class="nav-item" type="button">Favorites</button>
               <button id="navRecent" class="nav-item" type="button">Recent</button>
               <button id="navHidden" class="nav-item" type="button">Hidden</button>
+              <button id="navLiquid" class="nav-item" type="button">Liquid Lab</button>
             </div>
           </div>
 
@@ -76,7 +77,7 @@
             <div id="activeMeta" class="meta"></div>
           </div>
 
-          <div class="topbar__right">
+          <div id="topbarRight" class="topbar__right">
             <input id="searchInput" class="search" placeholder="Search in current context..." />
             <button id="btnFilters" class="btn btn--secondary" type="button">Filters</button>
             <select id="sortSelect" class="sort" aria-label="Sort">
@@ -116,13 +117,21 @@
           </div>
         </section>
 
-        <section class="chipsbar">
+        <section id="chipsBar" class="chipsbar">
           <div id="activeFilters" class="chips"></div>
         </section>
 
         <section id="demoHint" class="demo-hint" hidden>
           <span id="demoHintText"></span>
           <button id="demoHintAdd" class="btn btn--primary" type="button"></button>
+        </section>
+
+        <section id="liquidLab" class="liquid-lab" hidden>
+          <canvas id="liquidCanvas" class="liquid-lab__canvas"></canvas>
+          <div id="liquidFallback" class="liquid-lab__fallback" hidden>
+            <div id="liquidFallbackTitle" class="liquid-lab__fallback-title">WebGL недоступен</div>
+            <div id="liquidFallbackText" class="liquid-lab__fallback-text">Эта демо-вкладка требует поддержку WebGL в браузере.</div>
+          </div>
         </section>
 
         <section id="grid" class="grid"></section>

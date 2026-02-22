@@ -17,6 +17,7 @@ import { addLinkCollections, createCollection, createCollectionInvite, deleteCol
 import { createSavedFilter, deleteSavedFilter, listSavedFilters } from "./useSavedFilters.js";
 import { getAuthIssue, getSessionAccessToken } from "./supabase.js";
 import { initOnboarding } from "./Onboarding.js";
+import { createLiquidLab } from "./liquidLab.js";
 
 const TITLE_MIN_LEN = 2;
 const TITLE_MAX_LEN = 120;
@@ -46,6 +47,7 @@ const els = {
   navFav: document.getElementById("navFav"),
   navHidden: document.getElementById("navHidden"),
   navRecent: document.getElementById("navRecent"),
+  navLiquid: document.getElementById("navLiquid"),
   labelNav: document.getElementById("labelNav"),
   labelCollections: document.getElementById("labelCollections"),
   labelSavedFilters: document.getElementById("labelSavedFilters"),
@@ -62,11 +64,18 @@ const els = {
   searchInput: document.getElementById("searchInput"),
   sortSelect: document.getElementById("sortSelect"),
   btnFilters: document.getElementById("btnFilters"),
+  topbarRight: document.getElementById("topbarRight"),
   filtersPanel: document.getElementById("filtersPanel"),
+  chipsBar: document.getElementById("chipsBar"),
   activeFilters: document.getElementById("activeFilters"),
   demoHint: document.getElementById("demoHint"),
   demoHintText: document.getElementById("demoHintText"),
   demoHintAdd: document.getElementById("demoHintAdd"),
+  liquidLab: document.getElementById("liquidLab"),
+  liquidCanvas: document.getElementById("liquidCanvas"),
+  liquidFallback: document.getElementById("liquidFallback"),
+  liquidFallbackTitle: document.getElementById("liquidFallbackTitle"),
+  liquidFallbackText: document.getElementById("liquidFallbackText"),
   filterTypes: document.getElementById("filterTypes"),
   filterSources: document.getElementById("filterSources"),
   filterTagInput: document.getElementById("filterTagInput"),
@@ -157,6 +166,7 @@ const feedback = {
 };
 let onboardingController = null;
 let authIssueNotice = "";
+let liquidLabController = null;
 
 function notify(text, kind = "info", target = null) {
   return toast(target || els.authStatus, text, { kind, timeoutMs: 1500 });
@@ -242,6 +252,7 @@ function renderApp() {
   syncAuthGate();
   syncGuestModeUi();
   render(state, els, persistUiSettings, actions);
+  syncLiquidLabView();
 }
 
 function requestRender() {
@@ -515,6 +526,8 @@ function applyI18n() {
   if (els.labelFilterSources) els.labelFilterSources.textContent = t(L, "filterSources");
   if (els.labelFilterTag) els.labelFilterTag.textContent = t(L, "filterTag");
   if (els.labelFilterFavorite) els.labelFilterFavorite.textContent = t(L, "filterFavoriteOnly");
+  if (els.liquidFallbackTitle) els.liquidFallbackTitle.textContent = t(L, "liquidFallbackTitle");
+  if (els.liquidFallbackText) els.liquidFallbackText.textContent = t(L, "liquidFallbackText");
   if (els.modalAddTitle) els.modalAddTitle.textContent = t(L, "modalAddTitle");
   if (els.labelAddUrl) els.labelAddUrl.textContent = t(L, "modalUrl");
   if (els.labelAddTitle) els.labelAddTitle.textContent = t(L, "modalTitle");
@@ -562,6 +575,32 @@ function applyI18n() {
   renderTagSuggestions();
   renderAuthStatus();
   syncThemeToggle();
+  liquidLabController?.markTextDirty();
+}
+
+function isLiquidLabActive() {
+  return state.activeCollectionId === "liquid";
+}
+
+function syncLiquidLabView() {
+  const active = isLiquidLabActive();
+  if (els.topbarRight) els.topbarRight.hidden = active;
+  if (els.filtersPanel) els.filtersPanel.hidden = active ? true : !state.ui.filtersOpen;
+  if (els.chipsBar) els.chipsBar.hidden = active;
+  if (els.demoHint) els.demoHint.hidden = active ? true : !state.isUsingDemoData;
+  if (els.grid) els.grid.hidden = active;
+  if (els.liquidLab) els.liquidLab.hidden = !active;
+
+  if (!liquidLabController && els.liquidCanvas) {
+    liquidLabController = createLiquidLab({
+      canvas: els.liquidCanvas,
+      fallback: els.liquidFallback,
+      getText: () => t(state.lang, "liquidHeroText")
+    });
+  }
+  if (!liquidLabController) return;
+  if (active) liquidLabController.start();
+  else liquidLabController.stop();
 }
 
 function filterPayload() {
@@ -1081,6 +1120,12 @@ function setupEvents() {
     closeMobileMenuIfNeeded();
   });
   els.navRecent?.addEventListener("click", () => { state.activeSavedFilterId = null; state.activeCollectionId = "recent"; requestRender(); closeMobileMenuIfNeeded(); });
+  els.navLiquid?.addEventListener("click", () => {
+    state.activeSavedFilterId = null;
+    state.activeCollectionId = "liquid";
+    requestRender();
+    closeMobileMenuIfNeeded();
+  });
   els.searchInput?.addEventListener("input", (e) => {
     state.activeSavedFilterId = null;
     state.search = String(e.target.value || "");

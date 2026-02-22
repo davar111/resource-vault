@@ -551,12 +551,48 @@ select option { background: var(--bg-surface-1); color: var(--text-primary); }
 
 .demo-hint .btn { min-height: 34px; padding: 5px 12px 7px; }
 
+.liquid-lab {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: var(--space-3) var(--space-5) var(--space-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  position: relative;
+  background: #000000;
+}
+.liquid-lab__canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+}
+.liquid-lab__fallback {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: var(--space-6);
+  background: color-mix(in srgb, var(--bg-surface-1) 90%, transparent);
+}
+.liquid-lab__fallback-title {
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+.liquid-lab__fallback-text {
+  color: var(--text-secondary);
+  max-width: 540px;
+}
+
 .grid {
   flex: 1 1 auto;
   min-height: 0;
   padding: var(--space-5);
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-flow: row;
   gap: clamp(14px, 1.6vw, 20px);
   align-items: start;
   overflow-y: auto;
@@ -1278,8 +1314,8 @@ select option { background: var(--bg-surface-1); color: var(--text-primary); }
 }
 
 @keyframes card-in {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 @keyframes app-enter {
@@ -1371,6 +1407,9 @@ select option { background: var(--bg-surface-1); color: var(--text-primary); }
   .grid {
     grid-template-columns: 1fr;
     padding: var(--space-3) calc(var(--space-3) + env(safe-area-inset-right)) var(--space-3) calc(var(--space-3) + env(safe-area-inset-left));
+  }
+  .liquid-lab {
+    margin: var(--space-3) calc(var(--space-3) + env(safe-area-inset-right)) var(--space-3) calc(var(--space-3) + env(safe-area-inset-left));
   }
   .row { flex-direction: column; }
   .row--end { align-items: stretch; }
