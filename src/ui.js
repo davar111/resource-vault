@@ -416,7 +416,11 @@ function renderGrid(state, els, onChange, actions, L) {
         <a class="card__preview-link" href="${item.url}" target="_blank" rel="noreferrer" draggable="false">
           <img class="card__preview" src="${escapeHtml(previewSrc)}" data-fallback="${escapeHtml(previewFallbackUrl(item.url))}" alt="${escapeHtml(item.title || "preview")}" loading="lazy" referrerpolicy="no-referrer" />
         </a>
-        <button class="card__fav-preview ${item.favorite ? "card__fav-preview--on" : ""} ${item.isDemo ? "card__fav-preview--disabled" : ""}" type="button" title="${escapeHtml(t(L, "favorites"))}" ${item.isDemo ? "disabled" : ""}>&#10084;</button>
+        <button class="card__fav-preview ${item.favorite ? "card__fav-preview--on" : ""} ${item.isDemo ? "card__fav-preview--disabled" : ""}" type="button" title="${escapeHtml(t(L, "favorites"))}" ${item.isDemo ? "disabled" : ""}>
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" focusable="false">
+            <path d="M8 2.5L9.9 6.3l4.2.6-3 2.9.7 4.2L8 11.8l-3.8 2.2.7-4.2-3-2.9 4.2-.6L8 2.5z"></path>
+          </svg>
+        </button>
       </div>
 
       <div class="card__top">

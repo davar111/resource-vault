@@ -524,7 +524,11 @@ function applyI18n() {
   if (els.authGateGuestBtn) els.authGateGuestBtn.textContent = t(L, "authGateGuestBtn");
   if (els.langSelect) els.langSelect.value = L === "en" ? "en" : "ru";
   if (els.searchInput) els.searchInput.placeholder = t(L, "searchPlaceholder");
-  if (els.btnFilters) els.btnFilters.textContent = t(L, "filters");
+  if (els.btnFilters) {
+    const label = els.btnFilters.querySelector(".btn-filters__label");
+    if (label) label.textContent = t(L, "filters");
+    else els.btnFilters.textContent = t(L, "filters");
+  }
   if (els.labelFilterTypes) els.labelFilterTypes.textContent = t(L, "filterTypes");
   if (els.labelFilterSources) els.labelFilterSources.textContent = t(L, "filterSources");
   if (els.labelFilterTag) els.labelFilterTag.textContent = t(L, "filterTag");

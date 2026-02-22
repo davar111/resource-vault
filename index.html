@@ -81,8 +81,23 @@
           </div>
 
           <div id="topbarRight" class="topbar__right">
-            <input id="searchInput" class="search" placeholder="Search in current context..." aria-label="Search links" />
-            <button id="btnFilters" class="btn btn--secondary" type="button">Filters</button>
+            <div class="search-wrap">
+              <span class="search-icon" aria-hidden="true">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <circle cx="7" cy="7" r="5"></circle>
+                  <path d="M13 13l-3-3"></path>
+                </svg>
+              </span>
+              <input id="searchInput" class="search" placeholder="Search in current context..." aria-label="Search links" />
+            </div>
+            <button id="btnFilters" class="btn btn--secondary btn-filters" type="button">
+              <span class="btn-filters__icon" aria-hidden="true">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M2 4h12M4 8h8M6 12h4"></path>
+                </svg>
+              </span>
+              <span class="btn-filters__label">Filters</span>
+            </button>
             <select id="sortSelect" class="sort" aria-label="Sort">
               <option value="newest">Newest first</option>
               <option value="oldest">Oldest first</option>

@@ -17,7 +17,7 @@ export const state = {
     favoriteOnly: false
   },
   ui: {
-    filtersOpen: false,
+    filtersOpen: true,
     mobileMenuOpen: false,
     hiddenUnlocked: false,
     collectionOrderIds: [],
