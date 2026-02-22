@@ -13,8 +13,16 @@
     <div id="appRoot" class="app">
       <aside id="sidebar" class="sidebar">
         <div class="sidebar__top">
-          <div class="brand-row">
-            <div id="brand" class="brand">Vault</div>
+          <div class="sidebar-logo brand-row">
+            <div class="logo-mark" aria-hidden="true">
+              <svg viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="1" y="1" width="5" height="5" rx="1.5" fill="#f5f4f1"/>
+                <rect x="8" y="1" width="5" height="5" rx="1.5" fill="#f5f4f1" opacity="0.5"/>
+                <rect x="1" y="8" width="5" height="5" rx="1.5" fill="#f5f4f1" opacity="0.5"/>
+                <rect x="8" y="8" width="5" height="5" rx="1.5" fill="#f5f4f1" opacity="0.3"/>
+              </svg>
+            </div>
+            <span id="brand" class="brand logo-name">Vault</span>
             <div class="top-controls">
               <select id="langSelect" class="lang-select" aria-label="Language">
                 <option value="ru">RU</option>
@@ -25,28 +33,43 @@
             <button id="btnMobileClose" class="btn btn--secondary btn--icon mobile-close-btn" type="button" aria-label="Close menu"><span class="btn-icon-cross">×</span></button>
           </div>
 
-          <div class="sidebar__section">
-            <div class="sidebar__label" id="labelNav">Navigation</div>
+          <div class="sidebar__section sidebar-section">
+            <div class="sidebar__label sidebar-label" id="labelNav">Navigation</div>
             <div class="sidebar__stack">
-              <button id="navAll" class="nav-item" type="button">All links</button>
-              <button id="navFav" class="nav-item" type="button">Favorites</button>
-              <button id="navRecent" class="nav-item" type="button">Recent</button>
-              <button id="navHidden" class="nav-item" type="button">Hidden</button>
-              <button id="navLiquid" class="nav-item" type="button">Liquid Lab</button>
+              <button id="navAll" class="nav-item sidebar-link" type="button">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.5" y="1.5" width="5.5" height="5.5" rx="1.5"/><rect x="9" y="1.5" width="5.5" height="5.5" rx="1.5"/><rect x="1.5" y="9" width="5.5" height="5.5" rx="1.5"/><rect x="9" y="9" width="5.5" height="5.5" rx="1.5"/></svg>
+                <span class="nav-label">All links</span>
+              </button>
+              <button id="navFav" class="nav-item sidebar-link" type="button">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2.5L9.9 6.3l4.2.6-3 2.9.7 4.2L8 11.8l-3.8 2.2.7-4.2-3-2.9 4.2-.6L8 2.5z"/></svg>
+                <span class="nav-label">Favorites</span>
+              </button>
+              <button id="navRecent" class="nav-item sidebar-link" type="button">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.5"/><path d="M8 4.5v3.5l2.5 2.5"/></svg>
+                <span class="nav-label">Recent</span>
+              </button>
+              <button id="navHidden" class="nav-item sidebar-link" type="button">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="4" width="12" height="9" rx="1.5"/><path d="M5 4V3a1 1 0 011-1h4a1 1 0 011 1v1"/></svg>
+                <span class="nav-label">Hidden</span>
+              </button>
+              <button id="navLiquid" class="nav-item sidebar-link" type="button">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 8h12M8 2v12"/></svg>
+                <span class="nav-label">Liquid Lab</span>
+              </button>
             </div>
           </div>
 
-          <div class="sidebar__section">
-            <div class="sidebar__section-head">
-              <div class="sidebar__label" id="labelCollections">Collections</div>
-              <button id="btnNewCollection" class="btn btn--secondary btn--icon" type="button" aria-label="New collection">+</button>
+          <div class="sidebar__section sidebar-section">
+            <div class="sidebar__section-head collections-header">
+              <div class="sidebar__label sidebar-label" id="labelCollections">Collections</div>
+              <button id="btnNewCollection" class="btn btn--secondary btn--icon btn-icon" type="button" aria-label="New collection">+</button>
             </div>
             <nav id="collectionsList" class="collections"></nav>
           </div>
 
-          <div id="savedFiltersSection" class="sidebar__section" hidden>
+          <div id="savedFiltersSection" class="sidebar__section sidebar-section" hidden>
             <div class="sidebar__section-head">
-              <div class="sidebar__label" id="labelSavedFilters">Saved filters</div>
+              <div class="sidebar__label sidebar-label" id="labelSavedFilters">Saved filters</div>
             </div>
             <nav id="savedFiltersList" class="collections"></nav>
           </div>
@@ -76,11 +99,11 @@
         <header class="topbar">
           <div class="topbar__left">
             <button id="btnMobileMenu" class="btn btn--secondary btn--icon mobile-menu-btn" type="button" aria-label="Open menu" aria-controls="sidebar" aria-expanded="false"><span class="mobile-menu-btn__icon"><span></span><span></span></span></button>
-            <div id="activeTitle" class="title">All links</div>
-            <div id="activeMeta" class="meta" role="status" aria-live="polite"></div>
+            <div id="activeTitle" class="title topbar-title">All links</div>
+            <div id="activeMeta" class="meta topbar-count" role="status" aria-live="polite"></div>
           </div>
 
-          <div id="topbarRight" class="topbar__right">
+          <div id="topbarRight" class="topbar__right topbar-actions">
             <div class="search-wrap">
               <span class="search-icon" aria-hidden="true">
                 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -88,9 +111,9 @@
                   <path d="M13 13l-3-3"></path>
                 </svg>
               </span>
-              <input id="searchInput" class="search" placeholder="Search in current context..." aria-label="Search links" />
+              <input id="searchInput" class="search search-input" placeholder="Search in current context..." aria-label="Search links" />
             </div>
-            <button id="btnFilters" class="btn btn--secondary btn-filters" type="button">
+            <button id="btnFilters" class="btn btn--secondary btn-filters btn-outline" type="button">
               <span class="btn-filters__icon" aria-hidden="true">
                 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
                   <path d="M2 4h12M4 8h8M6 12h4"></path>
@@ -98,7 +121,7 @@
               </span>
               <span class="btn-filters__label">Filters</span>
             </button>
-            <select id="sortSelect" class="sort" aria-label="Sort">
+            <select id="sortSelect" class="sort btn-sort" aria-label="Sort">
               <option value="newest">Newest first</option>
               <option value="oldest">Oldest first</option>
               <option value="title_asc">Title A-Z</option>
@@ -108,27 +131,28 @@
           </div>
         </header>
 
-        <section id="filtersPanel" class="filters-panel" hidden>
+        <section id="filtersPanel" class="filters-panel filters-bar" hidden>
           <div class="filters-grid">
-            <fieldset class="field multi">
-              <legend id="labelFilterTypes">Types</legend>
-              <div class="multi__chips" id="filterTypes"></div>
-            </fieldset>
+            <div class="filter-row">
+              <span class="filter-label" id="labelFilterTypes">Types</span>
+              <div class="pills multi__chips" id="filterTypes"></div>
+            </div>
 
-            <fieldset class="field multi">
-              <legend id="labelFilterSources">Sources</legend>
-              <div class="multi__chips" id="filterSources"></div>
-            </fieldset>
+            <div class="filter-row">
+              <span class="filter-label" id="labelFilterSources">Sources</span>
+              <div class="pills multi__chips" id="filterSources"></div>
+            </div>
 
-            <label class="field">
-              <span id="labelFilterTag">Tag contains</span>
-              <input id="filterTagInput" placeholder="fintech" />
-            </label>
-
-            <label class="check">
-              <input id="filterFavoriteOnly" type="checkbox" />
-              <span id="labelFilterFavorite">Only favorites</span>
-            </label>
+            <div class="filter-row">
+              <span class="filter-label" id="labelFilterTag">Tag</span>
+              <div class="filter-search-wrap">
+                <input id="filterTagInput" class="filter-input" placeholder="fintech" />
+                <label class="checkbox-label">
+                  <input id="filterFavoriteOnly" type="checkbox" />
+                  <span id="labelFilterFavorite">Only favorites</span>
+                </label>
+              </div>
+            </div>
           </div>
           <div class="filters-actions">
             <button id="btnSaveFilterInline" class="btn btn--secondary" type="button" hidden>Save filter</button>

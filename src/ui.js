@@ -27,24 +27,30 @@ function renderDemoHint(state, els, L) {
 }
 
 function renderNav(state, els, L) {
+  const setNavText = (el, value) => {
+    if (!el) return;
+    const label = el.querySelector(".nav-label");
+    if (label) label.textContent = value;
+    else el.textContent = value;
+  };
   if (els.navAll) {
-    els.navAll.textContent = t(L, "navAll");
+    setNavText(els.navAll, t(L, "navAll"));
     els.navAll.classList.toggle("nav-item--active", state.activeCollectionId === "all" && !state.activeSavedFilterId);
   }
   if (els.navFav) {
-    els.navFav.textContent = t(L, "navFav");
+    setNavText(els.navFav, t(L, "navFav"));
     els.navFav.classList.toggle("nav-item--active", state.activeCollectionId === "fav");
   }
   if (els.navHidden) {
-    els.navHidden.textContent = t(L, "navHidden");
+    setNavText(els.navHidden, t(L, "navHidden"));
     els.navHidden.classList.toggle("nav-item--active", state.activeCollectionId === "hidden");
   }
   if (els.navRecent) {
-    els.navRecent.textContent = t(L, "navRecent");
+    setNavText(els.navRecent, t(L, "navRecent"));
     els.navRecent.classList.toggle("nav-item--active", state.activeCollectionId === "recent");
   }
   if (els.navLiquid) {
-    els.navLiquid.textContent = t(L, "navLiquid");
+    setNavText(els.navLiquid, t(L, "navLiquid"));
     els.navLiquid.classList.toggle("nav-item--active", state.activeCollectionId === "liquid");
   }
 }
