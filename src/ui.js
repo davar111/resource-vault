@@ -1,6 +1,7 @@
 import { matchesLink, domainFromUrl, faviconUrl, previewFallbackUrl } from "./filter.js";
 import { t } from "./i18n.js";
 import { confirmDialog, promptDialog } from "./ui/feedback.js";
+import { showDialogWithA11y } from "./ui/dialogA11y.js";
 
 let activeActions = {};
 
@@ -85,97 +86,91 @@ function renderCollections(state, els, onChange, L) {
       </div>
     `;
 
-    btn.addEventListener("click", () => {
-      state.activeSavedFilterId = null;
-      state.activeCollectionId = c.id;
-      render(state, els, onChange, activeActions);
-    });
-
-    btn.addEventListener("dragstart", (e) => {
-      if (!e.dataTransfer) return;
-      e.dataTransfer.setData("text/resource-vault-collection-id", c.id);
-      e.dataTransfer.effectAllowed = "move";
-      btn.classList.add("collection--dragging");
-    });
-
-    btn.addEventListener("dragend", () => {
-      btn.classList.remove("collection--dragging");
-      document.querySelectorAll(".collection--dragover").forEach((el) => el.classList.remove("collection--dragover"));
-    });
-
-    btn.addEventListener("dragover", (e) => e.preventDefault());
-    btn.addEventListener("dragenter", (e) => {
-      e.preventDefault();
-      btn.classList.add("collection--dragover");
-    });
-    btn.addEventListener("dragleave", () => btn.classList.remove("collection--dragover"));
-    btn.addEventListener("drop", async (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      btn.classList.remove("collection--dragover");
-      const draggedCollectionId = String(e.dataTransfer?.getData("text/resource-vault-collection-id") || "").trim();
-      if (draggedCollectionId && draggedCollectionId !== c.id) {
-        await activeActions?.onReorderCollections?.(draggedCollectionId, c.id);
-        return;
-      }
-      const itemId = String(e.dataTransfer?.getData("text/resource-vault-item-id") || "").trim();
-      if (!itemId) return;
-      await activeActions?.onAssignToCollection?.(itemId, c.id);
-    });
-
-    btn.querySelector("[data-col-pin]")?.addEventListener("click", async (e) => {
-      e.stopPropagation();
-      await activeActions?.onTogglePinCollection?.(c.id);
-    });
-
-    const trigger = btn.querySelector("[data-col-menu]");
-    const pop = btn.querySelector("[data-col-pop]");
-    if (trigger && pop) {
-      trigger.addEventListener("click", (e) => {
-        e.stopPropagation();
-        const wasHidden = pop.hidden;
-        closeAllCollectionMenus();
-        pop.hidden = !wasHidden;
-        trigger.closest(".collection__menu")?.classList.toggle("collection__menu--open", !pop.hidden);
-      });
-    }
-
-    btn.querySelector("[data-col-rename]")?.addEventListener("click", async (e) => {
-      e.stopPropagation();
-      closeAllCollectionMenus();
-      const next = await promptDialog({
-        title: t(L, "renameCollection"),
-        message: t(L, "renameCollectionPrompt"),
-        defaultValue: c.name || "",
-        submitText: t(L, "save"),
-        cancelText: t(L, "cancel")
-      });
-      if (next == null) return;
-      const name = String(next || "").trim();
-      if (!name) return;
-      await activeActions?.onRenameCollection?.(c.id, name);
-    });
-
-    btn.querySelector("[data-col-invite]")?.addEventListener("click", async (e) => {
-      e.stopPropagation();
-      closeAllCollectionMenus();
-      await activeActions?.onInviteCollection?.(c.id);
-    });
-
-    btn.querySelector("[data-col-del]")?.addEventListener("click", async (e) => {
-      e.stopPropagation();
-      closeAllCollectionMenus();
-      const ok = await confirmAction(els, L, {
-        title: t(L, "deleteCollectionTitle"),
-        text: t(L, "deleteCollectionText"),
-        confirm: t(L, "del")
-      });
-      if (!ok) return;
-      await activeActions?.onDeleteCollection?.(c.id);
-    });
+    wireCollectionInteractions({ btn, collection: c, state, els, onChange, L });
 
     els.collectionsList.appendChild(btn);
   }
+}
+
+function wireCollectionInteractions({ btn, collection, state, els, onChange, L }) {
+  btn.addEventListener("click", () => {
+    state.activeSavedFilterId = null;
+    state.activeCollectionId = collection.id;
+    render(state, els, onChange, activeActions);
+  });
+
+  btn.addEventListener("dragstart", (e) => {
+    if (!e.dataTransfer) return;
+    e.dataTransfer.setData("text/resource-vault-collection-id", collection.id);
+    e.dataTransfer.effectAllowed = "move";
+    btn.classList.add("collection--dragging");
+  });
+
+  btn.addEventListener("dragend", () => {
+    btn.classList.remove("collection--dragging");
+    document.querySelectorAll(".collection--dragover").forEach((el) => el.classList.remove("collection--dragover"));
+  });
+
+  btn.addEventListener("dragover", (e) => e.preventDefault());
+  btn.addEventListener("dragenter", (e) => {
+    e.preventDefault();
+    btn.classList.add("collection--dragover");
+  });
+  btn.addEventListener("dragleave", () => btn.classList.remove("collection--dragover"));
+  btn.addEventListener("drop", async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    btn.classList.remove("collection--dragover");
+    const draggedCollectionId = String(e.dataTransfer?.getData("text/resource-vault-collection-id") || "").trim();
+    if (draggedCollectionId && draggedCollectionId !== collection.id) {
+      await activeActions?.onReorderCollections?.(draggedCollectionId, collection.id);
+      return;
+    }
+    const itemId = String(e.dataTransfer?.getData("text/resource-vault-item-id") || "").trim();
+    if (!itemId) return;
+    await activeActions?.onAssignToCollection?.(itemId, collection.id);
+  });
+
+  btn.querySelector("[data-col-pin]")?.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    await activeActions?.onTogglePinCollection?.(collection.id);
+  });
+
+  bindCollectionMenuToggle(btn, "[data-col-menu]", "[data-col-pop]");
+
+  btn.querySelector("[data-col-rename]")?.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    closeAllCollectionMenus();
+    const next = await promptDialog({
+      title: t(L, "renameCollection"),
+      message: t(L, "renameCollectionPrompt"),
+      defaultValue: collection.name || "",
+      submitText: t(L, "save"),
+      cancelText: t(L, "cancel")
+    });
+    if (next == null) return;
+    const name = String(next || "").trim();
+    if (!name) return;
+    await activeActions?.onRenameCollection?.(collection.id, name);
+  });
+
+  btn.querySelector("[data-col-invite]")?.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    closeAllCollectionMenus();
+    await activeActions?.onInviteCollection?.(collection.id);
+  });
+
+  btn.querySelector("[data-col-del]")?.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    closeAllCollectionMenus();
+    const ok = await confirmAction(els, L, {
+      title: t(L, "deleteCollectionTitle"),
+      text: t(L, "deleteCollectionText"),
+      confirm: t(L, "del")
+    });
+    if (!ok) return;
+    await activeActions?.onDeleteCollection?.(collection.id);
+  });
 }
 
 function renderSavedFilters(state, els, onChange, actions, L) {
@@ -204,49 +199,58 @@ function renderSavedFilters(state, els, onChange, actions, L) {
       </div>
     `;
 
-    btn.addEventListener("click", () => {
-      state.activeSavedFilterId = f.id;
-      state.activeCollectionId = "all";
-      const filter = f.filter || {};
-      state.filters.types = Array.isArray(filter.types) ? [...filter.types] : [];
-      state.filters.sources = Array.isArray(filter.sources) ? [...filter.sources] : [];
-      state.filters.tag = String(filter.tag || "");
-      state.filters.favoriteOnly = !!filter.favoriteOnly;
-      state.search = String(filter.search || "");
-      state.sortBy = String(filter.sortBy || state.sortBy || "newest");
-      syncFilterInputs(state, els);
-      if (els.searchInput) els.searchInput.value = state.search;
-      if (els.sortSelect) els.sortSelect.value = state.sortBy;
-      onChange?.();
-      render(state, els, onChange, actions);
-    });
-
-    const trigger = btn.querySelector("[data-filter-menu]");
-    const pop = btn.querySelector("[data-filter-pop]");
-    if (trigger && pop) {
-      trigger.addEventListener("click", (e) => {
-        e.stopPropagation();
-        const wasHidden = pop.hidden;
-        closeAllCollectionMenus();
-        pop.hidden = !wasHidden;
-        trigger.closest(".collection__menu")?.classList.toggle("collection__menu--open", !pop.hidden);
-      });
-    }
-
-    btn.querySelector("[data-filter-del]")?.addEventListener("click", async (e) => {
-      e.stopPropagation();
-      closeAllCollectionMenus();
-      const ok = await confirmAction(els, L, {
-        title: t(L, "deleteSavedFilterTitle"),
-        text: t(L, "deleteSavedFilterText"),
-        confirm: t(L, "del")
-      });
-      if (!ok) return;
-      await actions?.onDeleteSavedFilter?.(f.id);
-    });
+    wireSavedFilterInteractions({ btn, savedFilter: f, state, els, onChange, actions, L });
 
     els.savedFiltersList.appendChild(btn);
   }
+}
+
+function wireSavedFilterInteractions({ btn, savedFilter, state, els, onChange, actions, L }) {
+  btn.addEventListener("click", () => {
+    state.activeSavedFilterId = savedFilter.id;
+    state.activeCollectionId = "all";
+    const filter = savedFilter.filter || {};
+    state.filters.types = Array.isArray(filter.types) ? [...filter.types] : [];
+    state.filters.sources = Array.isArray(filter.sources) ? [...filter.sources] : [];
+    state.filters.tag = String(filter.tag || "");
+    state.filters.favoriteOnly = !!filter.favoriteOnly;
+    state.search = String(filter.search || "");
+    state.sortBy = String(filter.sortBy || state.sortBy || "newest");
+    syncFilterInputs(state, els);
+    if (els.searchInput) els.searchInput.value = state.search;
+    if (els.sortSelect) els.sortSelect.value = state.sortBy;
+    onChange?.();
+    render(state, els, onChange, actions);
+  });
+
+  bindCollectionMenuToggle(btn, "[data-filter-menu]", "[data-filter-pop]");
+
+  btn.querySelector("[data-filter-del]")?.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    closeAllCollectionMenus();
+    const ok = await confirmAction(els, L, {
+      title: t(L, "deleteSavedFilterTitle"),
+      text: t(L, "deleteSavedFilterText"),
+      confirm: t(L, "del")
+    });
+    if (!ok) return;
+    await actions?.onDeleteSavedFilter?.(savedFilter.id);
+  });
+}
+
+function bindCollectionMenuToggle(root, triggerSelector, popSelector) {
+  // Shared toggle behavior for collection/saved-filter context menus.
+  const trigger = root.querySelector(triggerSelector);
+  const pop = root.querySelector(popSelector);
+  if (!trigger || !pop) return;
+
+  trigger.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const wasHidden = pop.hidden;
+    closeAllCollectionMenus();
+    pop.hidden = !wasHidden;
+    trigger.closest(".collection__menu")?.classList.toggle("collection__menu--open", !pop.hidden);
+  });
 }
 
 function renderHeader(state, els, L) {
@@ -361,8 +365,9 @@ function renderGrid(state, els, onChange, actions, L) {
     return;
   }
   const list = filteredItems(state);
-  els.grid.innerHTML = "";
   els.grid.classList.toggle("grid--empty", !list.length);
+  // Batch DOM writes for better render performance on large lists.
+  const fragment = document.createDocumentFragment();
 
   if (!list.length) {
     const active = getActiveCollection(state);
@@ -382,7 +387,8 @@ function renderGrid(state, els, onChange, actions, L) {
     }
 
     wireQuickAdd(empty);
-    els.grid.appendChild(empty);
+    fragment.appendChild(empty);
+    els.grid.replaceChildren(fragment);
     return;
   }
 
@@ -407,7 +413,7 @@ function renderGrid(state, els, onChange, actions, L) {
       <div class="card__preview-wrap">
         ${item.isDemo ? `<span class="demo-badge">${escapeHtml(t(L, "demoBadge"))}</span>` : ""}
         ${item.isAiNew ? `<span class="new-badge">NEW</span>` : ""}
-        <a class="card__preview-link" href="${item.url}" target="_blank" rel="noreferrer">
+        <a class="card__preview-link" href="${item.url}" target="_blank" rel="noreferrer" draggable="false">
           <img class="card__preview" src="${escapeHtml(previewSrc)}" data-fallback="${escapeHtml(previewFallbackUrl(item.url))}" alt="${escapeHtml(item.title || "preview")}" loading="lazy" referrerpolicy="no-referrer" />
         </a>
         <button class="card__fav-preview ${item.favorite ? "card__fav-preview--on" : ""} ${item.isDemo ? "card__fav-preview--disabled" : ""}" type="button" title="${escapeHtml(t(L, "favorites"))}" ${item.isDemo ? "disabled" : ""}>&#10084;</button>
@@ -417,7 +423,7 @@ function renderGrid(state, els, onChange, actions, L) {
         <div class="card__left">
           ${icon ? `<img class="favicon" src="${icon}" alt="">` : `<div class="favicon"></div>`}
           <div>
-            <a class="card__title-link" href="${item.url}" target="_blank" rel="noreferrer">${escapeHtml(item.title || domain || "Untitled")}</a>
+            <a class="card__title-link" href="${item.url}" target="_blank" rel="noreferrer" draggable="false">${escapeHtml(item.title || domain || "Untitled")}</a>
           </div>
         </div>
         <div class="card__tools">
@@ -434,61 +440,9 @@ function renderGrid(state, els, onChange, actions, L) {
       <div class="tags">${tags.map((tg, i) => `<span class="tag ${i === 0 ? "tag--accent" : ""}"><span class="tag__text">${escapeHtml(tg)}</span></span>`).join("")}</div>
     `;
 
-    if (!item.isDemo) {
-      card.querySelector(".card__fav-preview")?.addEventListener("click", async (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        await actions?.onToggleFavorite?.(item.id, !item.favorite);
-      });
-    }
+    wireCardInteractions({ card, item, noteText, actions, els, L });
 
-    if (!item.isDemo) {
-      card.querySelector("[data-del]")?.addEventListener("click", async () => {
-        const confirmed = await confirmDelete(els, L);
-        if (!confirmed) return;
-        await actions?.onDeleteItem?.(item.id);
-      });
-    }
-
-    card.querySelector("[data-note-expand]")?.addEventListener("click", async () => {
-      await confirmAction(els, L, {
-        title: t(L, "modalNote"),
-        text: noteText,
-        confirm: t(L, "cancel"),
-        hideCancel: true
-      });
-    });
-
-    const previewEl = card.querySelector(".card__preview");
-    if (previewEl) {
-      previewEl.addEventListener("error", () => {
-        const fb = previewEl.dataset.fallback || "";
-        if (fb && previewEl.src !== fb) {
-          previewEl.src = fb;
-          return;
-        }
-        previewEl.closest(".card__preview-wrap")?.remove();
-      });
-    }
-
-    card.addEventListener("dragstart", (e) => {
-      if (!e.dataTransfer) return;
-      e.dataTransfer.setData("text/resource-vault-item-id", item.id);
-      e.dataTransfer.effectAllowed = "move";
-      card.classList.add("card--dragging");
-    });
-
-    card.addEventListener("dragend", () => {
-      card.classList.remove("card--dragging");
-      document.querySelectorAll(".collection--dragover").forEach((el) => el.classList.remove("collection--dragover"));
-    });
-
-    card.querySelectorAll('a[target="_blank"]').forEach((link) => {
-      link.draggable = false;
-      link.addEventListener("click", () => actions?.onOpenItem?.(item.id));
-    });
-
-    els.grid.appendChild(card);
+    fragment.appendChild(card);
   }
 
   const addCard = document.createElement("button");
@@ -497,7 +451,68 @@ function renderGrid(state, els, onChange, actions, L) {
   addCard.style.setProperty("--stagger", `${Math.min(list.length, 14) * 20}ms`);
   addCard.innerHTML = `<span class="card__add-plus">+</span><span class="card__add-text">${escapeHtml(t(L, "quickAddHint"))}</span>`;
   addCard.addEventListener("click", openAddModal);
-  els.grid.appendChild(addCard);
+  fragment.appendChild(addCard);
+  els.grid.replaceChildren(fragment);
+}
+
+function wireCardInteractions({ card, item, noteText, actions, els, L }) {
+  card.addEventListener("click", async (e) => {
+    const target = e.target instanceof Element ? e.target : null;
+    if (!target) return;
+
+    if (!item.isDemo && target.closest(".card__fav-preview")) {
+      e.preventDefault();
+      e.stopPropagation();
+      await actions?.onToggleFavorite?.(item.id, !item.favorite);
+      return;
+    }
+
+    if (!item.isDemo && target.closest("[data-del]")) {
+      e.preventDefault();
+      const confirmed = await confirmDelete(els, L);
+      if (!confirmed) return;
+      await actions?.onDeleteItem?.(item.id);
+      return;
+    }
+
+    if (target.closest("[data-note-expand]")) {
+      e.preventDefault();
+      await confirmAction(els, L, {
+        title: t(L, "modalNote"),
+        text: noteText,
+        confirm: t(L, "cancel"),
+        hideCancel: true
+      });
+      return;
+    }
+
+    const link = target.closest('a[target="_blank"]');
+    if (link) actions?.onOpenItem?.(item.id);
+  });
+
+  const previewEl = card.querySelector(".card__preview");
+  if (previewEl) {
+    previewEl.addEventListener("error", () => {
+      const fb = previewEl.dataset.fallback || "";
+      if (fb && previewEl.src !== fb) {
+        previewEl.src = fb;
+        return;
+      }
+      previewEl.closest(".card__preview-wrap")?.remove();
+    });
+  }
+
+  card.addEventListener("dragstart", (e) => {
+    if (!e.dataTransfer) return;
+    e.dataTransfer.setData("text/resource-vault-item-id", item.id);
+    e.dataTransfer.effectAllowed = "move";
+    card.classList.add("card--dragging");
+  });
+
+  card.addEventListener("dragend", () => {
+    card.classList.remove("card--dragging");
+    document.querySelectorAll(".collection--dragover").forEach((el) => el.classList.remove("collection--dragover"));
+  });
 }
 
 function filteredItems(state) {
@@ -712,6 +727,6 @@ function confirmAction(els, L, options = {}) {
     els.deleteConfirm.addEventListener("click", onConfirm);
     dialog.addEventListener("cancel", onCancel);
     dialog.addEventListener("close", onClose, { once: true });
-    dialog.showModal();
+    showDialogWithA11y(dialog, { preferredFocus: hideCancel ? els.deleteConfirm : els.deleteCancel });
   });
 }

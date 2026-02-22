@@ -63,7 +63,7 @@
             </span>
             <span id="btnAuthLabel">Sign in with Google</span>
           </button>
-          <div id="authStatus" class="hint"></div>
+          <div id="authStatus" class="hint" role="status" aria-live="polite"></div>
 
           <div id="localHint" class="hint">Данные хранятся локально в браузере (localStorage).</div>
         </div>
@@ -72,13 +72,13 @@
       <main class="main">
         <header class="topbar">
           <div class="topbar__left">
-            <button id="btnMobileMenu" class="btn btn--secondary btn--icon mobile-menu-btn" type="button" aria-label="Open menu"><span class="mobile-menu-btn__icon"><span></span><span></span></span></button>
+            <button id="btnMobileMenu" class="btn btn--secondary btn--icon mobile-menu-btn" type="button" aria-label="Open menu" aria-controls="sidebar" aria-expanded="false"><span class="mobile-menu-btn__icon"><span></span><span></span></span></button>
             <div id="activeTitle" class="title">All links</div>
-            <div id="activeMeta" class="meta"></div>
+            <div id="activeMeta" class="meta" role="status" aria-live="polite"></div>
           </div>
 
           <div id="topbarRight" class="topbar__right">
-            <input id="searchInput" class="search" placeholder="Search in current context..." />
+            <input id="searchInput" class="search" placeholder="Search in current context..." aria-label="Search links" />
             <button id="btnFilters" class="btn btn--secondary" type="button">Filters</button>
             <select id="sortSelect" class="sort" aria-label="Sort">
               <option value="newest">Newest first</option>

@@ -1,4 +1,5 @@
 import { flashStatus } from "./monoFeedback.js";
+import { showDialogWithA11y } from "./dialogA11y.js";
 
 function resolveTarget(targetOrEl) {
   if (typeof targetOrEl === "string") return document.querySelector(targetOrEl);
@@ -72,8 +73,7 @@ export function confirmDialog({
     els.submit.addEventListener("click", onSubmit);
     els.dialog.addEventListener("cancel", onCancel);
     els.dialog.addEventListener("close", onClose, { once: true });
-    els.dialog.showModal();
-    setTimeout(() => els.submit?.focus(), 0);
+    showDialogWithA11y(els.dialog, { preferredFocus: els.submit });
   });
 }
 
@@ -132,7 +132,6 @@ export function promptDialog({
     els.input.addEventListener("keydown", onKeyDown);
     els.dialog.addEventListener("cancel", onCancel);
     els.dialog.addEventListener("close", onClose, { once: true });
-    els.dialog.showModal();
-    setTimeout(() => els.input?.focus(), 0);
+    showDialogWithA11y(els.dialog, { preferredFocus: els.input });
   });
 }

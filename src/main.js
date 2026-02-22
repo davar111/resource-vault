@@ -7,6 +7,7 @@ import { t } from "./i18n.js";
 import { render } from "./ui.js";
 import { flashStatus, startSpinner } from "./ui/monoFeedback.js";
 import { promptDialog, toast } from "./ui/feedback.js";
+import { showDialogWithA11y } from "./ui/dialogA11y.js";
 import { scheduleRender } from "./renderScheduler.js";
 import { debounce } from "./utils/debounce.js";
 import { SOURCE_CODES, TYPE_CODES } from "./domain.js";
@@ -399,7 +400,9 @@ function ensureModalStatusLine(form, id) {
     line = document.createElement("div");
     line.id = id;
     line.className = "status-line status-line--inline mono status-info";
+    line.setAttribute("role", "status");
     line.setAttribute("aria-live", "polite");
+    line.setAttribute("aria-atomic", "true");
     form.append(line);
   }
   return line;
@@ -449,7 +452,7 @@ function openNewLinkModal(preset = {}) {
   if (els.inputAddSource) els.inputAddSource.value = "other";
   if (els.addFavorite) els.addFavorite.checked = state.activeCollectionId === "fav";
   updateAddSourceUi();
-  els.modalAddLink?.showModal();
+  if (els.modalAddLink) showDialogWithA11y(els.modalAddLink, { preferredFocus: els.inputAddUrl });
 }
 
 function updateTagsMenu() {
@@ -724,8 +727,7 @@ function openHiddenAuthDialog(mode = "unlock") {
     els.hiddenAuthCancel?.addEventListener("click", onCancel);
     dialog.addEventListener("cancel", onCancel);
     dialog.addEventListener("close", onClose, { once: true });
-    dialog.showModal();
-    setTimeout(() => els.hiddenAuthPassword?.focus(), 0);
+    showDialogWithA11y(dialog, { preferredFocus: els.hiddenAuthPassword });
   });
 }
 
@@ -1100,10 +1102,18 @@ function setupEvents() {
   const mobileMq = window.matchMedia("(max-width: 700px)");
   const debouncedSearchRender = debounce(() => requestRender(), 150);
   const setMobileMenu = (open) => {
-    state.ui.mobileMenuOpen = !!open;
-    document.body.classList.toggle("mobile-menu-open", !!open);
-    els.btnMobileMenu?.setAttribute("aria-expanded", open ? "true" : "false");
+    const isOpen = !!open;
+    state.ui.mobileMenuOpen = isOpen;
+    document.body.classList.toggle("mobile-menu-open", isOpen);
+    els.btnMobileMenu?.setAttribute("aria-expanded", isOpen ? "true" : "false");
+    els.mobileOverlay?.setAttribute("aria-hidden", isOpen ? "false" : "true");
+    if (mobileMq.matches) {
+      els.sidebar?.setAttribute("aria-hidden", isOpen ? "false" : "true");
+    } else {
+      els.sidebar?.setAttribute("aria-hidden", "false");
+    }
   };
+  setMobileMenu(false);
   const closeMobileMenuIfNeeded = () => { if (mobileMq.matches) setMobileMenu(false); };
 
   els.inputAddTitle && (els.inputAddTitle.maxLength = TITLE_MAX_LEN);
@@ -1164,7 +1174,12 @@ function setupEvents() {
 
   els.btnAddLink?.addEventListener("click", () => { openNewLinkModal(); closeMobileMenuIfNeeded(); });
   els.demoHintAdd?.addEventListener("click", () => { openNewLinkModal(); });
-  els.btnNewCollection?.addEventListener("click", () => { els.formCollection?.reset(); els.modalCollection?.showModal(); closeMobileMenuIfNeeded(); });
+  els.btnNewCollection?.addEventListener("click", () => {
+    els.formCollection?.reset();
+    const nameInput = els.formCollection?.querySelector('input[name="name"]');
+    if (els.modalCollection) showDialogWithA11y(els.modalCollection, { preferredFocus: nameInput });
+    closeMobileMenuIfNeeded();
+  });
   els.btnSaveFilterInline?.addEventListener("click", async () => {
     if (!ensureAuth()) return;
     if (els.btnSaveFilterInline?.disabled) return;
