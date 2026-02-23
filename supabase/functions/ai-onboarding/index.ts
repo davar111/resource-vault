@@ -730,20 +730,8 @@ Deno.serve(async (req) => {
     return jsonResponse(500, { error: "Supabase environment is not configured" });
   }
 
-  const authHeader = req.headers.get("authorization") || "";
-  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-  if (!token) return jsonResponse(401, { error: "Missing bearer token" });
-
-  const authClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    global: { headers: { Authorization: `Bearer ${token}` } }
-  });
-  const { data: authData, error: authError } = await authClient.auth.getUser();
-  if (authError || !authData?.user) return jsonResponse(401, { error: "Unauthorized" });
-
-  const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
   const body = await req.json().catch(() => ({}));
   const action = String(body?.action || "");
-  const role = String(body?.role || "").trim();
 
   if (action === "parse_link") {
     const url = toHttpUrl(String(body?.url || ""));
@@ -767,9 +755,9 @@ Deno.serve(async (req) => {
         "Return strict JSON with keys:",
         `{"title":"string","tags":["string","..."],"preview":"https://... or empty"}`,
         "Rules:",
+        "- Generate 3 to 5 useful tags if possible.",
+        "- Tags must be short, lowercase, practical.",
         "- Improve title only if current one is weak/generic.",
-        "- Keep tags broad and practical for a knowledge vault.",
-        "- Max 5 tags, lowercase.",
         "- preview must be http/https or empty string.",
         "- Do not include any explanation."
       ].join("\n")
@@ -786,6 +774,19 @@ Deno.serve(async (req) => {
       preview
     });
   }
+
+  const authHeader = req.headers.get("authorization") || "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+  if (!token) return jsonResponse(401, { error: "Missing bearer token" });
+
+  const authClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: `Bearer ${token}` } }
+  });
+  const { data: authData, error: authError } = await authClient.auth.getUser();
+  if (authError || !authData?.user) return jsonResponse(401, { error: "Unauthorized" });
+
+  const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  const role = String(body?.role || "").trim();
 
   if (action === "chat_turn") {
     if (!role) return jsonResponse(400, { error: "Role is required" });

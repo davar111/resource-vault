@@ -618,22 +618,21 @@ function looksGenericParsedTitle(title, normalizedUrl) {
 }
 
 async function parseLinkWithAi(meta) {
-  if (!state.isAuthenticated) return null;
   let token = "";
   try {
     token = String(await getSessionAccessToken() || "").trim();
   } catch {}
-  if (!token) return null;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 4200);
   try {
+    const headers = {
+      "Content-Type": "application/json"
+    };
+    if (token) headers.Authorization = `Bearer ${token}`;
     const response = await fetch(AI_FUNCTION_PATH, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`
-      },
+      headers,
       body: JSON.stringify({
         action: "parse_link",
         lang: state.lang || "ru",
