@@ -69,3 +69,15 @@
 16. Единым источником схемы сделать `supabase.sql`.
 - Решение: в `supabase.sql` добавлена таблица `public.users` + RLS политики; `AI_ONBOARDING_SETUP.md` переключён на `supabase.sql`.
 - Причина: убрать рассинхрон между onboarding-функцией и фактической схемой БД.
+
+17. Режим `Space` реализовать как отдельный экран внутри текущего `activeCollectionId`.
+- Решение: добавлен `activeCollectionId = "space"` с отдельным контейнером `#spaceView`, рендером одной карточки, swipe/open/archive действиями и прогрессом.
+- Причина: внедрить новый сценарий «разбора ссылок» без ломки существующей сетки и without-refactor остальных режимов.
+
+18. Стрик `Space` хранить только в runtime-состоянии.
+- Решение: счётчики (`dailyDone`, `streakDays`, `lastActionDate`, `lastStreakDate`) ведутся в `state.space` без `localStorage`.
+- Причина: прямое требование пользователя: не сохранять стрик локально.
+
+19. Перенести стрик `Space` из runtime в Supabase для авторизованного пользователя.
+- Решение: добавлена таблица `public.user_space_stats` + RLS; в клиенте подключён `src/useSpaceStats.js` и upsert после `open/archive` в Space.
+- Причина: обеспечить сохранение серии между сессиями и устройствами без использования `localStorage`.

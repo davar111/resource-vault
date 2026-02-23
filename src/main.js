@@ -16,9 +16,9 @@ import { initAuth, loginWithGoogle, logout } from "./useAuth.js";
 import { createLink, deleteLink, listLinks, updateLink } from "./useLinks.js";
 import { addLinkCollections, createCollection, createCollectionInvite, deleteCollection, listCollections, listLinkCollections, replaceLinkCollections, updateCollection } from "./useCollections.js";
 import { createSavedFilter, deleteSavedFilter, listSavedFilters } from "./useSavedFilters.js";
+import { getSpaceStats, upsertSpaceStats } from "./useSpaceStats.js";
 import { getAuthIssue, getSessionAccessToken } from "./supabase.js";
 import { initOnboarding } from "./Onboarding.js";
-import { createLiquidLab } from "./liquidLab.js";
 
 const TITLE_MIN_LEN = 2;
 const TITLE_MAX_LEN = 120;
@@ -48,7 +48,7 @@ const els = {
   navFav: document.getElementById("navFav"),
   navHidden: document.getElementById("navHidden"),
   navRecent: document.getElementById("navRecent"),
-  navLiquid: document.getElementById("navLiquid"),
+  navSpace: document.getElementById("navSpace"),
   labelNav: document.getElementById("labelNav"),
   labelCollections: document.getElementById("labelCollections"),
   labelSavedFilters: document.getElementById("labelSavedFilters"),
@@ -81,6 +81,7 @@ const els = {
   liquidFallback: document.getElementById("liquidFallback"),
   liquidFallbackTitle: document.getElementById("liquidFallbackTitle"),
   liquidFallbackText: document.getElementById("liquidFallbackText"),
+  spaceView: document.getElementById("spaceView"),
   filterTypes: document.getElementById("filterTypes"),
   filterSources: document.getElementById("filterSources"),
   filterTagInput: document.getElementById("filterTagInput"),
@@ -196,7 +197,9 @@ const feedback = {
 };
 let onboardingController = null;
 let authIssueNotice = "";
-let liquidLabController = null;
+let spaceStatsPersistTimer = null;
+let spaceStatsPersistInFlight = false;
+let spaceStatsPersistQueued = false;
 
 function notify(text, kind = "info", target = null) {
   return toast(target || els.authStatus, text, { kind, timeoutMs: 1500 });
@@ -282,7 +285,7 @@ function renderApp() {
   syncAuthGate();
   syncGuestModeUi();
   render(state, els, persistUiSettings, actions);
-  syncLiquidLabView();
+  syncContentViews();
 }
 
 function requestRender() {
@@ -444,6 +447,113 @@ function canMutateItem(item) {
   if (!state.currentUserId) return false;
   const ownerId = String(item.ownerId || "");
   return !ownerId || ownerId === state.currentUserId;
+}
+
+function ensureSpaceState() {
+  const space = state.space && typeof state.space === "object" ? state.space : {};
+  if (!Array.isArray(space.dismissedIds)) space.dismissedIds = [];
+  if (!Number.isFinite(space.dailyDone)) space.dailyDone = 0;
+  if (typeof space.lastActionDate !== "string") space.lastActionDate = "";
+  if (!Number.isFinite(space.streakDays)) space.streakDays = 0;
+  if (typeof space.lastStreakDate !== "string") space.lastStreakDate = "";
+  state.space = space;
+  return space;
+}
+
+function dayKey(ts = Date.now()) {
+  const d = new Date(ts);
+  const yyyy = String(d.getFullYear());
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function dayDiff(fromKey, toKey) {
+  const from = Date.parse(`${String(fromKey || "").trim()}T00:00:00Z`);
+  const to = Date.parse(`${String(toKey || "").trim()}T00:00:00Z`);
+  if (!Number.isFinite(from) || !Number.isFinite(to)) return 0;
+  return Math.round((to - from) / 86_400_000);
+}
+
+function pruneSpaceDismissedIds() {
+  const space = ensureSpaceState();
+  const allowed = new Set(
+    (state.items || [])
+      .map((item) => String(item.id || "").trim())
+      .filter(Boolean)
+  );
+  space.dismissedIds = [...new Set(space.dismissedIds.map((id) => String(id || "").trim()).filter(Boolean))]
+    .filter((id) => allowed.has(id));
+  return space.dismissedIds;
+}
+
+function registerSpaceDecision(itemId) {
+  const id = String(itemId || "").trim();
+  if (!id) return;
+  const space = ensureSpaceState();
+  const dismissed = pruneSpaceDismissedIds();
+  if (!dismissed.includes(id)) dismissed.push(id);
+  space.dismissedIds = dismissed;
+
+  const today = dayKey();
+  if (space.lastActionDate !== today) {
+    if (space.lastActionDate && dayDiff(space.lastActionDate, today) > 1) {
+      space.streakDays = 0;
+    }
+    space.dailyDone = 0;
+    space.lastActionDate = today;
+  }
+  space.dailyDone += 1;
+
+  if (space.dailyDone >= 3 && space.lastStreakDate !== today) {
+    if (!space.lastStreakDate) {
+      space.streakDays = 1;
+    } else if (dayDiff(space.lastStreakDate, today) === 1) {
+      space.streakDays += 1;
+    } else {
+      space.streakDays = 1;
+    }
+    space.lastStreakDate = today;
+  }
+}
+
+function spaceStatsPayload() {
+  const space = ensureSpaceState();
+  return {
+    dailyDone: Math.max(0, Math.floor(Number(space.dailyDone || 0))),
+    streakDays: Math.max(0, Math.floor(Number(space.streakDays || 0))),
+    lastActionDate: String(space.lastActionDate || "").trim(),
+    lastStreakDate: String(space.lastStreakDate || "").trim()
+  };
+}
+
+async function persistSpaceStatsNow() {
+  if (!state.isAuthenticated || !currentUser?.id) return;
+  if (spaceStatsPersistInFlight) {
+    spaceStatsPersistQueued = true;
+    return;
+  }
+  spaceStatsPersistInFlight = true;
+  try {
+    await upsertSpaceStats(currentUser.id, spaceStatsPayload());
+  } catch (err) {
+    console.warn("Space stats save failed", err?.message || err);
+  } finally {
+    spaceStatsPersistInFlight = false;
+    if (spaceStatsPersistQueued) {
+      spaceStatsPersistQueued = false;
+      void persistSpaceStatsNow();
+    }
+  }
+}
+
+function queueSpaceStatsPersist() {
+  if (!state.isAuthenticated || !currentUser?.id) return;
+  if (spaceStatsPersistTimer) clearTimeout(spaceStatsPersistTimer);
+  spaceStatsPersistTimer = setTimeout(() => {
+    spaceStatsPersistTimer = null;
+    void persistSpaceStatsNow();
+  }, 180);
 }
 
 function visibleCollectionItemCount(collectionId) {
@@ -823,32 +933,21 @@ function applyI18n() {
   renderTagSuggestions();
   renderAuthStatus();
   syncThemeToggle();
-  liquidLabController?.markTextDirty();
 }
 
-function isLiquidLabActive() {
-  return state.activeCollectionId === "liquid";
+function isSpaceActive() {
+  return state.activeCollectionId === "space";
 }
 
-function syncLiquidLabView() {
-  const active = isLiquidLabActive();
+function syncContentViews() {
+  const active = isSpaceActive();
   if (els.topbarRight) els.topbarRight.hidden = active;
   if (els.filtersPanel) els.filtersPanel.hidden = active ? true : !state.ui.filtersOpen;
   if (els.chipsBar) els.chipsBar.hidden = active;
   if (els.demoHint) els.demoHint.hidden = active ? true : !state.isUsingDemoData;
   if (els.grid) els.grid.hidden = active;
-  if (els.liquidLab) els.liquidLab.hidden = !active;
-
-  if (!liquidLabController && els.liquidCanvas) {
-    liquidLabController = createLiquidLab({
-      canvas: els.liquidCanvas,
-      fallback: els.liquidFallback,
-      getText: () => t(state.lang, "liquidHeroText")
-    });
-  }
-  if (!liquidLabController) return;
-  if (active) liquidLabController.start();
-  else liquidLabController.stop();
+  if (els.spaceView) els.spaceView.hidden = !active;
+  if (els.liquidLab) els.liquidLab.hidden = true;
 }
 
 function filterPayload() {
@@ -1013,11 +1112,12 @@ async function ensureHiddenAccess() {
 }
 
 async function loadData() {
-  const [links, collections, rows, savedFilters] = await Promise.all([
+  const [links, collections, rows, savedFilters, spaceStats] = await Promise.all([
     listLinks(),
     listCollections(),
     listLinkCollections(),
-    listSavedFilters()
+    listSavedFilters(),
+    getSpaceStats(currentUser?.id || "")
   ]);
   const relMap = new Map();
   for (const rel of rows || []) {
@@ -1032,6 +1132,12 @@ async function loadData() {
   state.collections = collections;
   applyCollectionUiSettings();
   state.savedFilters = savedFilters;
+  const space = ensureSpaceState();
+  space.dismissedIds = [];
+  space.dailyDone = Math.max(0, Number(spaceStats?.dailyDone || 0));
+  space.streakDays = Math.max(0, Number(spaceStats?.streakDays || 0));
+  space.lastActionDate = String(spaceStats?.lastActionDate || "");
+  space.lastStreakDate = String(spaceStats?.lastStreakDate || "");
 }
 
 const ONBOARDING_TAG_BLACKLIST = new Set([
@@ -1139,11 +1245,49 @@ async function migrateLegacyIfNeeded() {
 }
 
 const actions = {
-  onOpenItem: (id) => {
+  onOpenItem: (id, options = {}) => {
     const item = state.items.find((x) => x.id === id);
     if (item?.isAiNew) item.isAiNew = false;
     state.recentViewedIds = [id, ...state.recentViewedIds.filter((x) => x !== id)].slice(0, 100);
+    if (options?.fromSpace) {
+      registerSpaceDecision(id);
+      queueSpaceStatsPersist();
+    }
     requestRender();
+  },
+  onArchiveItem: async (id, options = {}) => {
+    if (pendingLinkOps.has(id)) return;
+    pendingLinkOps.add(id);
+    try {
+      const item = state.items.find((x) => x.id === id);
+      if (!item) return;
+
+      if (item.isDemo) {
+        item.hidden = true;
+        if (options?.fromSpace) {
+          registerSpaceDecision(id);
+          queueSpaceStatsPersist();
+        }
+        requestRender();
+        return;
+      }
+
+      if (!ensureAuth()) return;
+      if (!canMutateItem(item)) return;
+
+      const updated = await updateLink(id, { ...item, hidden: true });
+      item.hidden = !!(updated?.hidden ?? true);
+      item.updatedAt = Number(updated?.updatedAt || Date.now());
+      if (options?.fromSpace) {
+        registerSpaceDecision(id);
+        queueSpaceStatsPersist();
+      }
+      requestRender();
+    } catch (err) {
+      notify(err?.message || (state.lang === "ru" ? "Не удалось архивировать ссылку." : "Failed to archive link."), "error");
+    } finally {
+      pendingLinkOps.delete(id);
+    }
   },
   onToggleFavorite: async (id, next) => {
     if (!ensureAuth()) return;
@@ -1367,9 +1511,9 @@ function setupEvents() {
     closeMobileMenuIfNeeded();
   });
   els.navRecent?.addEventListener("click", () => { state.activeSavedFilterId = null; state.activeCollectionId = "recent"; requestRender(); closeMobileMenuIfNeeded(); });
-  els.navLiquid?.addEventListener("click", () => {
+  els.navSpace?.addEventListener("click", () => {
     state.activeSavedFilterId = null;
-    state.activeCollectionId = "liquid";
+    state.activeCollectionId = "space";
     requestRender();
     closeMobileMenuIfNeeded();
   });

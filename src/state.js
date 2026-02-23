@@ -23,6 +23,13 @@ export const state = {
     collectionOrderIds: [],
     pinnedCollectionIds: []
   },
+  space: {
+    dismissedIds: [],
+    dailyDone: 0,
+    lastActionDate: "",
+    streakDays: 0,
+    lastStreakDate: ""
+  },
   recentViewedIds: [],
   items: [],
   collections: [],

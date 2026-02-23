@@ -366,7 +366,7 @@ textarea:focus-visible,
 #navFav { --nav-icon: url("data:image/svg+xml,%3Csvg viewBox='0 0 16 16' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M8 2.5L9.9 6.3l4.2.6-3 2.9.7 4.2L8 11.8l-3.8 2.2.7-4.2-3-2.9 4.2-.6L8 2.5z' fill='none' stroke='black' stroke-width='1.5'/%3E%3C/svg%3E"); }
 #navRecent { --nav-icon: url("data:image/svg+xml,%3Csvg viewBox='0 0 16 16' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='8' cy='8' r='6.5' fill='none' stroke='black' stroke-width='1.5'/%3E%3Cpath d='M8 4.5v3.5l2.5 2.5' fill='none' stroke='black' stroke-width='1.5'/%3E%3C/svg%3E"); }
 #navHidden { --nav-icon: url("data:image/svg+xml,%3Csvg viewBox='0 0 16 16' xmlns='http://www.w3.org/2000/svg'%3E%3Crect x='2' y='4' width='12' height='9' rx='1.5' fill='none' stroke='black' stroke-width='1.5'/%3E%3Cpath d='M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1' fill='none' stroke='black' stroke-width='1.5'/%3E%3C/svg%3E"); }
-#navLiquid { --nav-icon: url("data:image/svg+xml,%3Csvg viewBox='0 0 16 16' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M2 8h12M8 2v12' fill='none' stroke='black' stroke-width='1.5'/%3E%3C/svg%3E"); }
+#navSpace { --nav-icon: url("data:image/svg+xml,%3Csvg viewBox='0 0 16 16' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='8' cy='8' r='5.5' fill='none' stroke='black' stroke-width='1.5'/%3E%3Cpath d='M8 4.8v3.4l2.2 2.2' fill='none' stroke='black' stroke-width='1.5'/%3E%3C/svg%3E"); }
 .collection--dragover {
   border-color: var(--border-strong);
   background: var(--bg-surface-2);

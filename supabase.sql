@@ -126,11 +126,24 @@ create table if not exists public.saved_filters (
 create index if not exists saved_filters_user_id_idx on public.saved_filters (user_id);
 create index if not exists saved_filters_created_at_idx on public.saved_filters (created_at desc);
 
+create table if not exists public.user_space_stats (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  daily_done integer not null default 0 check (daily_done >= 0),
+  streak_days integer not null default 0 check (streak_days >= 0),
+  last_action_date date null,
+  last_streak_date date null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists user_space_stats_updated_at_idx on public.user_space_stats (updated_at desc);
+
 alter table public.users enable row level security;
 alter table public.links enable row level security;
 alter table public.collections enable row level security;
 alter table public.link_collections enable row level security;
 alter table public.saved_filters enable row level security;
+alter table public.user_space_stats enable row level security;
 alter table public.collection_invites enable row level security;
 
 drop policy if exists "users_select_own" on public.users;
@@ -237,6 +250,15 @@ create policy "saved_filters_select_own" on public.saved_filters for select to a
 create policy "saved_filters_insert_own" on public.saved_filters for insert to authenticated with check (user_id = auth.uid());
 create policy "saved_filters_update_own" on public.saved_filters for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
 create policy "saved_filters_delete_own" on public.saved_filters for delete to authenticated using (user_id = auth.uid());
+
+drop policy if exists "user_space_stats_select_own" on public.user_space_stats;
+drop policy if exists "user_space_stats_insert_own" on public.user_space_stats;
+drop policy if exists "user_space_stats_update_own" on public.user_space_stats;
+drop policy if exists "user_space_stats_delete_own" on public.user_space_stats;
+create policy "user_space_stats_select_own" on public.user_space_stats for select to authenticated using (user_id = auth.uid());
+create policy "user_space_stats_insert_own" on public.user_space_stats for insert to authenticated with check (user_id = auth.uid());
+create policy "user_space_stats_update_own" on public.user_space_stats for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
+create policy "user_space_stats_delete_own" on public.user_space_stats for delete to authenticated using (user_id = auth.uid());
 
 drop policy if exists "collection_invites_select_own_or_received" on public.collection_invites;
 drop policy if exists "collection_invites_insert_owner_only" on public.collection_invites;

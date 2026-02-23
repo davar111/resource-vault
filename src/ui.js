@@ -15,6 +15,7 @@ export function render(state, els, onChange, actions = activeActions) {
   renderSmartSearchPanel(state, els, onChange, L);
   renderActiveFilters(state, els, onChange, L);
   renderDemoHint(state, els, L);
+  renderSpace(state, els, onChange, activeActions, L);
   renderGrid(state, els, onChange, activeActions, L);
 }
 
@@ -50,9 +51,9 @@ function renderNav(state, els, L) {
     setNavText(els.navRecent, t(L, "navRecent"));
     els.navRecent.classList.toggle("nav-item--active", state.activeCollectionId === "recent");
   }
-  if (els.navLiquid) {
-    setNavText(els.navLiquid, t(L, "navLiquid"));
-    els.navLiquid.classList.toggle("nav-item--active", state.activeCollectionId === "liquid");
+  if (els.navSpace) {
+    setNavText(els.navSpace, t(L, "navSpace"));
+    els.navSpace.classList.toggle("nav-item--active", state.activeCollectionId === "space");
   }
 }
 
@@ -277,6 +278,15 @@ function renderHeader(state, els, L) {
     return;
   }
 
+  if (active.id === "space") {
+    const stats = getSpaceStats(state);
+    const leftText = L === "ru" ? `${stats.remaining} в очереди` : `${stats.remaining} in queue`;
+    const streakText = `${t(L, "spaceStreakLabel")}: ${Math.max(0, Number(stats.streak || 0))}`;
+    els.activeTitle.textContent = t(L, "spaceTitle");
+    els.activeMeta.textContent = `${leftText} · ${streakText}`;
+    return;
+  }
+
   if (active.id === "fav") {
     els.activeTitle.textContent = t(L, "favorites");
     els.activeMeta.textContent = `${list.length} ${t(L, "items")}`;
@@ -317,6 +327,10 @@ function renderSmartSearchPanel(state, els, onChange, L) {
   const resultsWrap = els.searchPanelResults;
   const countNode = els.searchPanelCount;
   if (!panel || !filtersWrap || !resultsWrap || !countNode) return;
+  if (state.activeCollectionId === "space") {
+    panel.hidden = true;
+    return;
+  }
 
   const query = String(state.search || "").trim();
   if (!query) {
@@ -484,8 +498,225 @@ function canManageItem(state, item) {
   return !ownerId || ownerId === currentUserId;
 }
 
+function ensureSpaceRuntimeState(state) {
+  if (!state.space || typeof state.space !== "object") state.space = {};
+  if (!Array.isArray(state.space.dismissedIds)) state.space.dismissedIds = [];
+  if (!Number.isFinite(state.space.dailyDone)) state.space.dailyDone = 0;
+  if (!Number.isFinite(state.space.streakDays)) state.space.streakDays = 0;
+  return state.space;
+}
+
+function getSpaceQueue(state) {
+  const space = ensureSpaceRuntimeState(state);
+  const sourceList = (state.items || []).filter((item) => !item.hidden);
+  const availableIds = new Set((state.items || []).map((item) => String(item.id || "").trim()).filter(Boolean));
+  const dismissed = [...new Set((space.dismissedIds || [])
+    .map((id) => String(id || "").trim())
+    .filter((id) => id && availableIds.has(id)))];
+  space.dismissedIds = dismissed;
+  const dismissedSet = new Set(dismissed);
+  const recentSet = new Set((state.recentViewedIds || []).map((id) => String(id || "").trim()));
+  const unseen = [];
+  const seen = [];
+  for (const item of sourceList) {
+    const itemId = String(item.id || "").trim();
+    if (!itemId || dismissedSet.has(itemId)) continue;
+    if (recentSet.has(itemId)) seen.push(item);
+    else unseen.push(item);
+  }
+  unseen.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+  seen.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+  return [...unseen, ...seen];
+}
+
+function getSpaceStats(state) {
+  const queue = getSpaceQueue(state);
+  const space = ensureSpaceRuntimeState(state);
+  const done = Math.max(0, (space.dismissedIds || []).length);
+  const total = done + queue.length;
+  return {
+    queue,
+    current: queue[0] || null,
+    done,
+    total,
+    remaining: queue.length,
+    streak: Math.max(0, Number(space.streakDays || 0)),
+    dailyDone: Math.max(0, Number(space.dailyDone || 0))
+  };
+}
+
+function formatSpaceDaysAgo(ts, lang) {
+  const ms = Number(ts || 0);
+  if (!Number.isFinite(ms) || ms <= 0) return lang === "ru" ? "сегодня" : "today";
+  const days = Math.max(0, Math.floor((Date.now() - ms) / 86_400_000));
+  if (lang !== "ru") return days === 0 ? "today" : `${days}d ago`;
+  if (days === 0) return "сегодня";
+  const mod10 = days % 10;
+  const mod100 = days % 100;
+  if (mod10 === 1 && mod100 !== 11) return `${days} день назад`;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return `${days} дня назад`;
+  return `${days} дней назад`;
+}
+
+function bindSpaceSwipe(card, handlers) {
+  if (!card) return;
+  let dragging = false;
+  let startX = 0;
+  let startY = 0;
+  card.addEventListener("pointerdown", (event) => {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    dragging = true;
+    startX = event.clientX;
+    startY = event.clientY;
+  });
+  card.addEventListener("pointercancel", () => { dragging = false; });
+  card.addEventListener("pointerup", (event) => {
+    if (!dragging) return;
+    dragging = false;
+    const dx = event.clientX - startX;
+    const dy = event.clientY - startY;
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy)) return;
+    if (dx > 0) handlers?.onRight?.();
+    else handlers?.onLeft?.();
+  });
+}
+
+function renderSpace(state, els, onChange, actions, L) {
+  if (!els.spaceView) return;
+  const active = state.activeCollectionId === "space";
+  els.spaceView.hidden = !active;
+  if (!active) {
+    els.spaceView.replaceChildren();
+    return;
+  }
+
+  const stats = getSpaceStats(state);
+  const item = stats.current;
+  if (!item) {
+    els.spaceView.innerHTML = `
+      <div class="space-empty">
+        <div class="space-empty__title">${escapeHtml(t(L, "spaceDoneTitle"))}</div>
+        <div class="space-empty__text">${escapeHtml(t(L, "spaceDoneText"))}</div>
+        <div class="space-empty__actions">
+          <button type="button" class="btn btn--primary" data-space-back="1">${escapeHtml(t(L, "spaceBackToLibrary"))}</button>
+        </div>
+      </div>
+    `;
+    els.spaceView.querySelector("[data-space-back]")?.addEventListener("click", () => {
+      state.activeCollectionId = "all";
+      state.activeSavedFilterId = null;
+      render(state, els, onChange, actions);
+    });
+    return;
+  }
+
+  const safeUrl = toHttpUrl(item.url);
+  const hrefUrl = safeUrl || "#";
+  const previewSeed = safeUrl || "https://example.com";
+  const previewSrc = item.previewImage || previewFallbackUrl(previewSeed);
+  const domain = domainFromUrl(safeUrl) || "other";
+  const sourceBadge = sourceBadgeText(item?.source, domain);
+  const note = String(item.note || "").trim();
+  const tags = (Array.isArray(item.tags) ? item.tags : []).slice(0, 4);
+  const canArchive = canManageItem(state, item);
+  const when = formatSpaceDaysAgo(item.createdAt, L);
+  const position = stats.total ? Math.min(stats.done + 1, stats.total) : 0;
+  const progress = stats.total ? Math.max(0, Math.min(100, (position / stats.total) * 100)) : 0;
+  const dotsTotal = Math.min(Math.max(stats.total, 1), 7);
+  const dotsActive = Math.min(
+    dotsTotal,
+    Math.max(1, stats.total ? Math.round((position / stats.total) * dotsTotal) : 0)
+  );
+  const contextText = L === "ru"
+    ? `${position} из ${stats.total} непросмотренных`
+    : `${position} of ${stats.total} pending`;
+  const streakText = L === "ru"
+    ? `${t(L, "spaceStreakLabel")} ${stats.streak} дн.`
+    : `${t(L, "spaceStreakLabel")} ${stats.streak}d`;
+
+  els.spaceView.innerHTML = `
+    <div class="space-shell">
+      <div class="space-progress"><div class="space-progress__bar" style="width:${progress}%"></div></div>
+
+      <div class="space-context">
+        <span>${escapeHtml(contextText)}</span>
+        <span class="space-context__sep">·</span>
+        <span>${L === "ru" ? "сохранено" : "saved"} ${escapeHtml(when)}</span>
+      </div>
+
+      <article class="space-card" data-space-card>
+        <a class="space-card__preview" href="${escapeHtml(hrefUrl)}" target="_blank" rel="noreferrer">
+          <img class="space-card__preview-img" src="${escapeHtml(previewSrc)}" data-fallback="${escapeHtml(previewFallbackUrl(previewSeed))}" alt="${escapeHtml(item.title || domain)}" loading="lazy" referrerpolicy="no-referrer" />
+          <span class="space-card__when">${escapeHtml(when)}</span>
+        </a>
+        <div class="space-card__body">
+          <div class="space-card__source">
+            <span class="space-card__badge">${escapeHtml(sourceBadge)}</span>
+            <span>${escapeHtml(domain)}</span>
+          </div>
+          <a class="space-card__title" href="${escapeHtml(hrefUrl)}" target="_blank" rel="noreferrer">${escapeHtml(item.title || domain)}</a>
+          <div class="space-card__note ${note ? "" : "space-card__note--empty"}">${escapeHtml(note || t(L, "spaceNoNote"))}</div>
+          <div class="space-card__tags">${tags.map((tag) => `<span class="space-card__tag">${escapeHtml(tag)}</span>`).join("")}</div>
+        </div>
+      </article>
+
+      <div class="space-actions">
+        <button type="button" class="space-btn space-btn--open" data-space-open="1" ${!safeUrl ? "disabled" : ""}>${escapeHtml(t(L, "spaceOpen"))}</button>
+        <button type="button" class="space-btn space-btn--archive" data-space-archive="1" ${!canArchive ? "disabled" : ""}>${escapeHtml(t(L, "spaceArchive"))}</button>
+      </div>
+
+      <div class="space-footer">
+        <div class="space-dots">${Array.from({ length: dotsTotal }).map((_, index) => `<span class="space-dot ${index < dotsActive ? "space-dot--active" : ""}"></span>`).join("")}</div>
+        <div class="space-counter">${position} / ${stats.total}</div>
+      </div>
+
+      <div class="space-swipe">${escapeHtml(t(L, "spaceSwipeHint"))}</div>
+      <div class="space-streak">🔥 ${escapeHtml(streakText)}</div>
+    </div>
+  `;
+
+  const open = () => {
+    if (!safeUrl) return;
+    window.open(safeUrl, "_blank", "noopener,noreferrer");
+    actions?.onOpenItem?.(item.id, { fromSpace: true });
+  };
+  const archive = async () => {
+    if (!canArchive) return;
+    await actions?.onArchiveItem?.(item.id, { fromSpace: true });
+  };
+
+  const openBtn = els.spaceView.querySelector("[data-space-open]");
+  const archiveBtn = els.spaceView.querySelector("[data-space-archive]");
+  const card = els.spaceView.querySelector("[data-space-card]");
+  const links = els.spaceView.querySelectorAll(".space-card__preview, .space-card__title");
+  links.forEach((link) => {
+    link.addEventListener("click", (event) => {
+      event.preventDefault();
+      open();
+    });
+  });
+  openBtn?.addEventListener("click", open);
+  archiveBtn?.addEventListener("click", () => { void archive(); });
+  bindSpaceSwipe(card, {
+    onRight: open,
+    onLeft: () => { void archive(); }
+  });
+
+  const preview = els.spaceView.querySelector(".space-card__preview-img");
+  if (preview) {
+    preview.addEventListener("error", () => {
+      const fallback = String(preview.getAttribute("data-fallback") || "").trim();
+      if (fallback && preview.src !== fallback) {
+        preview.src = fallback;
+        return;
+      }
+      preview.closest(".space-card__preview")?.remove();
+    });
+  }
+}
+
 function renderGrid(state, els, onChange, actions, L) {
-  if (state.activeCollectionId === "liquid") {
+  if (state.activeCollectionId === "liquid" || state.activeCollectionId === "space") {
     els.grid.innerHTML = "";
     els.grid.classList.remove("grid--empty");
     return;
@@ -721,11 +952,13 @@ function getActiveCollection(state) {
   if (state.activeCollectionId === "fav") return { id: "fav", name: "Favorites" };
   if (state.activeCollectionId === "hidden") return { id: "hidden", name: "Hidden" };
   if (state.activeCollectionId === "recent") return { id: "recent", name: "Recent", recentViewedIds: state.recentViewedIds || [] };
+  if (state.activeCollectionId === "space") return { id: "space", name: "Space" };
   if (state.activeCollectionId === "liquid") return { id: "liquid", name: "Liquid Lab" };
   return state.collections.find((c) => c.id === state.activeCollectionId) || { id: "all", name: "All" };
 }
 
 function itemInActiveContext(item, active) {
+  if (active?.id === "space") return !item.hidden;
   if (active?.id === "hidden") return !!item.hidden;
   if (!active || active.id === "all") return !item.hidden;
   if (active.id === "fav") return !!item.favorite && !item.hidden;
