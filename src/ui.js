@@ -508,8 +508,8 @@ function ensureSpaceRuntimeState(state) {
 
 function getSpaceQueue(state) {
   const space = ensureSpaceRuntimeState(state);
-  const sourceList = (state.items || []).filter((item) => !item.hidden);
-  const availableIds = new Set((state.items || []).map((item) => String(item.id || "").trim()).filter(Boolean));
+  const sourceList = (state.items || []).filter((item) => !item.hidden && !item.isDemo);
+  const availableIds = new Set(sourceList.map((item) => String(item.id || "").trim()).filter(Boolean));
   const dismissed = [...new Set((space.dismissedIds || [])
     .map((id) => String(id || "").trim())
     .filter((id) => id && availableIds.has(id)))];
@@ -627,12 +627,12 @@ function renderSpace(state, els, onChange, actions, L) {
     dotsTotal,
     Math.max(1, stats.total ? Math.round((position / stats.total) * dotsTotal) : 0)
   );
+  const dailyProgressText = stats.dailyDone >= 3
+    ? (L === "ru" ? `🔥 \u0421\u0435\u0440\u0438\u044f ${stats.streak} \u0434\u043d\u0435\u0439` : `🔥 Streak ${stats.streak} days`)
+    : (L === "ru" ? `${stats.dailyDone} / 3 \u0441\u0435\u0433\u043e\u0434\u043d\u044f` : `${stats.dailyDone} / 3 today`);
   const contextText = L === "ru"
     ? `${position} из ${stats.total} непросмотренных`
     : `${position} of ${stats.total} pending`;
-  const streakText = L === "ru"
-    ? `${t(L, "spaceStreakLabel")} ${stats.streak} дн.`
-    : `${t(L, "spaceStreakLabel")} ${stats.streak}d`;
 
   els.spaceView.innerHTML = `
     <div class="space-shell">
@@ -664,6 +664,7 @@ function renderSpace(state, els, onChange, actions, L) {
         <button type="button" class="space-btn space-btn--open" data-space-open="1" ${!safeUrl ? "disabled" : ""}>${escapeHtml(t(L, "spaceOpen"))}</button>
         <button type="button" class="space-btn space-btn--archive" data-space-archive="1" ${!canArchive ? "disabled" : ""}>${escapeHtml(t(L, "spaceArchive"))}</button>
       </div>
+      <div class="space-daily-progress" style="margin-top:8px;text-align:center;font-size:12px;color:var(--text-muted);">${escapeHtml(dailyProgressText)}</div>
 
       <div class="space-footer">
         <div class="space-dots">${Array.from({ length: dotsTotal }).map((_, index) => `<span class="space-dot ${index < dotsActive ? "space-dot--active" : ""}"></span>`).join("")}</div>
@@ -671,7 +672,6 @@ function renderSpace(state, els, onChange, actions, L) {
       </div>
 
       <div class="space-swipe">${escapeHtml(t(L, "spaceSwipeHint"))}</div>
-      <div class="space-streak">🔥 ${escapeHtml(streakText)}</div>
     </div>
   `;
 

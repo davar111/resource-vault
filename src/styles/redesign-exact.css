@@ -285,6 +285,22 @@
   background: var(--bg-surface-2);
 }
 
+/* Keep a single outline for controls: remove extra gray + focus ring layer. */
+.search:focus,
+.search:focus-visible,
+.sort:focus,
+.sort:focus-visible,
+.field input:focus,
+.field input:focus-visible,
+.field select:focus,
+.field select:focus-visible,
+.field textarea:focus,
+.field textarea:focus-visible {
+  border-color: var(--text-primary) !important;
+  box-shadow: none !important;
+  outline: none;
+}
+
 .btn-outline,
 .btn-sort {
   min-height: 34px;

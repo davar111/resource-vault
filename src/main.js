@@ -171,6 +171,11 @@ const els = {
   modalOnboarding: document.getElementById("modalOnboarding")
 };
 
+const CRITICAL_ELS = ["appRoot", "authGate", "grid", "spaceView", "modalAddLink"];
+CRITICAL_ELS.forEach((key) => {
+  if (!els[key]) console.warn(`[Vault] Missing critical element: #${key}`);
+});
+
 let currentUser = null;
 let knownTags = [];
 let activeTagMenuIndex = -1;
@@ -574,23 +579,32 @@ function updateAddSourceUi() {
 }
 
 function inferAutoTags(url, title, sourceCode) {
-  const host = domainFromUrl(url);
-  const map = {
-    behance: ["дизайн", "портфолио", "вдохновение"],
-    pinterest: ["дизайн", "референс", "идеи"],
-    dribbble: ["дизайн", "ui", "портфолио"],
-    awwwards: ["веб", "интерактив", "тренды"],
-    site: ["веб"]
-  };
-  const base = [...(map[sourceCode] || [])];
+  void sourceCode;
+  const host = String(domainFromUrl(url) || "").toLowerCase();
   const titleLower = String(title || "").toLowerCase();
-  if (titleLower.includes("figma")) base.push("figma", "инструмент");
-  if (titleLower.includes("ux")) base.push("ux");
-  if (titleLower.includes("ui")) base.push("ui");
-  if (titleLower.includes("guide") || titleLower.includes("гайд")) base.push("гайд");
-  if (host.includes("youtube")) base.push("видео");
-  if (host.includes("github")) base.push("код");
-  return normalizeTags(base).slice(0, 6);
+  const base = [];
+  const hasHost = (...domains) => domains.some((domain) => host === domain || host.endsWith(`.${domain}`));
+  const hasWord = (word) => new RegExp(`(^|[^a-z0-9])${word}([^a-z0-9]|$)`, "i").test(titleLower);
+
+  if (hasHost("github.com")) base.push("код", "инструмент");
+  if (hasHost("youtube.com", "youtu.be")) base.push("видео");
+  if (hasHost("medium.com", "substack.com", "habr.com")) base.push("статья");
+  if (hasHost("figma.com")) base.push("дизайн", "инструмент");
+  if (hasHost("notion.so")) base.push("продуктивность");
+  if (hasHost("twitter.com", "x.com")) base.push("соцсети");
+
+  if (
+    titleLower.includes("tutorial")
+    || titleLower.includes("туториал")
+    || titleLower.includes("гайд")
+    || titleLower.includes("guide")
+  ) {
+    base.push("туториал");
+  }
+  if (hasWord("ux")) base.push("ux");
+  if (hasWord("ui")) base.push("ui");
+
+  return normalizeTags(base).slice(0, 5);
 }
 
 function syncAddTagsInput() {
@@ -1112,12 +1126,13 @@ async function ensureHiddenAccess() {
 }
 
 async function loadData() {
+  const spaceStatsPromise = currentUser?.id ? getSpaceStats(currentUser.id) : Promise.resolve(null);
   const [links, collections, rows, savedFilters, spaceStats] = await Promise.all([
     listLinks(),
     listCollections(),
     listLinkCollections(),
     listSavedFilters(),
-    getSpaceStats(currentUser?.id || "")
+    spaceStatsPromise
   ]);
   const relMap = new Map();
   for (const rel of rows || []) {
@@ -1129,6 +1144,7 @@ async function loadData() {
     relMap.set(linkId, list);
   }
   state.items = links.map((x) => ({ ...x, isDemo: false, previewImage: previewFallbackUrl(x.url), collectionIds: relMap.get(x.id) || [] }));
+  pruneSpaceDismissedIds();
   state.collections = collections;
   applyCollectionUiSettings();
   state.savedFilters = savedFilters;
