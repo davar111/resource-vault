@@ -72,3 +72,4 @@
 - [2026-02-23 17:20] Space persistence: добавлен модуль `src/useSpaceStats.js` и интеграция в `src/main.js` (load + upsert после действий в Space); стрик и дневной прогресс теперь синхронизируются с Supabase для авторизованных.
 - [2026-02-23 17:20] Supabase schema: в `supabase.sql` добавлена таблица `public.user_space_stats` (PK `user_id`, `daily_done`, `streak_days`, `last_action_date`, `last_streak_date`) + RLS и own-only политики.
 - [2026-02-23 17:20] Проверки после интеграции persistence: `npm run check`, `npm test`, `npm run build` — OK.
+- [2026-02-23 17:30] Favicon update: в `index.html` `rel="icon"` переключен на `/favicon.svg`; добавлен `public/favicon.svg` с той же иконкой 2x2 квадратов, что используется в логотипе.
