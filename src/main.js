@@ -2,7 +2,7 @@
 import "./styles/monoFeedback.css";
 import { state } from "./state.js";
 import { loadLegacyVault, loadUiSettings, saveUiSettings } from "./storage.js";
-import { TAG_MAX_LEN, TAG_MIN_LEN, detectSourceFromUrl, domainFromUrl, normalizeSearchText, normalizeTags, previewFallbackUrl, tryFetchPreview, tryFetchTitle } from "./filter.js";
+import { TAG_MAX_LEN, TAG_MIN_LEN, detectSourceFromUrl, domainFromUrl, normalizeSearchText, normalizeTags, previewFallbackUrl, toHttpUrl, tryFetchPreview, tryFetchTitle } from "./filter.js";
 import { t } from "./i18n.js";
 import { render } from "./ui.js";
 import { flashStatus, startSpinner } from "./ui/monoFeedback.js";
@@ -63,6 +63,10 @@ const els = {
   activeMeta: document.getElementById("activeMeta"),
   statusLine: document.getElementById("statusLine"),
   searchInput: document.getElementById("searchInput"),
+  searchPanel: document.getElementById("searchPanel"),
+  searchPanelFilters: document.getElementById("searchPanelFilters"),
+  searchPanelResults: document.getElementById("searchPanelResults"),
+  searchPanelCount: document.getElementById("searchPanelCount"),
   sortSelect: document.getElementById("sortSelect"),
   btnFilters: document.getElementById("btnFilters"),
   topbarRight: document.getElementById("topbarRight"),
@@ -383,7 +387,7 @@ function renderAddCollectionChoices(selectedIds = []) {
       id: String(col.id),
       name: String(col.name || ""),
       dot: "#5b73ff",
-      count: visibleItems(state, col).length,
+      count: visibleCollectionItemCount(String(col.id)),
       isInbox: false
     }))
   ];
@@ -417,8 +421,10 @@ function renderAddCollectionChoices(selectedIds = []) {
 }
 
 function normalizeUrlForCompare(rawUrl) {
+  const normalized = toHttpUrl(rawUrl);
+  if (!normalized) return String(rawUrl || "").trim();
   try {
-    const u = new URL(String(rawUrl || "").trim());
+    const u = new URL(normalized);
     u.hash = "";
     if (u.pathname.length > 1) u.pathname = u.pathname.replace(/\/+$/, "");
     return u.toString();
@@ -431,6 +437,20 @@ function findDuplicateLink(url) {
   const target = normalizeUrlForCompare(url);
   const pool = state.isUsingDemoData ? state.items.filter((item) => !item.isDemo) : state.items;
   return pool.find((item) => normalizeUrlForCompare(item.url) === target) || null;
+}
+
+function canMutateItem(item) {
+  if (!item || item.isDemo) return false;
+  if (!state.currentUserId) return false;
+  const ownerId = String(item.ownerId || "");
+  return !ownerId || ownerId === state.currentUserId;
+}
+
+function visibleCollectionItemCount(collectionId) {
+  return state.items.filter((item) => {
+    if (item.hidden) return false;
+    return Array.isArray(item.collectionIds) && item.collectionIds.includes(collectionId);
+  }).length;
 }
 
 function invalidTagChunks(rawInput) {
@@ -532,7 +552,7 @@ function setAddFlowStep(step) {
   if (els.addPanelDone) els.addPanelDone.classList.toggle("modal-add-flow__panel--active", is3);
   if (els.addBack) els.addBack.hidden = !is2;
   if (els.addSkip) els.addSkip.hidden = !is2;
-  if (els.addCancel) els.addCancel.hidden = is3;
+  if (els.addCancel) els.addCancel.hidden = !is1;
   if (els.addSave) {
     els.addSave.disabled = false;
     els.addSave.textContent = is1 ? (state.lang === "ru" ? "Далее" : "Next") : is2 ? t(state.lang, "save") : (state.lang === "ru" ? "Закрыть" : "Close");
@@ -542,10 +562,8 @@ function setAddFlowStep(step) {
 async function parseAddUrl(urlRaw) {
   const currentToken = ++addFlowParseToken;
   const raw = String(urlRaw || "").trim();
-  let normalized = "";
-  try {
-    normalized = new URL(raw).toString();
-  } catch {
+  const normalized = toHttpUrl(raw);
+  if (!normalized) {
     return { ok: false, error: state.lang === "ru" ? "некорректный URL" : "invalid URL" };
   }
   const source = detectSourceFromUrl(normalized);
@@ -794,7 +812,7 @@ function applyI18n() {
   if (typeSelect) {
     for (const option of typeSelect.options) option.textContent = option.value ? t(L, `type_${optionKey(option.value)}`) : t(L, "anyOption");
   }
-  if (els.inputAddSource) {
+  if (els.inputAddSource && els.inputAddSource.tagName === "SELECT") {
     for (const option of els.inputAddSource.options) option.textContent = t(L, `source_${optionKey(option.value)}`);
   }
 
@@ -1038,10 +1056,8 @@ async function importOnboardingResources(resources, profile) {
       skipped += 1;
       continue;
     }
-    let url = "";
-    try {
-      url = new URL(rawUrl).toString();
-    } catch {
+    const url = toHttpUrl(rawUrl);
+    if (!url) {
       skipped += 1;
       continue;
     }
@@ -1100,8 +1116,7 @@ async function migrateLegacyIfNeeded() {
 
   const seen = new Set(state.items.map((x) => normalizeUrlForCompare(x.url)));
   for (const item of legacy.items || []) {
-    let url = "";
-    try { url = new URL(String(item.url || "").trim()).toString(); } catch {}
+    const url = toHttpUrl(String(item.url || "").trim());
     if (!url) continue;
     const normalized = normalizeUrlForCompare(url);
     if (seen.has(normalized)) continue;
@@ -1137,6 +1152,7 @@ const actions = {
     try {
       const item = state.items.find((x) => x.id === id);
       if (!item || item.isDemo) return;
+      if (!canMutateItem(item)) return;
       const updated = await updateLink(id, { ...item, favorite: !!next });
       if (updated) item.favorite = updated.favorite;
       requestRender();
@@ -1158,6 +1174,7 @@ const actions = {
         requestRender();
         return;
       }
+      if (!canMutateItem(item)) return;
       await deleteLink(id);
       state.items = state.items.filter((x) => x.id !== id);
       renderTagSuggestions();
@@ -1175,6 +1192,7 @@ const actions = {
     try {
       const item = state.items.find((x) => x.id === linkId);
       if (!item) return;
+      if (!canMutateItem(item)) return;
       const next = [...new Set([...(item.collectionIds || []), collectionId])];
       await replaceLinkCollections(linkId, next, currentUser.id);
       item.collectionIds = next;
@@ -1310,30 +1328,16 @@ function firstHttpUrl(input) {
   if (!text) return "";
   const lines = text.split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
   for (const line of lines) {
-    try {
-      const u = new URL(line);
-      if (u.protocol === "http:" || u.protocol === "https:") return u.toString();
-    } catch {}
+    const normalized = toHttpUrl(line);
+    if (normalized) return normalized;
   }
   const inline = text.match(/https?:\/\/[^\s<>"')]+/i)?.[0] || "";
-  if (!inline) return "";
-  try {
-    const u = new URL(inline);
-    return u.protocol === "http:" || u.protocol === "https:" ? u.toString() : "";
-  } catch {
-    return "";
-  }
+  return toHttpUrl(inline);
 }
 
 function setupEvents() {
   const mobileMq = window.matchMedia("(max-width: 700px)");
   const debouncedSearchRender = debounce(() => requestRender(), 150);
-  const debouncedAddParse = debounce(() => {
-    if (addFlowStep !== 1) return;
-    const raw = String(els.inputAddUrl?.value || "").trim();
-    if (!raw) return;
-    void parseAddUrl(raw);
-  }, 420);
   const setMobileMenu = (open) => {
     const isOpen = !!open;
     state.ui.mobileMenuOpen = isOpen;
@@ -1373,6 +1377,29 @@ function setupEvents() {
     state.activeSavedFilterId = null;
     state.search = String(e.target.value || "");
     debouncedSearchRender();
+  });
+  els.searchInput?.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      state.search = "";
+      if (els.searchInput) els.searchInput.value = "";
+      requestRender();
+      return;
+    }
+    if (e.key === "ArrowDown") {
+      const firstResult = els.searchPanelResults?.querySelector("[data-search-result]");
+      if (firstResult instanceof HTMLElement) {
+        e.preventDefault();
+        firstResult.focus();
+      }
+      return;
+    }
+    if (e.key === "Enter") {
+      const firstResult = els.searchPanelResults?.querySelector("[data-search-result]");
+      if (firstResult instanceof HTMLElement) {
+        e.preventDefault();
+        firstResult.click();
+      }
+    }
   });
   els.sortSelect?.addEventListener("change", (e) => { state.activeSavedFilterId = null; state.sortBy = FILTER_SORTS.has(String(e.target.value || "")) ? String(e.target.value) : "newest"; requestRender(); });
   els.btnFilters?.addEventListener("click", () => { state.ui.filtersOpen = !state.ui.filtersOpen; if (els.filtersPanel) els.filtersPanel.hidden = !state.ui.filtersOpen; });
@@ -1542,10 +1569,8 @@ function setupEvents() {
       );
       return;
     }
-    let url = "";
-    try {
-      url = new URL(rawUrl).toString();
-    } catch {
+    const url = toHttpUrl(rawUrl);
+    if (!url) {
       feedback.addFlashCancel = flashStatus(
         addStatusLine,
         state.lang === "ru" ? "некорректный URL" : "invalid URL",
@@ -1631,7 +1656,6 @@ function setupEvents() {
 
   els.inputAddUrl?.addEventListener("input", () => {
     updateAddSourceUi();
-    debouncedAddParse();
   });
   els.inputAddSource?.addEventListener("change", () => { sourceAutofillEnabled = false; });
   els.inputAddUrl?.addEventListener("keydown", async (e) => {
@@ -1770,11 +1794,11 @@ async function bootstrap() {
         currentUser = null;
         state.isAuthenticated = false;
         state.currentUserId = "";
-        state.items = [];
+        state.items = applyDemoPrefs(makeDemoLinks());
         state.collections = [];
         state.savedFilters = [];
         state.activeSavedFilterId = null;
-        state.isUsingDemoData = false;
+        state.isUsingDemoData = true;
       } else {
         state.items = applyDemoPrefs(makeDemoLinks());
         state.isUsingDemoData = true;
@@ -1785,13 +1809,8 @@ async function bootstrap() {
   } else {
     stopFeedbackSpinner("pageSpinner");
     state.currentUserId = "";
-    if (authIssueNotice) {
-      state.items = [];
-      state.isUsingDemoData = false;
-    } else {
-      state.items = applyDemoPrefs(makeDemoLinks());
-      state.isUsingDemoData = true;
-    }
+    state.items = applyDemoPrefs(makeDemoLinks());
+    state.isUsingDemoData = true;
     state.collections = [];
     state.savedFilters = [];
     state.activeSavedFilterId = null;

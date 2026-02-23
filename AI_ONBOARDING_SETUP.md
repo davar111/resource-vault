@@ -11,11 +11,14 @@
 ## 2) Apply DB schema
 1. Open Supabase project.
 2. Go to SQL Editor.
-3. Run `SupabaseSchema.sql`.
+3. Run `supabase.sql`.
 
 This creates:
 - `public.users` with `ai_profile` JSONB.
-- `public.links` with tags + indexes + RLS.
+- `public.links`, `public.collections`, `public.link_collections`, `public.saved_filters`, `public.collection_invites`.
+- Full RLS policies for private/shared collections and onboarding profile.
+
+`SupabaseSchema.sql` оставлен как legacy-референс для раннего AI-onboarding прототипа и не покрывает актуальные таблицы коллекций.
 
 ## 3) Add basic test data for `links`
 Run in SQL Editor (replace `YOUR_USER_ID`):

@@ -124,8 +124,10 @@
 .btn-icon-cross {
   display: inline-grid;
   place-items: center;
+  font-size: 20px;
+  font-weight: 400;
   line-height: 1;
-  transform: translate(0.5px, -1px);
+  transform: translate(0.5px, -2px);
 }
 .mobile-menu-btn__icon {
   width: 14px;
@@ -187,6 +189,10 @@
     min-width: 168px;
     flex: 0 0 168px;
   }
+  .sort-wrap {
+    min-width: 168px;
+    flex: 0 0 168px;
+  }
 }
 
 @media (max-width: 900px) {
@@ -194,6 +200,7 @@
   .topbar { flex-wrap: wrap; }
   .topbar__right { width: 100%; margin-left: 0; }
   .sort { min-width: 140px; flex: 0 1 140px; }
+  .sort-wrap { min-width: 140px; flex: 0 1 140px; }
   .search { width: 100%; flex: 1 1 auto; }
   .search-wrap { width: 100%; flex: 1 1 auto; }
   .filters-grid { grid-template-columns: 1fr; }

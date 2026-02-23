@@ -22,6 +22,19 @@ function safeJsonParse(raw, fallback) {
   }
 }
 
+function toHttpUrl(input) {
+  const raw = String(input || "").trim();
+  if (!raw) return "";
+  try {
+    const u = new URL(raw);
+    const protocol = String(u.protocol || "").toLowerCase();
+    if (protocol !== "http:" && protocol !== "https:") return "";
+    return u.toString();
+  } catch {
+    return "";
+  }
+}
+
 function buildFunctionUrl(explicit) {
   const base = String(explicit || "").trim();
   if (base) return base;
@@ -410,7 +423,8 @@ export function initOnboarding(options = {}) {
     if (!els.chat || !Array.isArray(resources) || !resources.length) return;
     for (const [idx, r] of resources.slice(0, 12).entries()) {
       const title = String(r?.title || r?.url || `Resource ${idx + 1}`);
-      const url = String(r?.url || "");
+      const url = toHttpUrl(r?.url);
+      if (!url) continue;
       const host = (() => {
         try {
           return new URL(url).hostname;

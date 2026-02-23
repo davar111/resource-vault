@@ -7,6 +7,7 @@ const TABLE = "links";
 function mapRow(row) {
   return {
     id: row.id,
+    ownerId: String(row.user_id || ""),
     url: String(row.url || ""),
     title: String(row.title || ""),
     note: String(row.note || ""),
@@ -25,7 +26,7 @@ export async function listLinks() {
   const rows = await supabaseRequest(restPath(TABLE), {
     method: "GET",
     query: {
-      select: "id,url,title,note,tags,type,source,favorite,is_hidden,created_at,updated_at",
+      select: "id,user_id,url,title,note,tags,type,source,favorite,is_hidden,created_at,updated_at",
       order: "created_at.desc"
     }
   });
@@ -70,7 +71,7 @@ export async function updateLink(id, input) {
 
   const rows = await supabaseRequest(restPath(TABLE), {
     method: "PATCH",
-    query: { id: `eq.${id}`, select: "id,url,title,note,tags,type,source,favorite,is_hidden,created_at,updated_at" },
+    query: { id: `eq.${id}`, select: "id,user_id,url,title,note,tags,type,source,favorite,is_hidden,created_at,updated_at" },
     body: payload,
     prefer: "return=representation"
   });

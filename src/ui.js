@@ -1,4 +1,4 @@
-import { matchesLink, domainFromUrl, faviconUrl, previewFallbackUrl } from "./filter.js";
+import { matchesLink, domainFromUrl, faviconUrl, previewFallbackUrl, toHttpUrl } from "./filter.js";
 import { t } from "./i18n.js";
 import { confirmDialog, promptDialog } from "./ui/feedback.js";
 import { showDialogWithA11y } from "./ui/dialogA11y.js";
@@ -12,6 +12,7 @@ export function render(state, els, onChange, actions = activeActions) {
   renderCollections(state, els, onChange, L);
   renderSavedFilters(state, els, onChange, activeActions, L);
   renderHeader(state, els, L);
+  renderSmartSearchPanel(state, els, onChange, L);
   renderActiveFilters(state, els, onChange, L);
   renderDemoHint(state, els, L);
   renderGrid(state, els, onChange, activeActions, L);
@@ -307,76 +308,180 @@ function renderActiveFilters(state, els, onChange, L) {
   if (!bar) return;
   bar.innerHTML = "";
   const chipsBar = bar.closest(".chipsbar");
-  const hasSearch = !!String(state.search || "").trim();
-  if (!hasSearch) {
-    if (chipsBar) chipsBar.hidden = true;
+  if (chipsBar) chipsBar.hidden = true;
+}
+
+function renderSmartSearchPanel(state, els, onChange, L) {
+  const panel = els.searchPanel;
+  const filtersWrap = els.searchPanelFilters;
+  const resultsWrap = els.searchPanelResults;
+  const countNode = els.searchPanelCount;
+  if (!panel || !filtersWrap || !resultsWrap || !countNode) return;
+
+  const query = String(state.search || "").trim();
+  if (!query) {
+    panel.hidden = true;
     return;
   }
-  if (chipsBar) chipsBar.hidden = false;
 
-  const appendSep = () => {
+  panel.hidden = false;
+  filtersWrap.innerHTML = "";
+
+  const appendSeparator = () => {
     const sep = document.createElement("span");
-    sep.className = "smart-chip-sep";
-    bar.appendChild(sep);
-  };
-  const appendChip = (label, active, onClick) => {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = `smart-chip ${active ? "smart-chip--active" : ""}`.trim();
-    btn.textContent = label;
-    btn.addEventListener("click", onClick);
-    bar.appendChild(btn);
+    sep.className = "smart-search-panel__sep";
+    filtersWrap.appendChild(sep);
   };
 
-  appendChip(`${L === "ru" ? "▦" : "▦"} ${L === "ru" ? "Везде" : "Everywhere"}`, state.activeCollectionId === "all" && !state.filters.favoriteOnly && !state.filters.tag, () => {
+  const appendChip = (label, active, onClick) => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = `smart-search-panel__chip ${active ? "smart-search-panel__chip--active" : ""}`.trim();
+    chip.textContent = label;
+    chip.addEventListener("click", () => {
+      onClick();
+      onChange?.();
+      render(state, els, onChange, activeActions);
+    });
+    filtersWrap.appendChild(chip);
+  };
+
+  const isEverywhere = state.activeCollectionId === "all" && !state.filters.favoriteOnly && !state.filters.tag;
+  appendChip(L === "ru" ? "▦ Везде" : "▦ Everywhere", isEverywhere, () => {
     state.activeSavedFilterId = null;
     state.activeCollectionId = "all";
     state.filters.favoriteOnly = false;
     state.filters.tag = "";
-    onChange?.();
-    render(state, els, onChange, activeActions);
   });
 
-  appendChip(L === "ru" ? "Избранное" : "Favorites", !!state.filters.favoriteOnly, () => {
+  appendChip(L === "ru" ? "☆ Избранное" : "☆ Favorites", !!state.filters.favoriteOnly, () => {
     state.activeSavedFilterId = null;
     state.filters.favoriteOnly = !state.filters.favoriteOnly;
-    onChange?.();
-    render(state, els, onChange, activeActions);
   });
 
-  appendSep();
-
-  (state.collections || []).slice(0, 3).forEach((col) => {
-    appendChip(`📁 ${col.name}`, state.activeCollectionId === col.id, () => {
-      state.activeSavedFilterId = null;
-      state.activeCollectionId = col.id;
-      onChange?.();
-      render(state, els, onChange, activeActions);
+  const collections = (state.collections || []).slice(0, 3);
+  if (collections.length) {
+    appendSeparator();
+    collections.forEach((col) => {
+      appendChip(`📁 ${col.name}`, state.activeCollectionId === col.id, () => {
+        state.activeSavedFilterId = null;
+        state.activeCollectionId = col.id;
+      });
     });
-  });
-
-  appendSep();
-
-  const active = getActiveCollection(state);
-  const tagPool = state.items
-    .filter((item) => itemInActiveContext(item, active))
-    .filter((item) => matchesSearch(item, state.search))
-    .flatMap((item) => Array.isArray(item.tags) ? item.tags : []);
-  const freq = new Map();
-  for (const rawTag of tagPool) {
-    const tag = String(rawTag || "").trim().toLowerCase();
-    if (!tag) continue;
-    freq.set(tag, (freq.get(tag) || 0) + 1);
   }
-  const popularTags = [...freq.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([tag]) => tag);
-  popularTags.forEach((tag) => {
-    appendChip(`🏷 ${tag}`, state.filters.tag === tag, () => {
-      state.activeSavedFilterId = null;
-      state.filters.tag = state.filters.tag === tag ? "" : tag;
-      onChange?.();
-      render(state, els, onChange, activeActions);
+
+  const currentResults = filteredItems(state);
+  const tagFreq = new Map();
+  for (const item of currentResults) {
+    for (const rawTag of Array.isArray(item.tags) ? item.tags : []) {
+      const tag = String(rawTag || "").trim().toLowerCase();
+      if (!tag) continue;
+      tagFreq.set(tag, (tagFreq.get(tag) || 0) + 1);
+    }
+  }
+  const popularTags = [...tagFreq.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([tag]) => tag);
+
+  if (popularTags.length) {
+    appendSeparator();
+    popularTags.forEach((tag) => {
+      appendChip(`🏷 ${tag}`, state.filters.tag === tag, () => {
+        state.activeSavedFilterId = null;
+        state.filters.tag = state.filters.tag === tag ? "" : tag;
+      });
+    });
+  }
+
+  const previewItems = currentResults.slice(0, 6);
+  resultsWrap.innerHTML = previewItems.map((item) => {
+    const safeUrl = toHttpUrl(item.url);
+    const domain = domainFromUrl(safeUrl);
+    const titleText = String(item.title || domain || "Untitled");
+    const noteText = String(item.note || "").trim();
+    const meta = noteText ? `${domain} · ${noteText}` : domain;
+    const tags = (Array.isArray(item.tags) ? item.tags : []).slice(0, 2);
+    const iconUrl = faviconUrl(safeUrl);
+    const badge = sourceBadgeText(item?.source, domain);
+    const iconHtml = iconUrl
+      ? `<img class="smart-search-panel__favicon-img" src="${escapeHtml(iconUrl)}" alt="" data-badge="${escapeHtml(badge)}">`
+      : `<span class="smart-search-panel__favicon-fallback">${escapeHtml(badge)}</span>`;
+
+    return `
+      <button type="button" class="smart-search-panel__result" data-search-result="${escapeHtml(item.id)}">
+        <span class="smart-search-panel__favicon">${iconHtml}</span>
+        <span class="smart-search-panel__info">
+          <span class="smart-search-panel__title">${highlightText(titleText, query)}</span>
+          <span class="smart-search-panel__meta">${highlightText(meta, query)}</span>
+        </span>
+        <span class="smart-search-panel__tags">${tags.map((tag) => `<span class="smart-search-panel__tag">${escapeHtml(tag)}</span>`).join("")}</span>
+      </button>
+    `;
+  }).join("");
+
+  resultsWrap.querySelectorAll("[data-search-result]").forEach((el) => {
+    const id = String(el.getAttribute("data-search-result") || "");
+    const item = state.items.find((x) => x.id === id);
+    if (!item) return;
+    const safeUrl = toHttpUrl(item.url);
+    const open = () => {
+      if (!safeUrl) return;
+      activeActions?.onOpenItem?.(item.id);
+      window.open(safeUrl, "_blank", "noopener,noreferrer");
+    };
+    el.addEventListener("click", open);
+    el.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        const next = el.nextElementSibling;
+        if (next instanceof HTMLElement) next.focus();
+        return;
+      }
+      if (event.key === "ArrowUp") {
+        event.preventDefault();
+        const prev = el.previousElementSibling;
+        if (prev instanceof HTMLElement) {
+          prev.focus();
+        } else if (els.searchInput instanceof HTMLElement) {
+          els.searchInput.focus();
+        }
+        return;
+      }
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      open();
     });
   });
+
+  resultsWrap.querySelectorAll(".smart-search-panel__favicon-img").forEach((img) => {
+    img.addEventListener("error", () => {
+      const badge = String(img.getAttribute("data-badge") || "•");
+      const fallback = document.createElement("span");
+      fallback.className = "smart-search-panel__favicon-fallback";
+      fallback.textContent = badge;
+      img.replaceWith(fallback);
+    }, { once: true });
+  });
+
+  countNode.textContent = formatSearchResultCount(currentResults.length, L);
+}
+
+function formatSearchResultCount(count, lang) {
+  if (lang !== "ru") return `${count} results`;
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  if (mod10 === 1 && mod100 !== 11) return `${count} результат`;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return `${count} результата`;
+  return `${count} результатов`;
+}
+
+function canManageItem(state, item) {
+  if (!item || item.isDemo) return false;
+  const currentUserId = String(state.currentUserId || "");
+  if (!currentUserId) return false;
+  const ownerId = String(item.ownerId || "");
+  return !ownerId || ownerId === currentUserId;
 }
 
 function renderGrid(state, els, onChange, actions, L) {
@@ -415,16 +520,20 @@ function renderGrid(state, els, onChange, actions, L) {
 
   for (let index = 0; index < list.length; index += 1) {
     const item = list[index];
+    const canManage = canManageItem(state, item);
     const card = document.createElement("div");
     card.className = `card${item.isDemo ? " card--demo" : ""}`;
     card.style.setProperty("--stagger", `${Math.min(index, 14) * 20}ms`);
-    card.draggable = true;
+    card.draggable = canManage;
     card.dataset.itemId = item.id;
 
-    const domain = domainFromUrl(item.url);
+    const safeUrl = toHttpUrl(item.url);
+    const hrefUrl = safeUrl || "#";
+    const domain = domainFromUrl(safeUrl);
     const tags = (item.tags || []).slice(0, 10);
-    const icon = faviconUrl(item.url);
-    const previewSrc = item.previewImage || previewFallbackUrl(item.url);
+    const icon = faviconUrl(safeUrl);
+    const previewSeed = safeUrl || "https://example.com";
+    const previewSrc = item.previewImage || previewFallbackUrl(previewSeed);
     const noteText = String(item.note || "").trim();
     const hasNote = !!noteText;
     const noteNeedsExpand = hasNote && (noteText.length > 90 || /\r?\n/.test(noteText));
@@ -437,10 +546,10 @@ function renderGrid(state, els, onChange, actions, L) {
       <div class="card__preview-wrap">
         ${item.isDemo ? `<span class="demo-badge">${escapeHtml(t(L, "demoBadge"))}</span>` : ""}
         ${item.isAiNew ? `<span class="new-badge">NEW</span>` : ""}
-        <a class="card__preview-link" href="${item.url}" target="_blank" rel="noreferrer" draggable="false">
-          <img class="card__preview" src="${escapeHtml(previewSrc)}" data-fallback="${escapeHtml(previewFallbackUrl(item.url))}" alt="${escapeHtml(item.title || "preview")}" loading="lazy" referrerpolicy="no-referrer" />
+        <a class="card__preview-link" href="${escapeHtml(hrefUrl)}" target="_blank" rel="noreferrer" draggable="false">
+          <img class="card__preview" src="${escapeHtml(previewSrc)}" data-fallback="${escapeHtml(previewFallbackUrl(previewSeed))}" alt="${escapeHtml(item.title || "preview")}" loading="lazy" referrerpolicy="no-referrer" />
         </a>
-        <button class="card__fav-preview ${item.favorite ? "card__fav-preview--on" : ""} ${item.isDemo ? "card__fav-preview--disabled" : ""}" type="button" title="${escapeHtml(t(L, "favorites"))}" ${item.isDemo ? "disabled" : ""}>
+        <button class="card__fav-preview ${item.favorite ? "card__fav-preview--on" : ""} ${!canManage ? "card__fav-preview--disabled" : ""}" type="button" title="${escapeHtml(t(L, "favorites"))}" ${!canManage ? "disabled" : ""}>
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" focusable="false">
             <path d="M8 2.5L9.9 6.3l4.2.6-3 2.9.7 4.2L8 11.8l-3.8 2.2.7-4.2-3-2.9 4.2-.6L8 2.5z"></path>
           </svg>
@@ -453,12 +562,12 @@ function renderGrid(state, els, onChange, actions, L) {
             ${renderCardFavicon(item, icon, domain)}
             <div class="card__source">${escapeHtml(domain || "other")}</div>
           </div>
-          <a class="card__title-link" href="${item.url}" target="_blank" rel="noreferrer" draggable="false">${highlightedTitle}</a>
+          <a class="card__title-link" href="${escapeHtml(hrefUrl)}" target="_blank" rel="noreferrer" draggable="false">${highlightedTitle}</a>
         </div>
         <div class="card__tools">
-          ${item.isDemo ? "" : `<button class="card__delete" type="button" data-del="1" aria-label="${escapeHtml(t(L, "del"))}" title="${escapeHtml(t(L, "del"))}">
+          ${canManage ? `<button class="card__delete" type="button" data-del="1" aria-label="${escapeHtml(t(L, "del"))}" title="${escapeHtml(t(L, "del"))}">
             <svg viewBox="18 18 20 22" aria-hidden="true" focusable="false"><path fill="currentColor" fill-rule="evenodd" d="M36 26v10.997c0 1.659-1.337 3.003-3.009 3.003h-9.981c-1.662 0-3.009-1.342-3.009-3.003v-10.997h16zm-2 0v10.998c0 .554-.456 1.002-1.002 1.002h-9.995c-.554 0-1.002-.456-1.002-1.002v-10.998h12zm-9-5c0-.552.451-1 .991-1h4.018c.547 0 .991.444.991 1 0 .552-.451 1-.991 1h-4.018c-.547 0-.991-.444-.991-1zm0 6.997c0-.551.444-.997 1-.997.552 0 1 .453 1 .997v6.006c0 .551-.444.997-1 .997-.552 0-1-.453-1-.997v-6.006zm4 0c0-.551.444-.997 1-.997.552 0 1 .453 1 .997v6.006c0 .551-.444.997-1 .997-.552 0-1-.453-1-.997v-6.006zm-6-5.997h-4.008c-.536 0-.992.448-.992 1 0 .556.444 1 .992 1h18.016c.536 0 .992-.448.992-1 0-.556-.444-1-.992-1h-4.008v-1c0-1.653-1.343-3-3-3h-3.999c-1.652 0-3 1.343-3 3v1z"/></svg>
-          </button>`}
+          </button>` : ""}
         </div>
       </div>
 
@@ -469,7 +578,7 @@ function renderGrid(state, els, onChange, actions, L) {
       <div class="tags">${tags.map((tg, i) => `<span class="tag ${i === 0 ? "tag--accent" : ""}"><span class="tag__text">${escapeHtml(tg)}</span></span>`).join("")}</div>
     `;
 
-    wireCardInteractions({ card, item, noteText, actions, els, L });
+    wireCardInteractions({ card, item, noteText, actions, els, L, canManage, safeUrl });
 
     fragment.appendChild(card);
   }
@@ -507,19 +616,19 @@ function sourceBadgeText(source, domain) {
   return d.slice(0, 1).toUpperCase();
 }
 
-function wireCardInteractions({ card, item, noteText, actions, els, L }) {
+function wireCardInteractions({ card, item, noteText, actions, els, L, canManage, safeUrl }) {
   card.addEventListener("click", async (e) => {
     const target = e.target instanceof Element ? e.target : null;
     if (!target) return;
 
-    if (!item.isDemo && target.closest(".card__fav-preview")) {
+    if (canManage && target.closest(".card__fav-preview")) {
       e.preventDefault();
       e.stopPropagation();
       await actions?.onToggleFavorite?.(item.id, !item.favorite);
       return;
     }
 
-    if (!item.isDemo && target.closest("[data-del]")) {
+    if (canManage && target.closest("[data-del]")) {
       e.preventDefault();
       const confirmed = await confirmDelete(els, L);
       if (!confirmed) return;
@@ -539,7 +648,13 @@ function wireCardInteractions({ card, item, noteText, actions, els, L }) {
     }
 
     const link = target.closest('a[target="_blank"]');
-    if (link) actions?.onOpenItem?.(item.id);
+    if (link) {
+      if (!safeUrl) {
+        e.preventDefault();
+        return;
+      }
+      actions?.onOpenItem?.(item.id);
+    }
   });
 
   const previewEl = card.querySelector(".card__preview");

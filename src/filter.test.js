@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { normalizeTags, matchesLink } from "./filter.js";
+import { normalizeTags, matchesLink, toHttpUrl } from "./filter.js";
 
 test("normalizeTags trims, lowercases, removes empties and duplicates", () => {
   assert.deepEqual(
@@ -84,4 +84,12 @@ test("matchesLink tagContains works as case-insensitive substring over tags", ()
   assert.equal(matchesLink(link, { tagContains: "UI" }), true);
   assert.equal(matchesLink(link, { tagContains: "xyz" }), false);
   assert.equal(matchesLink({ ...link, tags: [] }, { tagContains: "ui" }), false);
+});
+
+test("toHttpUrl accepts only http and https protocols", () => {
+  assert.equal(toHttpUrl("https://example.com"), "https://example.com/");
+  assert.equal(toHttpUrl("http://example.com/path"), "http://example.com/path");
+  assert.equal(toHttpUrl("javascript:evil(1)"), "");
+  assert.equal(toHttpUrl("data:text/html,<svg/onload=1>"), "");
+  assert.equal(toHttpUrl(""), "");
 });

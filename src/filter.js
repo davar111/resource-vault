@@ -1,6 +1,19 @@
 export const TAG_MIN_LEN = 2;
 export const TAG_MAX_LEN = 24;
 
+export function toHttpUrl(input) {
+  const raw = String(input || "").trim();
+  if (!raw) return "";
+  try {
+    const u = new URL(raw);
+    const protocol = String(u.protocol || "").toLowerCase();
+    if (protocol !== "http:" && protocol !== "https:") return "";
+    return u.toString();
+  } catch {
+    return "";
+  }
+}
+
 export function normalizeTags(input) {
   const rawList = Array.isArray(input)
     ? input
