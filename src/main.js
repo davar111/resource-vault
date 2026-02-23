@@ -645,7 +645,10 @@ async function parseLinkWithAi(meta) {
       }),
       signal: controller.signal
     });
-    if (!response.ok) return null;
+    if (!response.ok) {
+      console.warn("AI parse_link failed", response.status);
+      return null;
+    }
     const data = await response.json().catch(() => null);
     if (!data || typeof data !== "object") return null;
     const parsedTitle = String(data.title || "").trim().slice(0, TITLE_MAX_LEN);
@@ -806,7 +809,12 @@ async function parseAddUrl(urlRaw) {
     els.addAutoTags.innerHTML = addFlowAutoTags.map((tag) => `<span class="modal-add-flow__auto-tag"><span>авто</span> ${escapeHtml(tag)}</span>`).join("");
   }
   if (els.addParseStatus) els.addParseStatus.classList.add("modal-add-flow__parse-status--done");
-  if (els.addParseStatusText) els.addParseStatusText.textContent = state.lang === "ru" ? "Данные получены автоматически" : "Data parsed automatically";
+  if (els.addParseStatusText) {
+    const parsedSomeData = !!(fetchedTitle || fetchedPreview || aiParsed?.title || aiParsed?.preview || (aiParsed?.tags || []).length);
+    els.addParseStatusText.textContent = parsedSomeData
+      ? (state.lang === "ru" ? "Данные получены автоматически" : "Data parsed automatically")
+      : (state.lang === "ru" ? "Метаданные не найдены, использован адрес сайта" : "Metadata not found, using site address");
+  }
   renderAddTagChips();
   return { ok: true, url: normalized };
 }

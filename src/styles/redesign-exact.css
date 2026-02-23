@@ -1524,8 +1524,12 @@
 }
 
 .modal-add-flow__input:focus,
-.modal-add-flow__textarea:focus {
-  border-color: var(--add-flow-border-strong);
+.modal-add-flow__input:focus-visible,
+.modal-add-flow__textarea:focus,
+.modal-add-flow__textarea:focus-visible {
+  border-color: var(--text-primary);
+  box-shadow: none !important;
+  outline: none;
 }
 
 .modal-add-flow__hint {
@@ -1684,7 +1688,7 @@
 }
 
 .modal-add-flow__tags-wrap:focus-within {
-  border-color: var(--add-flow-border-strong);
+  border-color: var(--text-primary);
 }
 
 .modal-add-flow__tags-input {
@@ -1696,6 +1700,13 @@
   outline: none;
   min-width: 80px;
   flex: 1;
+}
+
+.modal-add-flow__tags-input:focus,
+.modal-add-flow__tags-input:focus-visible {
+  border: none;
+  box-shadow: none !important;
+  outline: none;
 }
 
 .modal-add-flow__tag-chip {

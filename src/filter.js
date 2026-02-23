@@ -72,6 +72,55 @@ export function faviconUrl(url) {
   return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(d)}&sz=64`;
 }
 
+function normalizeTitleText(input) {
+  return String(input || "")
+    .replaceAll("&amp;", "&")
+    .replaceAll("&quot;", '"')
+    .replaceAll("&#39;", "'")
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 120);
+}
+
+function extractTitleCandidate(text) {
+  const raw = String(text || "");
+  if (!raw) return "";
+
+  const htmlTitle =
+    raw.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["'][^>]*>/i)?.[1]
+    || raw.match(/<meta[^>]+name=["']twitter:title["'][^>]+content=["']([^"']+)["'][^>]*>/i)?.[1]
+    || raw.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1];
+  const normalizedHtml = normalizeTitleText(htmlTitle);
+  if (normalizedHtml) return normalizedHtml;
+
+  const lines = raw
+    .split(/\r?\n/g)
+    .map((line) => String(line || "").trim())
+    .filter(Boolean);
+
+  const markdownHeading = lines.find((line) => /^#\s+/.test(line));
+  if (markdownHeading) {
+    const value = normalizeTitleText(markdownHeading.replace(/^#\s+/, ""));
+    if (value) return value;
+  }
+
+  const labeledTitle = lines.find((line) => /^title\s*:/i.test(line));
+  if (labeledTitle) {
+    const value = normalizeTitleText(labeledTitle.replace(/^title\s*:/i, ""));
+    if (value) return value;
+  }
+
+  const firstMeaningful = lines.find((line) => {
+    if (line.length < 8 || line.length > 120) return false;
+    if (/^https?:\/\//i.test(line)) return false;
+    if (/^[#_*`>\-\[\]().,:;!?\s]+$/.test(line)) return false;
+    return true;
+  });
+  return normalizeTitleText(firstMeaningful);
+}
+
 export async function tryFetchTitle(url) {
   const clean = String(url || "").trim();
   if (!clean) return "";
@@ -84,11 +133,11 @@ export async function tryFetchTitle(url) {
 
   for (const u of candidates) {
     try {
-      const res = await fetchWithTimeout(u, 2200);
+      const res = await fetchWithTimeout(u, 3200);
       if (!res.ok) continue;
       const text = await res.text();
-      const m = text.match(/<title[^>]*>([^<]+)<\/title>/i);
-      if (m?.[1]) return m[1].trim().replace(/\s+/g, " ").slice(0, 120);
+      const title = extractTitleCandidate(text);
+      if (title) return title;
     } catch {}
   }
   return "";
@@ -108,7 +157,7 @@ export async function tryFetchPreview(url) {
 
   for (const u of candidates) {
     try {
-      const res = await fetchWithTimeout(u, 2200);
+      const res = await fetchWithTimeout(u, 3200);
       if (!res.ok) continue;
       const text = await res.text();
 
