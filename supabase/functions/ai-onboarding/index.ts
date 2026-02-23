@@ -232,6 +232,30 @@ function parseJsonFromText(input: string | null) {
   }
 }
 
+function toHttpUrl(input: string) {
+  const raw = String(input || "").trim();
+  if (!raw) return "";
+  try {
+    const u = new URL(raw);
+    const protocol = String(u.protocol || "").toLowerCase();
+    if (protocol !== "http:" && protocol !== "https:") return "";
+    return u.toString();
+  } catch {
+    return "";
+  }
+}
+
+function normalizeShortTags(input: unknown) {
+  const arr = Array.isArray(input) ? input : [];
+  const out = new Set<string>();
+  for (const raw of arr) {
+    const value = String(raw || "").trim().toLowerCase();
+    if (!value || value.length < 2) continue;
+    out.add(value.slice(0, 24));
+  }
+  return [...out].slice(0, 5);
+}
+
 function hostnameOf(url: string) {
   try {
     return new URL(String(url || "")).hostname.toLowerCase();
@@ -720,6 +744,48 @@ Deno.serve(async (req) => {
   const body = await req.json().catch(() => ({}));
   const action = String(body?.action || "");
   const role = String(body?.role || "").trim();
+
+  if (action === "parse_link") {
+    const url = toHttpUrl(String(body?.url || ""));
+    if (!url) return jsonResponse(400, { error: "Valid URL is required" });
+
+    const lang = String(body?.lang || "ru") === "en" ? "en" : "ru";
+    const inputTitle = String(body?.title || "").trim();
+    const inputPreview = toHttpUrl(String(body?.preview || "").trim());
+    const inputSource = String(body?.source || "").trim().toLowerCase();
+    const inputTags = normalizeShortTags(body?.tags);
+
+    const aiText = await askGroq(
+      "You improve metadata extraction for saved links. Return strict JSON only.",
+      [
+        `Language: ${lang === "en" ? "English" : "Russian"}`,
+        `URL: ${url}`,
+        `Current title: ${inputTitle || "(empty)"}`,
+        `Current preview image: ${inputPreview || "(empty)"}`,
+        `Current source: ${inputSource || "(empty)"}`,
+        `Current tags: ${inputTags.join(", ") || "(empty)"}`,
+        "Return strict JSON with keys:",
+        `{"title":"string","tags":["string","..."],"preview":"https://... or empty"}`,
+        "Rules:",
+        "- Improve title only if current one is weak/generic.",
+        "- Keep tags broad and practical for a knowledge vault.",
+        "- Max 5 tags, lowercase.",
+        "- preview must be http/https or empty string.",
+        "- Do not include any explanation."
+      ].join("\n")
+    );
+
+    const parsed = parseJsonFromText(aiText);
+    const title = String(parsed?.title || "").trim().slice(0, 120);
+    const tags = normalizeShortTags(parsed?.tags);
+    const preview = toHttpUrl(String(parsed?.preview || ""));
+
+    return jsonResponse(200, {
+      title,
+      tags,
+      preview
+    });
+  }
 
   if (action === "chat_turn") {
     if (!role) return jsonResponse(400, { error: "Role is required" });

@@ -28,6 +28,7 @@ const THEME_MODES = new Set(["system", "light", "dark"]);
 const HIDDEN_PASSWORD_KEY = "resource_vault_hidden_password_v1";
 const DEMO_PREFS_KEY = "resource_vault_demo_prefs_v1";
 const ENABLE_AI_ONBOARDING = true;
+const AI_FUNCTION_PATH = "/functions/v1/ai-onboarding";
 
 const els = {
   langSelect: document.getElementById("langSelect"),
@@ -607,6 +608,61 @@ function inferAutoTags(url, title, sourceCode) {
   return normalizeTags(base).slice(0, 5);
 }
 
+function looksGenericParsedTitle(title, normalizedUrl) {
+  const value = String(title || "").trim().toLowerCase();
+  if (!value) return true;
+  const domain = String(domainFromUrl(normalizedUrl) || "").trim().toLowerCase();
+  if (domain && (value === domain || value === `www.${domain}`)) return true;
+  if (value.length < TITLE_MIN_LEN) return true;
+  return false;
+}
+
+async function parseLinkWithAi(meta) {
+  if (!state.isAuthenticated) return null;
+  let token = "";
+  try {
+    token = String(await getSessionAccessToken() || "").trim();
+  } catch {}
+  if (!token) return null;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 4200);
+  try {
+    const response = await fetch(AI_FUNCTION_PATH, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        action: "parse_link",
+        lang: state.lang || "ru",
+        url: meta?.url || "",
+        title: meta?.title || "",
+        preview: meta?.preview || "",
+        source: meta?.source || "",
+        tags: Array.isArray(meta?.tags) ? meta.tags : []
+      }),
+      signal: controller.signal
+    });
+    if (!response.ok) return null;
+    const data = await response.json().catch(() => null);
+    if (!data || typeof data !== "object") return null;
+    const parsedTitle = String(data.title || "").trim().slice(0, TITLE_MAX_LEN);
+    const parsedPreview = toHttpUrl(String(data.preview || "").trim());
+    const parsedTags = normalizeTags(Array.isArray(data.tags) ? data.tags : []).slice(0, 5);
+    return {
+      title: parsedTitle,
+      preview: parsedPreview,
+      tags: parsedTags
+    };
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function syncAddTagsInput() {
   if (!els.inputAddTags) return;
   const merged = normalizeTags([...(addFlowAutoTags || []), ...(addFlowManualTags || [])]);
@@ -713,12 +769,30 @@ async function parseAddUrl(urlRaw) {
   } catch {}
   if (currentToken !== addFlowParseToken) return { ok: false, error: "stale" };
 
-  const finalTitle = String(fetchedTitle || domainFromUrl(normalized) || normalized).trim().slice(0, TITLE_MAX_LEN);
+  let finalTitle = String(fetchedTitle || domainFromUrl(normalized) || normalized).trim().slice(0, TITLE_MAX_LEN);
+  let finalPreview = fetchedPreview;
+  const baseTags = inferAutoTags(normalized, finalTitle, source);
+
+  const aiParsed = await parseLinkWithAi({
+    url: normalized,
+    title: finalTitle,
+    preview: finalPreview,
+    source,
+    tags: baseTags
+  });
+  if (currentToken !== addFlowParseToken) return { ok: false, error: "stale" };
+  if (aiParsed?.title && looksGenericParsedTitle(finalTitle, normalized)) {
+    finalTitle = aiParsed.title;
+  }
+  if (aiParsed?.preview && !finalPreview) {
+    finalPreview = aiParsed.preview;
+  }
+
   if (els.inputAddTitle && !String(els.inputAddTitle.value || "").trim()) els.inputAddTitle.value = finalTitle;
   if (els.addParsedTitle) els.addParsedTitle.textContent = finalTitle;
   if (els.addParsedThumb) {
-    if (fetchedPreview) {
-      els.addParsedThumb.innerHTML = `<img src="${escapeHtml(fetchedPreview)}" alt="" loading="lazy" referrerpolicy="no-referrer" /><span id="addParsedShimmer" class="modal-add-flow__parse-thumb-shimmer" aria-hidden="true" hidden></span>`;
+    if (finalPreview) {
+      els.addParsedThumb.innerHTML = `<img src="${escapeHtml(finalPreview)}" alt="" loading="lazy" referrerpolicy="no-referrer" /><span id="addParsedShimmer" class="modal-add-flow__parse-thumb-shimmer" aria-hidden="true" hidden></span>`;
       els.addParsedShimmer = els.addParsedThumb.querySelector("#addParsedShimmer");
       els.addParsedThumbEmoji = null;
     } else {
@@ -727,7 +801,7 @@ async function parseAddUrl(urlRaw) {
     }
   }
 
-  addFlowAutoTags = inferAutoTags(normalized, finalTitle, source);
+  addFlowAutoTags = normalizeTags([...(aiParsed?.tags || []), ...baseTags]).slice(0, 5);
   if (els.addAutoTags) {
     els.addAutoTags.innerHTML = addFlowAutoTags.map((tag) => `<span class="modal-add-flow__auto-tag"><span>авто</span> ${escapeHtml(tag)}</span>`).join("");
   }
