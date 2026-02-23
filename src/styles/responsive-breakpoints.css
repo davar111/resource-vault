@@ -112,7 +112,9 @@
 .btn--compact {
   min-height: 36px;
   padding: 5px 10px 7px;
-  min-width: 78px;
+  min-width: 0;
+  width: auto;
+  white-space: nowrap;
 }
 
 .mobile-menu-btn,

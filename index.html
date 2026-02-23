@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="ru">
   <head>
     <meta charset="UTF-8" />
@@ -16,21 +16,17 @@
           <div class="sidebar-logo brand-row">
             <div class="logo-mark" aria-hidden="true">
               <svg viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect x="1" y="1" width="5" height="5" rx="1.5" fill="#f5f4f1"/>
-                <rect x="8" y="1" width="5" height="5" rx="1.5" fill="#f5f4f1" opacity="0.5"/>
-                <rect x="1" y="8" width="5" height="5" rx="1.5" fill="#f5f4f1" opacity="0.5"/>
-                <rect x="8" y="8" width="5" height="5" rx="1.5" fill="#f5f4f1" opacity="0.3"/>
+                <rect x="1" y="1" width="5" height="5" rx="1.5" fill="currentColor"/>
+                <rect x="8" y="1" width="5" height="5" rx="1.5" fill="currentColor" opacity="0.5"/>
+                <rect x="1" y="8" width="5" height="5" rx="1.5" fill="currentColor" opacity="0.5"/>
+                <rect x="8" y="8" width="5" height="5" rx="1.5" fill="currentColor" opacity="0.3"/>
               </svg>
             </div>
             <span id="brand" class="brand logo-name">Vault</span>
             <div class="top-controls">
-              <select id="langSelect" class="lang-select" aria-label="Language">
-                <option value="ru">RU</option>
-                <option value="en">EN</option>
-              </select>
-              <button id="btnTheme" class="btn btn--secondary btn--compact" type="button" aria-label="Toggle theme">Dark</button>
+              <button id="btnTheme" class="btn btn--secondary btn--compact btn--theme-icon" type="button" aria-label="Toggle theme"></button>
             </div>
-            <button id="btnMobileClose" class="btn btn--secondary btn--icon mobile-close-btn" type="button" aria-label="Close menu"><span class="btn-icon-cross">×</span></button>
+            <button id="btnMobileClose" class="btn btn--secondary btn--icon mobile-close-btn" type="button" aria-label="Close menu"><span class="btn-icon-cross">Г—</span></button>
           </div>
 
           <div class="sidebar__section sidebar-section">
@@ -77,7 +73,7 @@
 
         <div class="sidebar__bottom sidebar__bottom--stack">
           <button id="btnAddLink" class="btn btn--primary" type="button">+ Add link</button>
-          <button id="btnAiOnboarding" class="btn btn--secondary" type="button">AI-онбординг</button>
+          <button id="btnAiOnboarding" class="btn btn--secondary" type="button">AI-РѕРЅР±РѕСЂРґРёРЅРі</button>
           <button id="btnAuth" class="btn btn--secondary btn-auth" type="button">
             <span class="btn-auth__icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" focusable="false">
@@ -91,7 +87,7 @@
           </button>
           <div id="authStatus" class="hint" role="status" aria-live="polite"></div>
 
-          <div id="localHint" class="hint">Данные хранятся локально в браузере (localStorage).</div>
+          <div id="localHint" class="hint">Р”Р°РЅРЅС‹Рµ С…СЂР°РЅСЏС‚СЃСЏ Р»РѕРєР°Р»СЊРЅРѕ РІ Р±СЂР°СѓР·РµСЂРµ (localStorage).</div>
         </div>
       </aside>
 
@@ -112,15 +108,8 @@
                 </svg>
               </span>
               <input id="searchInput" class="search search-input" placeholder="Search in current context..." aria-label="Search links" />
+              <span class="search-shortcut">⌘K</span>
             </div>
-            <button id="btnFilters" class="btn btn--secondary btn-filters btn-outline" type="button">
-              <span class="btn-filters__icon" aria-hidden="true">
-                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
-                  <path d="M2 4h12M4 8h8M6 12h4"></path>
-                </svg>
-              </span>
-              <span class="btn-filters__label">Filters</span>
-            </button>
             <select id="sortSelect" class="sort btn-sort" aria-label="Sort">
               <option value="newest">Newest first</option>
               <option value="oldest">Oldest first</option>
@@ -131,33 +120,7 @@
           </div>
         </header>
 
-        <section id="filtersPanel" class="filters-panel filters-bar" hidden>
-          <div class="filters-grid">
-            <div class="filter-row">
-              <span class="filter-label" id="labelFilterTypes">Types</span>
-              <div class="pills multi__chips" id="filterTypes"></div>
-            </div>
-
-            <div class="filter-row">
-              <span class="filter-label" id="labelFilterSources">Sources</span>
-              <div class="pills multi__chips" id="filterSources"></div>
-            </div>
-
-            <div class="filter-row">
-              <span class="filter-label" id="labelFilterTag">Tag</span>
-              <div class="filter-search-wrap">
-                <input id="filterTagInput" class="filter-input" placeholder="fintech" />
-                <label class="checkbox-label">
-                  <input id="filterFavoriteOnly" type="checkbox" />
-                  <span id="labelFilterFavorite">Only favorites</span>
-                </label>
-              </div>
-            </div>
-          </div>
-          <div class="filters-actions">
-            <button id="btnSaveFilterInline" class="btn btn--secondary" type="button" hidden>Save filter</button>
-          </div>
-        </section>
+        <section id="filtersPanel" class="filters-panel filters-bar" hidden></section>
 
         <section id="chipsBar" class="chipsbar">
           <div id="activeFilters" class="chips"></div>
@@ -171,42 +134,92 @@
         <section id="liquidLab" class="liquid-lab" hidden>
           <canvas id="liquidCanvas" class="liquid-lab__canvas"></canvas>
           <div id="liquidFallback" class="liquid-lab__fallback" hidden>
-            <div id="liquidFallbackTitle" class="liquid-lab__fallback-title">WebGL недоступен</div>
-            <div id="liquidFallbackText" class="liquid-lab__fallback-text">Эта демо-вкладка требует поддержку WebGL в браузере.</div>
+            <div id="liquidFallbackTitle" class="liquid-lab__fallback-title">WebGL РЅРµРґРѕСЃС‚СѓРїРµРЅ</div>
+            <div id="liquidFallbackText" class="liquid-lab__fallback-text">Р­С‚Р° РґРµРјРѕ-РІРєР»Р°РґРєР° С‚СЂРµР±СѓРµС‚ РїРѕРґРґРµСЂР¶РєСѓ WebGL РІ Р±СЂР°СѓР·РµСЂРµ.</div>
           </div>
         </section>
 
         <section id="grid" class="grid"></section>
       </main>
     </div>
-    <section id="authGate" class="auth-gate" hidden>
-      <div class="auth-gate__showcase">
-        <div class="auth-gate__showcase-inner">
-          <div id="authGateShowcaseTitle" class="auth-gate__showcase-title">Храните ссылки, коллекции и фильтры в одном месте</div>
-          <p id="authGateShowcaseText" class="auth-gate__showcase-text">Единый vault для находок, референсов и рабочих подборок.</p>
+    <section id="authGate" class="auth-gate auth-login" hidden>
+      <div class="auth-login__left">
+        <div class="auth-login__stack">
+          <div class="auth-login__mini-card auth-login__mini-card--1">
+            <div class="auth-login__mini-thumb">🏆</div>
+            <div class="auth-login__mini-body">
+              <div class="auth-login__mini-source">cssdesignawards.com</div>
+              <div class="auth-login__mini-title">CSS Design Awards — сайт дня</div>
+              <div class="auth-login__mini-tags"><span class="auth-login__mini-tag">награды</span><span class="auth-login__mini-tag">тренды</span></div>
+            </div>
+          </div>
+          <div class="auth-login__mini-card auth-login__mini-card--2">
+            <div class="auth-login__mini-thumb">📌</div>
+            <div class="auth-login__mini-body">
+              <div class="auth-login__mini-source">pinterest.com</div>
+              <div class="auth-login__mini-title">Pinterest: типографика</div>
+              <div class="auth-login__mini-tags"><span class="auth-login__mini-tag">шрифты</span><span class="auth-login__mini-tag">дизайн</span></div>
+            </div>
+          </div>
+          <div class="auth-login__mini-card auth-login__mini-card--3">
+            <div class="auth-login__mini-thumb">🎨</div>
+            <div class="auth-login__mini-body">
+              <div class="auth-login__mini-source">behance.net</div>
+              <div class="auth-login__mini-title">Behance — главная</div>
+              <div class="auth-login__mini-tags"><span class="auth-login__mini-tag">вдохновение</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="auth-login__left-footer">
+          <div id="authGateShowcaseTitle" class="auth-login__left-tagline">Храните ссылки<br />и коллекции<br />в одном месте</div>
+          <p id="authGateShowcaseText" class="auth-login__left-sub">Сохраняйте, организуйте и находите нужное быстро.</p>
+          <div class="auth-login__feature-list">
+            <div class="auth-login__feature-item"><span class="auth-login__feature-dot"></span>Умные теги и фильтры</div>
+            <div class="auth-login__feature-item"><span class="auth-login__feature-dot"></span>Совместные коллекции</div>
+            <div class="auth-login__feature-item"><span class="auth-login__feature-dot"></span>Превью и заметки</div>
+          </div>
         </div>
       </div>
-      <div class="auth-gate__panel">
-        <div class="auth-gate__card">
-          <div class="auth-gate__brandline auth-gate__brandline--compact">
-            <img class="auth-gate__logo" src="/favicon.png?v=2" alt="" />
-            <span id="authGateBrandInline">Vault</span>
+
+      <div class="auth-login__right">
+        <div class="auth-login__box">
+          <div class="auth-login__logo-line">
+            <div class="auth-login__logo-mark" aria-hidden="true">
+              <svg viewBox="0 0 14 14" fill="none">
+                <rect x="1" y="1" width="5" height="5" rx="1.5" fill="#0e0e0d"/>
+                <rect x="8" y="1" width="5" height="5" rx="1.5" fill="#0e0e0d" opacity="0.5"/>
+                <rect x="1" y="8" width="5" height="5" rx="1.5" fill="#0e0e0d" opacity="0.5"/>
+                <rect x="8" y="8" width="5" height="5" rx="1.5" fill="#0e0e0d" opacity="0.3"/>
+              </svg>
+            </div>
+            <span id="authGateBrandInline" class="auth-login__logo-name">Vault</span>
           </div>
-          <div id="authGateTitle" class="auth-gate__title">Войдите в аккаунт</div>
-          <p id="authGateText" class="auth-gate__text">Чтобы управлять ссылками и коллекциями, войдите через Google.</p>
-          <div class="auth-gate__actions">
-            <button id="authGateBtn" class="btn btn--primary btn-auth" type="button">
-              <span class="btn-auth__icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" focusable="false">
-                  <path fill="#4285F4" d="M21.6 12.23c0-.64-.06-1.25-.16-1.85H12v3.5h5.4a4.63 4.63 0 0 1-2 3.04v2.52h3.23c1.9-1.75 2.97-4.32 2.97-7.21z"/>
-                  <path fill="#34A853" d="M12 22c2.7 0 4.96-.9 6.62-2.44l-3.23-2.52c-.9.6-2.04.96-3.39.96-2.6 0-4.8-1.76-5.59-4.12H3.08v2.59A9.99 9.99 0 0 0 12 22z"/>
-                  <path fill="#FBBC05" d="M6.41 13.88a5.99 5.99 0 0 1 0-3.76V7.53H3.08a10 10 0 0 0 0 8.94l3.33-2.59z"/>
-                  <path fill="#EA4335" d="M12 6c1.47 0 2.8.51 3.84 1.5l2.88-2.88C16.95 2.98 14.7 2 12 2a10 10 0 0 0-8.92 5.53l3.33 2.59C7.2 7.76 9.4 6 12 6z"/>
-                </svg>
-              </span>
-              <span id="authGateBtnLabel">Войти через Google</span>
-            </button>
-            <button id="authGateGuestBtn" class="btn btn--secondary" type="button">Продолжить как гость</button>
+
+          <div id="authGateTitle" class="auth-login__title">Вход</div>
+          <p id="authGateText" class="auth-login__sub">Войдите, чтобы продолжить</p>
+
+          <button id="authGateBtn" class="auth-login__btn-google" type="button">
+            <svg class="auth-login__google-icon" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#4285F4"/>
+              <path d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z" fill="#34A853"/>
+              <path d="M3.964 10.707A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.707V4.961H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.039l3.007-2.332z" fill="#FBBC05"/>
+              <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.961L3.964 7.293C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
+            </svg>
+            <span id="authGateBtnLabel">Войти через Google</span>
+          </button>
+
+          <div class="auth-login__divider">
+            <div class="auth-login__divider-line"></div>
+            <span class="auth-login__divider-text">или</span>
+            <div class="auth-login__divider-line"></div>
+          </div>
+
+          <button id="authGateGuestBtn" class="auth-login__btn-guest" type="button">Продолжить как гость</button>
+
+          <div class="auth-login__footer">
+            Входя, вы соглашаетесь с <a href="#" tabindex="-1">условиями</a><br />
+            и <a href="#" tabindex="-1">политикой конфиденциальности</a>
           </div>
         </div>
       </div>
@@ -214,79 +227,102 @@
     <div id="mobileOverlay" class="mobile-overlay" aria-hidden="true"></div>
 
     <dialog id="modalAddLink" class="modal">
-      <form method="dialog" class="modal__card" id="formAddLink">
-        <div class="modal__header">
-          <div id="modalAddTitle" class="modal__title">Add link</div>
-          <button id="addCloseX" class="btn btn--icon btn--ghost" type="button" aria-label="Close"><span class="btn-icon-cross">×</span></button>
+      <form method="dialog" class="modal__card modal-add-flow" id="formAddLink">
+        <div class="modal-add-flow__head">
+          <div id="modalAddTitle" class="modal-add-flow__title">Добавить ссылку</div>
+          <button id="addCloseX" class="btn btn--icon btn--ghost" type="button" aria-label="Close">
+            <span class="btn-icon-cross">Г—</span>
+          </button>
         </div>
 
-        <div class="modal__section">
-          <label class="field">
-            <span id="labelAddUrl">URL</span>
-            <input name="url" required placeholder="https://..." />
-          </label>
-
-          <label class="field">
-            <span id="labelAddTitle">Title</span>
-            <input id="inputAddTitle" name="title" placeholder="Optional" />
-          </label>
+        <div class="modal-add-flow__steps">
+          <div id="addStep1" class="modal-add-flow__step modal-add-flow__step--active">01 · Ссылка</div>
+          <div id="addStep2" class="modal-add-flow__step">02 · Детали</div>
+          <div id="addStep3" class="modal-add-flow__step">03 · Готово</div>
         </div>
 
-        <div id="addToSection" class="modal__section">
-          <div id="labelAddTo" class="modal__section-title">Add to collections</div>
-          <div id="addCollectionsList" class="multi__chips"></div>
-        </div>
+        <div class="modal-add-flow__body">
+          <section id="addPanelUrl" class="modal-add-flow__panel modal-add-flow__panel--active">
+            <label class="modal-add-flow__field">
+              <span id="labelAddUrl" class="modal-add-flow__label">Ссылка</span>
+              <span class="modal-add-flow__url-wrap">
+                <span class="modal-add-flow__url-icon" aria-hidden="true">
+                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M6.5 5.5h-1A3.5 3.5 0 1 0 5.5 12h1"></path>
+                    <path d="M9.5 10.5h1a3.5 3.5 0 1 0 0-7h-1"></path>
+                    <path d="M5.5 8h5"></path>
+                  </svg>
+                </span>
+                <input id="inputAddUrl" name="url" class="modal-add-flow__input modal-add-flow__input--url" required placeholder="Вставь URL и нажми Enter..." />
+              </span>
+            </label>
+            <div class="modal-add-flow__hint">Вставь ссылку. Название, превью и теги заполнятся автоматически.</div>
+            <div id="addParsedCard" class="modal-add-flow__parse" hidden>
+              <div id="addParsedThumb" class="modal-add-flow__parse-thumb">
+                <span class="modal-add-flow__parse-thumb-emoji">🔗</span>
+                <span id="addParsedShimmer" class="modal-add-flow__parse-thumb-shimmer" aria-hidden="true"></span>
+              </div>
+              <div class="modal-add-flow__parse-body">
+                <div id="addParsedSource" class="modal-add-flow__parse-source">source</div>
+                <div id="addParsedTitle" class="modal-add-flow__parse-title">Title</div>
+              </div>
+              <div id="addParseStatus" class="modal-add-flow__parse-status">
+                <span class="modal-add-flow__spinner" aria-hidden="true"></span>
+                <span id="addParseStatusText">Парсим страницу...</span>
+              </div>
+              <div id="addAutoTags" class="modal-add-flow__auto-tags"></div>
+            </div>
+          </section>
 
-        <div class="modal__section">
-          <label class="field">
-            <span id="labelAddTags">Tags (comma)</span>
-            <input id="inputAddTags" name="tags" autocomplete="off" placeholder="dark, fintech" />
-            <div id="addTagsMenu" class="add-tags-menu" hidden></div>
-          </label>
+          <section id="addPanelDetails" class="modal-add-flow__panel">
+            <input id="inputAddTitle" name="title" type="hidden" />
+            <input id="inputAddTags" name="tags" type="hidden" />
+            <input name="type" type="hidden" />
+            <input id="inputAddSource" name="source" type="hidden" />
+            <input id="addCollectionHidden" name="collections" type="hidden" />
 
-          <div class="row">
-            <label class="field">
-              <span id="labelAddType">Type</span>
-              <select name="type">
-                <option value="">Any</option>
-                <option value="case">Case</option>
-                <option value="inspiration">Inspiration</option>
-                <option value="article">Article</option>
-                <option value="tool">Tool</option>
-                <option value="asset">Asset</option>
-              </select>
+            <label class="modal-add-flow__field">
+              <span id="labelAddTags" class="modal-add-flow__label">Теги</span>
+              <div id="addTagsWrap" class="modal-add-flow__tags-wrap">
+                <input id="addTagInput" class="modal-add-flow__tags-input" type="text" placeholder="добавить тег..." />
+              </div>
             </label>
 
-            <label id="addSourceField" class="field">
-              <span id="labelAddSource">Source</span>
-              <select id="inputAddSource" name="source">
-                <option value="other">Other</option>
-                <option value="site">Site</option>
-                <option value="behance">Behance</option>
-                <option value="awwwards">Awwwards</option>
-                <option value="pinterest">Pinterest</option>
-                <option value="dribbble">Dribbble</option>
-              </select>
+            <section id="addToSection" class="modal-add-flow__field">
+              <span id="labelAddTo" class="modal-add-flow__label">Коллекция</span>
+              <div id="addCollectionsList" class="modal-add-flow__collections"></div>
+            </section>
+
+            <label class="modal-add-flow__field">
+              <span id="labelAddNote" class="modal-add-flow__label">Заметка</span>
+              <textarea id="inputAddNote" name="note" rows="3" class="modal-add-flow__textarea" placeholder="Зачем сохранил?"></textarea>
             </label>
+
+            <label class="check modal-add-flow__favorite" hidden>
+              <input id="addFavorite" type="checkbox" name="favorite" />
+              <span id="labelAddFavorite">Favorite</span>
+            </label>
+          </section>
+
+          <section id="addPanelDone" class="modal-add-flow__panel">
+            <div class="modal-add-flow__done">
+              <div class="modal-add-flow__done-icon">✓</div>
+              <div class="modal-add-flow__done-title">Ссылка сохранена</div>
+              <div class="modal-add-flow__done-text">Можно добавить ещё одну или закрыть окно.</div>
+            </div>
+          </section>
+        </div>
+
+        <div class="modal-add-flow__footer">
+          <button id="addCancel" class="btn btn--secondary" type="button">Отмена</button>
+          <button id="addSkip" class="modal-add-flow__skip" type="button">Пропустить детали →</button>
+          <div class="modal-add-flow__footer-right">
+            <button id="addBack" class="btn btn--secondary" type="button">Назад</button>
+            <button id="addSave" class="btn btn--primary" type="button">Далее</button>
           </div>
-
-          <label class="check">
-            <input id="addFavorite" type="checkbox" name="favorite" />
-            <span id="labelAddFavorite">Favorite</span>
-          </label>
         </div>
 
-        <div class="modal__section">
-          <label class="field">
-            <span id="labelAddNote">Note</span>
-            <textarea id="inputAddNote" name="note" rows="3" placeholder="Зачем сохранил?"></textarea>
-          </label>
-        </div>
-
-        <div class="row row--end">
-          <button id="addCancel" class="btn btn--secondary" type="button">Cancel</button>
-          <button id="addSave" class="btn btn--primary" type="submit">Save</button>
-        </div>
+        <div id="addTagsMenu" class="add-tags-menu" hidden></div>
       </form>
     </dialog>
 
@@ -294,7 +330,7 @@
       <form method="dialog" class="modal__card" id="formCollection">
         <div class="modal__header">
           <div id="modalCollectionTitle" class="modal__title">Create collection</div>
-          <button id="colCloseX" class="btn btn--icon btn--ghost" type="button" aria-label="Close"><span class="btn-icon-cross">×</span></button>
+          <button id="colCloseX" class="btn btn--icon btn--ghost" type="button" aria-label="Close"><span class="btn-icon-cross">Г—</span></button>
         </div>
 
         <label class="field">
@@ -356,10 +392,10 @@
     <dialog id="modalOnboarding" class="modal">
       <div class="modal__card modal__card--onboarding">
         <div class="modal__header">
-          <div data-onboarding-title class="modal__title">AI-онбординг</div>
-          <button data-onboarding-close class="btn btn--icon btn--ghost" type="button" aria-label="Close"><span class="btn-icon-cross">×</span></button>
+          <div data-onboarding-title class="modal__title">AI-РѕРЅР±РѕСЂРґРёРЅРі</div>
+          <button data-onboarding-close class="btn btn--icon btn--ghost" type="button" aria-label="Close"><span class="btn-icon-cross">Г—</span></button>
         </div>
-        <p data-onboarding-subtitle class="modal__text">Выбери роль и ответь на несколько вопросов.</p>
+        <p data-onboarding-subtitle class="modal__text">Р’С‹Р±РµСЂРё СЂРѕР»СЊ Рё РѕС‚РІРµС‚СЊ РЅР° РЅРµСЃРєРѕР»СЊРєРѕ РІРѕРїСЂРѕСЃРѕРІ.</p>
         <div data-onboarding-chat class="onboarding-chat"></div>
         <div data-onboarding-chips class="onboarding-chips"></div>
         <div class="row">
@@ -393,6 +429,7 @@
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>
+
 
 
 

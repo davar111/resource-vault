@@ -44,7 +44,7 @@
     items: "элементов",
     contextManual: "Ручная коллекция",
 
-    searchPlaceholder: "Поиск по URL, названию, заметке...",
+    searchPlaceholder: "Поиск по всему — URL, названию, тегам, заметкам...",
     filters: "Фильтры",
     themeLight: "Светлая",
     themeDark: "Темная",
@@ -134,7 +134,7 @@
     hiddenAuthUnlockText: "Введите пароль, чтобы открыть раздел Скрытые.",
     hiddenAuthPasswordLabel: "Пароль",
     hiddenAuthConfirmLabel: "Повтор пароля",
-    demoHintText: "✨ Это примеры ссылок. Добавь свою первую, чтобы начать коллекцию.",
+    demoHintText: "✦ Это примеры ссылок. Добавь свою первую, чтобы начать коллекцию.",
     demoHintAction: "Добавить ссылку",
     demoBadge: "пример",
 
@@ -212,7 +212,7 @@
     items: "items",
     contextManual: "Manual collection",
 
-    searchPlaceholder: "Search in URL, title, note...",
+    searchPlaceholder: "Search across URL, title, tags and notes...",
     filters: "Filters",
     themeLight: "Light",
     themeDark: "Dark",
@@ -302,7 +302,7 @@
     hiddenAuthUnlockText: "Enter password to open Hidden section.",
     hiddenAuthPasswordLabel: "Password",
     hiddenAuthConfirmLabel: "Confirm password",
-    demoHintText: "✨ These are sample links. Add your first one to start your own vault.",
+    demoHintText: "✦ These are sample links. Add your first one to start your own vault.",
     demoHintAction: "Add link",
     demoBadge: "demo",
 

@@ -73,7 +73,7 @@
   cursor: pointer;
 }
 .card--add:hover { border-color: var(--border-strong); background: var(--bg-surface-3); color: var(--text-primary); }
-.card__add-plus { font-size: 36px; line-height: 1; font-weight: 600; }
+.card__add-plus { font-size: 34px; line-height: 1; font-weight: 400; color: var(--text-secondary); }
 .card__add-text { font-size: 13px; color: var(--text-muted); }
 
 .btn {

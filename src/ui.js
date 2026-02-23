@@ -307,61 +307,76 @@ function renderActiveFilters(state, els, onChange, L) {
   if (!bar) return;
   bar.innerHTML = "";
   const chipsBar = bar.closest(".chipsbar");
-
-  const chips = [];
-  for (const type of state.filters.types || []) chips.push({ key: "type", value: type, label: `${t(L, "chipType")}: ${displayOptionLabel(type, "type", L)}` });
-  for (const src of state.filters.sources || []) chips.push({ key: "source", value: src, label: `${t(L, "chipSource")}: ${displayOptionLabel(src, "source", L)}` });
-  if (state.filters.tag) chips.push({ key: "tag", value: state.filters.tag, label: `${t(L, "chipTag")}: ${state.filters.tag}` });
-  if (state.filters.favoriteOnly) chips.push({ key: "fav", value: "1", label: t(L, "chipFav") });
-
-  if (!chips.length && !state.search) {
+  const hasSearch = !!String(state.search || "").trim();
+  if (!hasSearch) {
     if (chipsBar) chipsBar.hidden = true;
     return;
   }
   if (chipsBar) chipsBar.hidden = false;
 
-  for (const c of chips) {
+  const appendSep = () => {
+    const sep = document.createElement("span");
+    sep.className = "smart-chip-sep";
+    bar.appendChild(sep);
+  };
+  const appendChip = (label, active, onClick) => {
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = "chip chip--on";
-    btn.textContent = `${c.label} x`;
-    btn.addEventListener("click", () => {
-      removeFilter(state, c);
-      syncFilterInputs(state, els);
-      onChange?.();
-      render(state, els, onChange, activeActions);
-    });
+    btn.className = `smart-chip ${active ? "smart-chip--active" : ""}`.trim();
+    btn.textContent = label;
+    btn.addEventListener("click", onClick);
     bar.appendChild(btn);
-  }
+  };
 
-  if (state.search) {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "chip chip--on";
-    btn.textContent = `${t(L, "chipSearch")}: ${state.search} x`;
-    btn.addEventListener("click", () => {
-      state.search = "";
-      if (els.searchInput) els.searchInput.value = "";
-      syncFilterInputs(state, els);
-      onChange?.();
-      render(state, els, onChange, activeActions);
-    });
-    bar.appendChild(btn);
-  }
-
-  const clear = document.createElement("button");
-  clear.type = "button";
-  clear.className = "chip";
-  clear.textContent = t(L, "clearFilters");
-  clear.addEventListener("click", () => {
-    state.filters = { types: [], sources: [], tag: "", favoriteOnly: false };
-    state.search = "";
-    if (els.searchInput) els.searchInput.value = "";
-    syncFilterInputs(state, els);
+  appendChip(`${L === "ru" ? "▦" : "▦"} ${L === "ru" ? "Везде" : "Everywhere"}`, state.activeCollectionId === "all" && !state.filters.favoriteOnly && !state.filters.tag, () => {
+    state.activeSavedFilterId = null;
+    state.activeCollectionId = "all";
+    state.filters.favoriteOnly = false;
+    state.filters.tag = "";
     onChange?.();
     render(state, els, onChange, activeActions);
   });
-  bar.appendChild(clear);
+
+  appendChip(L === "ru" ? "Избранное" : "Favorites", !!state.filters.favoriteOnly, () => {
+    state.activeSavedFilterId = null;
+    state.filters.favoriteOnly = !state.filters.favoriteOnly;
+    onChange?.();
+    render(state, els, onChange, activeActions);
+  });
+
+  appendSep();
+
+  (state.collections || []).slice(0, 3).forEach((col) => {
+    appendChip(`📁 ${col.name}`, state.activeCollectionId === col.id, () => {
+      state.activeSavedFilterId = null;
+      state.activeCollectionId = col.id;
+      onChange?.();
+      render(state, els, onChange, activeActions);
+    });
+  });
+
+  appendSep();
+
+  const active = getActiveCollection(state);
+  const tagPool = state.items
+    .filter((item) => itemInActiveContext(item, active))
+    .filter((item) => matchesSearch(item, state.search))
+    .flatMap((item) => Array.isArray(item.tags) ? item.tags : []);
+  const freq = new Map();
+  for (const rawTag of tagPool) {
+    const tag = String(rawTag || "").trim().toLowerCase();
+    if (!tag) continue;
+    freq.set(tag, (freq.get(tag) || 0) + 1);
+  }
+  const popularTags = [...freq.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([tag]) => tag);
+  popularTags.forEach((tag) => {
+    appendChip(`🏷 ${tag}`, state.filters.tag === tag, () => {
+      state.activeSavedFilterId = null;
+      state.filters.tag = state.filters.tag === tag ? "" : tag;
+      onChange?.();
+      render(state, els, onChange, activeActions);
+    });
+  });
 }
 
 function renderGrid(state, els, onChange, actions, L) {
@@ -414,6 +429,9 @@ function renderGrid(state, els, onChange, actions, L) {
     const hasNote = !!noteText;
     const noteNeedsExpand = hasNote && (noteText.length > 90 || /\r?\n/.test(noteText));
     const notePreview = hasNote ? noteText : t(L, "noteEmpty");
+    const titleText = item.title || domain || "Untitled";
+    const highlightedTitle = highlightText(titleText, state.search);
+    const highlightedNote = highlightText(notePreview, state.search);
 
     card.innerHTML = `
       <div class="card__preview-wrap">
@@ -431,10 +449,11 @@ function renderGrid(state, els, onChange, actions, L) {
 
       <div class="card__top">
         <div class="card__left">
-          ${icon ? `<img class="favicon" src="${icon}" alt="">` : `<div class="favicon"></div>`}
-          <div>
-            <a class="card__title-link" href="${item.url}" target="_blank" rel="noreferrer" draggable="false">${escapeHtml(item.title || domain || "Untitled")}</a>
+          <div class="card__meta-row">
+            ${renderCardFavicon(item, icon, domain)}
+            <div class="card__source">${escapeHtml(domain || "other")}</div>
           </div>
+          <a class="card__title-link" href="${item.url}" target="_blank" rel="noreferrer" draggable="false">${highlightedTitle}</a>
         </div>
         <div class="card__tools">
           ${item.isDemo ? "" : `<button class="card__delete" type="button" data-del="1" aria-label="${escapeHtml(t(L, "del"))}" title="${escapeHtml(t(L, "del"))}">
@@ -444,7 +463,7 @@ function renderGrid(state, els, onChange, actions, L) {
       </div>
 
       <div class="card__note-wrap">
-        <div class="card__note ${hasNote ? "" : "card__note--empty"}">${escapeHtml(notePreview)}</div>
+        <div class="card__note ${hasNote ? "" : "card__note--empty"}">${highlightedNote}</div>
         ${noteNeedsExpand ? `<button class="card__note-more" type="button" data-note-expand="1">${escapeHtml(t(L, "expandNote"))}</button>` : ""}
       </div>
       <div class="tags">${tags.map((tg, i) => `<span class="tag ${i === 0 ? "tag--accent" : ""}"><span class="tag__text">${escapeHtml(tg)}</span></span>`).join("")}</div>
@@ -463,6 +482,29 @@ function renderGrid(state, els, onChange, actions, L) {
   addCard.addEventListener("click", openAddModal);
   fragment.appendChild(addCard);
   els.grid.replaceChildren(fragment);
+}
+
+function renderCardFavicon(item, iconUrl, domain) {
+  const badge = sourceBadgeText(item?.source, domain);
+  if (item?.isDemo) {
+    return `<div class="favicon favicon--badge" aria-hidden="true">${escapeHtml(badge)}</div>`;
+  }
+  if (!iconUrl) {
+    return `<div class="favicon favicon--badge" aria-hidden="true">${escapeHtml(badge)}</div>`;
+  }
+  return `<img class="favicon" src="${escapeHtml(iconUrl)}" alt="" data-badge="${escapeHtml(badge)}">`;
+}
+
+function sourceBadgeText(source, domain) {
+  const key = String(source || "").toLowerCase();
+  if (key === "behance") return "Be";
+  if (key === "pinterest") return "P";
+  if (key === "dribbble") return "D";
+  if (key === "awwwards") return "A";
+  if (key === "site" && String(domain || "").includes("cssdesignawards")) return "✦";
+  const d = String(domain || "").trim();
+  if (!d) return "•";
+  return d.slice(0, 1).toUpperCase();
 }
 
 function wireCardInteractions({ card, item, noteText, actions, els, L }) {
@@ -512,6 +554,18 @@ function wireCardInteractions({ card, item, noteText, actions, els, L }) {
     });
   }
 
+  const faviconEl = card.querySelector(".favicon");
+  if (faviconEl && faviconEl.tagName === "IMG") {
+    faviconEl.addEventListener("error", () => {
+      const badge = String(faviconEl.getAttribute("data-badge") || "•");
+      const fallback = document.createElement("div");
+      fallback.className = "favicon favicon--badge";
+      fallback.setAttribute("aria-hidden", "true");
+      fallback.textContent = badge;
+      faviconEl.replaceWith(fallback);
+    }, { once: true });
+  }
+
   card.addEventListener("dragstart", (e) => {
     if (!e.dataTransfer) return;
     e.dataTransfer.setData("text/resource-vault-item-id", item.id);
@@ -532,8 +586,8 @@ function filteredItems(state) {
   const list = state.items
     .filter((item) => itemInActiveContext(item, active))
     .filter((item) => matchesLink(item, {
-      types: state.filters.types || [],
-      sources: state.filters.sources || [],
+      types: [],
+      sources: [],
       tagContains: state.filters.tag || "",
       favoriteOnly: !!state.filters.favoriteOnly
     }))
@@ -620,6 +674,14 @@ function syncFilterInputs(state, els) {
 
   if (els.filterTagInput) els.filterTagInput.value = state.filters.tag || "";
   if (els.filterFavoriteOnly) els.filterFavoriteOnly.checked = !!state.filters.favoriteOnly;
+}
+
+function highlightText(text, query) {
+  const raw = String(text || "");
+  const needle = String(query || "").trim();
+  if (!needle) return escapeHtml(raw);
+  const escapedNeedle = needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return escapeHtml(raw).replace(new RegExp(escapedNeedle, "gi"), (match) => `<mark>${match}</mark>`);
 }
 
 function escapeHtml(str) {

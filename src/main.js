@@ -2,7 +2,7 @@
 import "./styles/monoFeedback.css";
 import { state } from "./state.js";
 import { loadLegacyVault, loadUiSettings, saveUiSettings } from "./storage.js";
-import { TAG_MAX_LEN, TAG_MIN_LEN, detectSourceFromUrl, domainFromUrl, normalizeSearchText, normalizeTags, previewFallbackUrl } from "./filter.js";
+import { TAG_MAX_LEN, TAG_MIN_LEN, detectSourceFromUrl, domainFromUrl, normalizeSearchText, normalizeTags, previewFallbackUrl, tryFetchPreview, tryFetchTitle } from "./filter.js";
 import { t } from "./i18n.js";
 import { render } from "./ui.js";
 import { flashStatus, startSpinner } from "./ui/monoFeedback.js";
@@ -99,6 +99,14 @@ const els = {
   addCloseX: document.getElementById("addCloseX"),
   addCancel: document.getElementById("addCancel"),
   addSave: document.getElementById("addSave"),
+  addBack: document.getElementById("addBack"),
+  addSkip: document.getElementById("addSkip"),
+  addStep1: document.getElementById("addStep1"),
+  addStep2: document.getElementById("addStep2"),
+  addStep3: document.getElementById("addStep3"),
+  addPanelUrl: document.getElementById("addPanelUrl"),
+  addPanelDetails: document.getElementById("addPanelDetails"),
+  addPanelDone: document.getElementById("addPanelDone"),
   modalAddTitle: document.getElementById("modalAddTitle"),
   labelAddUrl: document.getElementById("labelAddUrl"),
   labelAddTitle: document.getElementById("labelAddTitle"),
@@ -114,6 +122,18 @@ const els = {
   inputAddTags: document.getElementById("inputAddTags"),
   inputAddNote: document.getElementById("inputAddNote"),
   inputAddSource: document.getElementById("inputAddSource"),
+  addCollectionHidden: document.getElementById("addCollectionHidden"),
+  addTagsWrap: document.getElementById("addTagsWrap"),
+  addTagInput: document.getElementById("addTagInput"),
+  addParsedCard: document.getElementById("addParsedCard"),
+  addParsedThumb: document.getElementById("addParsedThumb"),
+  addParsedThumbEmoji: document.querySelector("#addParsedThumb .modal-add-flow__parse-thumb-emoji"),
+  addParsedShimmer: document.getElementById("addParsedShimmer"),
+  addParsedSource: document.getElementById("addParsedSource"),
+  addParsedTitle: document.getElementById("addParsedTitle"),
+  addParseStatus: document.getElementById("addParseStatus"),
+  addParseStatusText: document.getElementById("addParseStatusText"),
+  addAutoTags: document.getElementById("addAutoTags"),
   addFavorite: document.getElementById("addFavorite"),
   addCollectionsList: document.getElementById("addCollectionsList"),
   addTagsMenu: document.getElementById("addTagsMenu"),
@@ -150,6 +170,11 @@ let currentUser = null;
 let knownTags = [];
 let activeTagMenuIndex = -1;
 let sourceAutofillEnabled = true;
+let addFlowStep = 1;
+let addFlowAutoTags = [];
+let addFlowManualTags = [];
+let addFlowSelectedCollectionId = "";
+let addFlowParseToken = 0;
 let prevGateVisible = null;
 const pendingLinkOps = new Set();
 const pendingCollectionOps = new Set();
@@ -289,7 +314,10 @@ function syncLanguageSelect() {
 function syncThemeToggle() {
   if (!els.btnTheme) return;
   const nextIsDark = state.theme !== "dark";
-  els.btnTheme.textContent = state.theme === "dark" ? t(state.lang, "themeDark") : t(state.lang, "themeLight");
+  const isDark = state.theme === "dark";
+  els.btnTheme.innerHTML = isDark
+    ? `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 2.8v2.1M12 19.1v2.1M4.9 4.9l1.5 1.5M17.6 17.6l1.5 1.5M2.8 12h2.1M19.1 12h2.1M4.9 19.1l1.5-1.5M17.6 6.4l1.5-1.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg>`
+    : `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   els.btnTheme.setAttribute("title", nextIsDark ? t(state.lang, "switchThemeToDark") : t(state.lang, "switchThemeToLight"));
   els.btnTheme.setAttribute("aria-label", nextIsDark ? t(state.lang, "switchThemeToDark") : t(state.lang, "switchThemeToLight"));
 }
@@ -342,10 +370,50 @@ function renderFilterChips() {
 
 function renderAddCollectionChoices(selectedIds = []) {
   if (!els.addCollectionsList) return;
-  const set = new Set(selectedIds);
-  const chips = [`<span class="chip">${escapeHtml(t(state.lang, "addToInbox"))}</span>`];
-  for (const col of state.collections) chips.push(chipCheckHtml("collections", col.id, col.name, set.has(col.id)));
-  els.addCollectionsList.innerHTML = chips.join("");
+  addFlowSelectedCollectionId = String(selectedIds?.[0] || "");
+  const allOptions = [
+    {
+      id: "",
+      name: t(state.lang, "addToInbox"),
+      dot: "#8a8880",
+      count: "",
+      isInbox: true
+    },
+    ...(state.collections || []).map((col) => ({
+      id: String(col.id),
+      name: String(col.name || ""),
+      dot: "#5b73ff",
+      count: visibleItems(state, col).length,
+      isInbox: false
+    }))
+  ];
+  const html = allOptions.map((opt) => {
+    const selected = opt.id === addFlowSelectedCollectionId;
+    const right = opt.isInbox
+      ? `<span class="modal-add-flow__collection-check">${selected ? "✓" : ""}</span>`
+      : `<span class="modal-add-flow__collection-count">${escapeHtml(String(opt.count))}</span><span class="modal-add-flow__collection-check">${selected ? "✓" : ""}</span>`;
+    return `
+      <button
+        type="button"
+        class="modal-add-flow__collection-option ${selected ? "modal-add-flow__collection-option--selected" : ""}"
+        data-add-col-option="${escapeHtml(opt.id || "__inbox__")}"
+      >
+        <span class="modal-add-flow__collection-dot" style="background:${escapeHtml(opt.dot)};"></span>
+        <span class="modal-add-flow__collection-name">${escapeHtml(opt.name)}</span>
+        <span class="modal-add-flow__collection-right">${right}</span>
+      </button>
+    `;
+  }).join("");
+  els.addCollectionsList.innerHTML = html;
+  if (els.addCollectionHidden) els.addCollectionHidden.value = addFlowSelectedCollectionId;
+  els.addCollectionsList.querySelectorAll("[data-add-col-option]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const raw = String(btn.getAttribute("data-add-col-option") || "");
+      addFlowSelectedCollectionId = raw === "__inbox__" ? "" : raw;
+      if (els.addCollectionHidden) els.addCollectionHidden.value = addFlowSelectedCollectionId;
+      renderAddCollectionChoices(addFlowSelectedCollectionId ? [addFlowSelectedCollectionId] : []);
+    });
+  });
 }
 
 function normalizeUrlForCompare(rawUrl) {
@@ -373,6 +441,158 @@ function updateAddSourceUi() {
   if (!els.inputAddSource || !els.inputAddUrl || !sourceAutofillEnabled) return;
   const detected = detectSourceFromUrl(els.inputAddUrl.value || "");
   els.inputAddSource.value = SOURCE_CODES.includes(detected) ? detected : "other";
+}
+
+function inferAutoTags(url, title, sourceCode) {
+  const host = domainFromUrl(url);
+  const map = {
+    behance: ["дизайн", "портфолио", "вдохновение"],
+    pinterest: ["дизайн", "референс", "идеи"],
+    dribbble: ["дизайн", "ui", "портфолио"],
+    awwwards: ["веб", "интерактив", "тренды"],
+    site: ["веб"]
+  };
+  const base = [...(map[sourceCode] || [])];
+  const titleLower = String(title || "").toLowerCase();
+  if (titleLower.includes("figma")) base.push("figma", "инструмент");
+  if (titleLower.includes("ux")) base.push("ux");
+  if (titleLower.includes("ui")) base.push("ui");
+  if (titleLower.includes("guide") || titleLower.includes("гайд")) base.push("гайд");
+  if (host.includes("youtube")) base.push("видео");
+  if (host.includes("github")) base.push("код");
+  return normalizeTags(base).slice(0, 6);
+}
+
+function syncAddTagsInput() {
+  if (!els.inputAddTags) return;
+  const merged = normalizeTags([...(addFlowAutoTags || []), ...(addFlowManualTags || [])]);
+  els.inputAddTags.value = merged.join(", ");
+}
+
+function renderAddTagChips() {
+  if (!els.addTagsWrap) return;
+  const merged = [
+    ...(addFlowAutoTags || []).map((tag) => ({ tag, auto: true })),
+    ...(addFlowManualTags || []).map((tag) => ({ tag, auto: false }))
+  ];
+  const chips = merged.map(({ tag, auto }) => `
+    <span class="modal-add-flow__tag-chip ${auto ? "modal-add-flow__tag-chip--auto" : ""}">
+      ${escapeHtml(tag)}
+      <button type="button" data-add-tag-remove="${escapeHtml(tag)}" aria-label="remove tag">
+        <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+          <path d="M1 1l8 8M9 1L1 9"></path>
+        </svg>
+      </button>
+    </span>
+  `).join("");
+  const inputHtml = `<input id="addTagInput" class="modal-add-flow__tags-input" type="text" placeholder="${escapeHtml(state.lang === "ru" ? "добавить тег..." : "add tag...")}" />`;
+  els.addTagsWrap.innerHTML = `${chips}${inputHtml}`;
+  const input = els.addTagsWrap.querySelector("#addTagInput");
+  if (input) {
+    els.addTagInput = input;
+    input.addEventListener("keydown", (e) => {
+      if ((e.key === "Enter" || e.key === ",") && String(input.value || "").trim()) {
+        e.preventDefault();
+        const next = String(input.value || "").replace(",", "").trim().toLowerCase();
+        if (!next) return;
+        if (!addFlowAutoTags.includes(next) && !addFlowManualTags.includes(next) && next.length >= TAG_MIN_LEN) {
+          addFlowManualTags.push(next.slice(0, TAG_MAX_LEN));
+        }
+        syncAddTagsInput();
+        renderAddTagChips();
+      } else if (e.key === "Backspace" && !String(input.value || "").trim() && addFlowManualTags.length) {
+        addFlowManualTags.pop();
+        syncAddTagsInput();
+        renderAddTagChips();
+      }
+    });
+  }
+  els.addTagsWrap.querySelectorAll("[data-add-tag-remove]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const tag = String(btn.getAttribute("data-add-tag-remove") || "");
+      addFlowAutoTags = addFlowAutoTags.filter((x) => x !== tag);
+      addFlowManualTags = addFlowManualTags.filter((x) => x !== tag);
+      syncAddTagsInput();
+      renderAddTagChips();
+    });
+  });
+  syncAddTagsInput();
+}
+
+function setAddFlowStep(step) {
+  addFlowStep = Math.max(1, Math.min(3, Number(step) || 1));
+  const is1 = addFlowStep === 1;
+  const is2 = addFlowStep === 2;
+  const is3 = addFlowStep === 3;
+  if (els.addStep1) els.addStep1.className = `modal-add-flow__step ${is1 ? "modal-add-flow__step--active" : is2 || is3 ? "modal-add-flow__step--done" : ""}`.trim();
+  if (els.addStep2) els.addStep2.className = `modal-add-flow__step ${is2 ? "modal-add-flow__step--active" : is3 ? "modal-add-flow__step--done" : ""}`.trim();
+  if (els.addStep3) els.addStep3.className = `modal-add-flow__step ${is3 ? "modal-add-flow__step--active" : ""}`.trim();
+  if (els.addPanelUrl) els.addPanelUrl.classList.toggle("modal-add-flow__panel--active", is1);
+  if (els.addPanelDetails) els.addPanelDetails.classList.toggle("modal-add-flow__panel--active", is2);
+  if (els.addPanelDone) els.addPanelDone.classList.toggle("modal-add-flow__panel--active", is3);
+  if (els.addBack) els.addBack.hidden = !is2;
+  if (els.addSkip) els.addSkip.hidden = !is2;
+  if (els.addCancel) els.addCancel.hidden = is3;
+  if (els.addSave) {
+    els.addSave.disabled = false;
+    els.addSave.textContent = is1 ? (state.lang === "ru" ? "Далее" : "Next") : is2 ? t(state.lang, "save") : (state.lang === "ru" ? "Закрыть" : "Close");
+  }
+}
+
+async function parseAddUrl(urlRaw) {
+  const currentToken = ++addFlowParseToken;
+  const raw = String(urlRaw || "").trim();
+  let normalized = "";
+  try {
+    normalized = new URL(raw).toString();
+  } catch {
+    return { ok: false, error: state.lang === "ru" ? "некорректный URL" : "invalid URL" };
+  }
+  const source = detectSourceFromUrl(normalized);
+  if (els.inputAddSource) els.inputAddSource.value = source;
+  if (els.addParsedCard) els.addParsedCard.hidden = false;
+  if (els.addParseStatus) els.addParseStatus.classList.remove("modal-add-flow__parse-status--done");
+  if (els.addParseStatusText) els.addParseStatusText.textContent = state.lang === "ru" ? "Парсим страницу..." : "Parsing page...";
+  if (els.addParsedSource) els.addParsedSource.textContent = domainFromUrl(normalized) || source;
+  if (els.addParsedTitle) els.addParsedTitle.textContent = state.lang === "ru" ? "Получаю данные..." : "Parsing...";
+  if (els.addParsedThumb) {
+    els.addParsedThumb.innerHTML = `<span class="modal-add-flow__parse-thumb-emoji">🔎</span><span id="addParsedShimmer" class="modal-add-flow__parse-thumb-shimmer" aria-hidden="true"></span>`;
+    els.addParsedThumbEmoji = els.addParsedThumb.querySelector(".modal-add-flow__parse-thumb-emoji");
+    els.addParsedShimmer = els.addParsedThumb.querySelector("#addParsedShimmer");
+  }
+
+  let fetchedTitle = "";
+  let fetchedPreview = "";
+  try {
+    fetchedTitle = await tryFetchTitle(normalized);
+  } catch {}
+  try {
+    fetchedPreview = await tryFetchPreview(normalized);
+  } catch {}
+  if (currentToken !== addFlowParseToken) return { ok: false, error: "stale" };
+
+  const finalTitle = String(fetchedTitle || domainFromUrl(normalized) || normalized).trim().slice(0, TITLE_MAX_LEN);
+  if (els.inputAddTitle && !String(els.inputAddTitle.value || "").trim()) els.inputAddTitle.value = finalTitle;
+  if (els.addParsedTitle) els.addParsedTitle.textContent = finalTitle;
+  if (els.addParsedThumb) {
+    if (fetchedPreview) {
+      els.addParsedThumb.innerHTML = `<img src="${escapeHtml(fetchedPreview)}" alt="" loading="lazy" referrerpolicy="no-referrer" /><span id="addParsedShimmer" class="modal-add-flow__parse-thumb-shimmer" aria-hidden="true" hidden></span>`;
+      els.addParsedShimmer = els.addParsedThumb.querySelector("#addParsedShimmer");
+      els.addParsedThumbEmoji = null;
+    } else {
+      const emoji = source === "pinterest" ? "📌" : source === "behance" ? "🎨" : source === "awwwards" ? "🏆" : "🔗";
+      if (els.addParsedThumbEmoji) els.addParsedThumbEmoji.textContent = emoji;
+    }
+  }
+
+  addFlowAutoTags = inferAutoTags(normalized, finalTitle, source);
+  if (els.addAutoTags) {
+    els.addAutoTags.innerHTML = addFlowAutoTags.map((tag) => `<span class="modal-add-flow__auto-tag"><span>авто</span> ${escapeHtml(tag)}</span>`).join("");
+  }
+  if (els.addParseStatus) els.addParseStatus.classList.add("modal-add-flow__parse-status--done");
+  if (els.addParseStatusText) els.addParseStatusText.textContent = state.lang === "ru" ? "Данные получены автоматически" : "Data parsed automatically";
+  renderAddTagChips();
+  return { ok: true, url: normalized };
 }
 
 function clearFeedbackTimer(key) {
@@ -426,6 +646,7 @@ function closeAddModal() {
   clearAddModalFeedback();
   sourceAutofillEnabled = true;
   activeTagMenuIndex = -1;
+  addFlowParseToken += 1;
   if (els.addTagsMenu) els.addTagsMenu.hidden = true;
   els.modalAddLink?.close();
 }
@@ -445,37 +666,38 @@ function openNewLinkModal(preset = {}) {
   const presetCollections = state.activeCollectionId === "hidden"
     ? []
     : (lockCollectionTarget ? [state.activeCollectionId] : []);
+  addFlowSelectedCollectionId = String(presetCollections[0] || "");
+  addFlowAutoTags = [];
+  addFlowManualTags = [];
+  addFlowParseToken += 1;
   renderAddCollectionChoices(presetCollections);
   renderTagSuggestions();
   if (els.inputAddUrl) els.inputAddUrl.value = String(preset.url || "");
   if (els.inputAddTitle) els.inputAddTitle.value = String(preset.title || "");
   if (els.inputAddSource) els.inputAddSource.value = "other";
+  if (els.inputAddTags) els.inputAddTags.value = "";
   if (els.addFavorite) els.addFavorite.checked = state.activeCollectionId === "fav";
+  if (els.inputAddNote) els.inputAddNote.value = "";
+  if (els.addParsedCard) els.addParsedCard.hidden = true;
+  if (els.addParsedTitle) els.addParsedTitle.textContent = "";
+  if (els.addParsedSource) els.addParsedSource.textContent = "";
+  if (els.addParsedThumb) {
+    els.addParsedThumb.innerHTML = `<span class="modal-add-flow__parse-thumb-emoji">🔗</span><span id="addParsedShimmer" class="modal-add-flow__parse-thumb-shimmer" aria-hidden="true"></span>`;
+    els.addParsedThumbEmoji = els.addParsedThumb.querySelector(".modal-add-flow__parse-thumb-emoji");
+    els.addParsedShimmer = els.addParsedThumb.querySelector("#addParsedShimmer");
+  }
+  if (els.addParseStatus) els.addParseStatus.classList.remove("modal-add-flow__parse-status--done");
+  if (els.addParseStatusText) els.addParseStatusText.textContent = state.lang === "ru" ? "Парсим страницу..." : "Parsing page...";
+  if (els.addAutoTags) els.addAutoTags.innerHTML = "";
+  renderAddTagChips();
+  setAddFlowStep(1);
   updateAddSourceUi();
   if (els.modalAddLink) showDialogWithA11y(els.modalAddLink, { preferredFocus: els.inputAddUrl });
+  if (preset.url) void parseAddUrl(String(preset.url));
 }
 
 function updateTagsMenu() {
-  if (!els.addTagsMenu || !els.inputAddTags) return;
-  if (document.activeElement !== els.inputAddTags) {
-    els.addTagsMenu.hidden = true;
-    return;
-  }
-  const raw = String(els.inputAddTags.value || "");
-  const chunks = raw.split(",");
-  const query = normalizeSearchText(chunks.pop() || "");
-  const chosen = normalizeTags(chunks.join(","));
-  const next = knownTags.filter((tag) => !chosen.includes(tag)).filter((tag) => !query || tag.includes(query)).slice(0, 8);
-  if (!next.length) {
-    activeTagMenuIndex = -1;
-    els.addTagsMenu.hidden = true;
-    els.addTagsMenu.innerHTML = "";
-    return;
-  }
-  if (activeTagMenuIndex >= next.length) activeTagMenuIndex = next.length - 1;
-  if (activeTagMenuIndex < -1) activeTagMenuIndex = -1;
-  els.addTagsMenu.innerHTML = next.map((tag, i) => `<button type="button" class="add-tags-menu__item ${i === activeTagMenuIndex ? "add-tags-menu__item--active" : ""}" data-tag-suggestion="${escapeHtml(tag)}">${escapeHtml(tag)}</button>`).join("");
-  els.addTagsMenu.hidden = false;
+  if (els.addTagsMenu) els.addTagsMenu.hidden = true;
 }
 
 function renderTagSuggestions() {
@@ -484,15 +706,12 @@ function renderTagSuggestions() {
 }
 
 function applyTagSuggestion(tag) {
-  if (!els.inputAddTags) return;
-  const raw = String(els.inputAddTags.value || "");
-  const chunks = raw.split(",");
-  chunks.pop();
-  const chosen = normalizeTags(chunks.join(","));
-  if (!chosen.includes(tag)) chosen.push(tag);
-  els.inputAddTags.value = `${chosen.join(", ")}${chosen.length ? ", " : ""}`;
-  activeTagMenuIndex = -1;
-  updateTagsMenu();
+  if (!tag) return;
+  if (!addFlowAutoTags.includes(tag) && !addFlowManualTags.includes(tag)) {
+    addFlowManualTags.push(String(tag).trim().toLowerCase());
+    syncAddTagsInput();
+    renderAddTagChips();
+  }
 }
 
 function applyI18n() {
@@ -547,7 +766,9 @@ function applyI18n() {
   if (els.inputAddTitle) els.inputAddTitle.placeholder = t(L, "modalTitleHint");
   if (els.inputAddNote) els.inputAddNote.placeholder = L === "ru" ? "Зачем сохранил?" : "Why saved?";
   if (els.addCancel) els.addCancel.textContent = t(L, "cancel");
-  if (els.addSave) els.addSave.textContent = t(L, "save");
+  if (els.addBack) els.addBack.textContent = L === "ru" ? "Назад" : "Back";
+  if (els.addSkip) els.addSkip.textContent = L === "ru" ? "Пропустить детали →" : "Skip details →";
+  if (els.addSave && addFlowStep === 2) els.addSave.textContent = t(L, "save");
   if (els.modalCollectionTitle) els.modalCollectionTitle.textContent = t(L, "modalCollectionTitle");
   if (els.labelColName) els.labelColName.textContent = t(L, "name");
   if (els.labelColDescription) els.labelColDescription.textContent = t(L, "description");
@@ -576,6 +797,8 @@ function applyI18n() {
   if (els.inputAddSource) {
     for (const option of els.inputAddSource.options) option.textContent = t(L, `source_${optionKey(option.value)}`);
   }
+
+  setAddFlowStep(addFlowStep);
 
   renderFilterChips();
   renderAddCollectionChoices();
@@ -612,8 +835,8 @@ function syncLiquidLabView() {
 
 function filterPayload() {
   return {
-    types: [...state.filters.types],
-    sources: [...state.filters.sources],
+    types: [],
+    sources: [],
     tag: String(state.filters.tag || ""),
     favoriteOnly: !!state.filters.favoriteOnly,
     search: String(state.search || ""),
@@ -622,7 +845,7 @@ function filterPayload() {
 }
 
 function isFilterActive() {
-  return Boolean(state.filters.types.length || state.filters.sources.length || state.filters.tag || state.filters.favoriteOnly || state.search);
+  return Boolean(state.filters.tag || state.filters.favoriteOnly || state.search);
 }
 
 function normalizeEmail(input) {
@@ -1105,6 +1328,12 @@ function firstHttpUrl(input) {
 function setupEvents() {
   const mobileMq = window.matchMedia("(max-width: 700px)");
   const debouncedSearchRender = debounce(() => requestRender(), 150);
+  const debouncedAddParse = debounce(() => {
+    if (addFlowStep !== 1) return;
+    const raw = String(els.inputAddUrl?.value || "").trim();
+    if (!raw) return;
+    void parseAddUrl(raw);
+  }, 420);
   const setMobileMenu = (open) => {
     const isOpen = !!open;
     state.ui.mobileMenuOpen = isOpen;
@@ -1289,6 +1518,7 @@ function setupEvents() {
     e.preventDefault();
     if (!ensureAuth()) return;
     if (els.addSave?.disabled) return;
+    syncAddTagsInput();
     const addStatusLine = ensureModalStatusLine(els.formAddLink, "addStatusLine");
     const fd = new FormData(els.formAddLink);
     const rawUrl = String(fd.get("url") || "").trim();
@@ -1378,8 +1608,9 @@ function setupEvents() {
           "ok",
           1000
         );
+        setAddFlowStep(3);
         clearFeedbackTimer("addCloseTimer");
-        feedback.addCloseTimer = setTimeout(() => closeAddModal(), 220);
+        feedback.addCloseTimer = setTimeout(() => closeAddModal(), 420);
         renderTagSuggestions();
       }
       requestRender();
@@ -1398,32 +1629,47 @@ function setupEvents() {
     }
   });
 
-  els.inputAddUrl?.addEventListener("input", updateAddSourceUi);
+  els.inputAddUrl?.addEventListener("input", () => {
+    updateAddSourceUi();
+    debouncedAddParse();
+  });
   els.inputAddSource?.addEventListener("change", () => { sourceAutofillEnabled = false; });
-  els.inputAddTags?.addEventListener("input", () => { activeTagMenuIndex = -1; updateTagsMenu(); });
-  els.inputAddTags?.addEventListener("focus", () => { activeTagMenuIndex = -1; updateTagsMenu(); });
-  els.addTagsMenu?.addEventListener("mousedown", (e) => {
-    const btn = e.target.closest("[data-tag-suggestion]");
-    if (!btn) return;
+  els.inputAddUrl?.addEventListener("keydown", async (e) => {
+    if (e.key !== "Enter") return;
     e.preventDefault();
-    const tag = String(btn.dataset.tagSuggestion || "").trim();
-    if (!tag) return;
-    applyTagSuggestion(tag);
-    els.inputAddTags?.focus();
+    if (addFlowStep !== 1) return;
+    const parsed = await parseAddUrl(els.inputAddUrl?.value || "");
+    if (!parsed.ok && parsed.error !== "stale") {
+      feedback.addFlashCancel = flashStatus(ensureModalStatusLine(els.formAddLink, "addStatusLine"), parsed.error, "error", 1400);
+      return;
+    }
+    setAddFlowStep(2);
   });
-  els.inputAddTags?.addEventListener("keydown", (e) => {
-    if (!els.addTagsMenu || els.addTagsMenu.hidden) return;
-    const list = els.addTagsMenu.querySelectorAll("[data-tag-suggestion]");
-    if (!list.length) return;
-    if (e.key === "ArrowDown") { e.preventDefault(); activeTagMenuIndex = (activeTagMenuIndex + 1 + list.length) % list.length; updateTagsMenu(); }
-    if (e.key === "ArrowUp") { e.preventDefault(); activeTagMenuIndex = (activeTagMenuIndex - 1 + list.length) % list.length; updateTagsMenu(); }
-    if (e.key === "Enter" && activeTagMenuIndex >= 0) { e.preventDefault(); const tag = list[activeTagMenuIndex]?.dataset?.tagSuggestion; if (tag) applyTagSuggestion(tag); }
+  els.addBack?.addEventListener("click", () => {
+    if (addFlowStep === 2) setAddFlowStep(1);
   });
-  document.addEventListener("mousedown", (e) => {
-    if (!els.addTagsMenu || !els.inputAddTags) return;
-    if (e.target.closest("#addTagsMenu") || e.target === els.inputAddTags) return;
-    activeTagMenuIndex = -1;
-    els.addTagsMenu.hidden = true;
+  els.addSkip?.addEventListener("click", () => {
+    if (addFlowStep !== 2) return;
+    if (els.inputAddNote) els.inputAddNote.value = "";
+    syncAddTagsInput();
+    els.formAddLink?.requestSubmit();
+  });
+  els.addSave?.addEventListener("click", async () => {
+    if (addFlowStep === 1) {
+      const parsed = await parseAddUrl(els.inputAddUrl?.value || "");
+      if (!parsed.ok && parsed.error !== "stale") {
+        feedback.addFlashCancel = flashStatus(ensureModalStatusLine(els.formAddLink, "addStatusLine"), parsed.error, "error", 1400);
+        return;
+      }
+      setAddFlowStep(2);
+      return;
+    }
+    if (addFlowStep === 2) {
+      syncAddTagsInput();
+      els.formAddLink?.requestSubmit();
+      return;
+    }
+    closeAddModal();
   });
   els.modalAddLink?.addEventListener("close", clearAddModalFeedback);
   els.modalCollection?.addEventListener("close", clearCollectionModalFeedback);
@@ -1453,7 +1699,15 @@ function setupEvents() {
   els.btnMobileClose?.addEventListener("click", () => setMobileMenu(false));
   els.mobileOverlay?.addEventListener("click", () => setMobileMenu(false));
   mobileMq.addEventListener("change", (e) => { if (!e.matches) setMobileMenu(false); });
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape") setMobileMenu(false); });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") setMobileMenu(false);
+    const isShortcut = (e.ctrlKey || e.metaKey) && String(e.key || "").toLowerCase() === "k";
+    if (isShortcut && els.searchInput) {
+      e.preventDefault();
+      els.searchInput.focus();
+      els.searchInput.select?.();
+    }
+  });
 }
 
 function escapeHtml(str) {
@@ -1466,7 +1720,7 @@ async function bootstrap() {
   state.sortBy = FILTER_SORTS.has(settings.sortBy) ? settings.sortBy : "newest";
   state.ui.collectionOrderIds = Array.isArray(settings.collectionOrderIds) ? settings.collectionOrderIds : [];
   state.ui.pinnedCollectionIds = Array.isArray(settings.pinnedCollectionIds) ? settings.pinnedCollectionIds : [];
-  applyTheme(THEME_MODES.has(settings.themeMode) ? settings.themeMode : "system");
+  applyTheme(THEME_MODES.has(settings.themeMode) ? settings.themeMode : "light");
   state.ui.filtersOpen = false;
   state.ui.mobileMenuOpen = false;
 
