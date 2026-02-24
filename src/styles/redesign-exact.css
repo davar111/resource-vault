@@ -261,6 +261,12 @@
   background: var(--bg-canvas);
 }
 
+@media (min-width: 901px) {
+  .sidebar-logo {
+    padding-bottom: 24px;
+  }
+}
+
 .topbar-actions,
 .topbar__right {
   gap: 8px;
