@@ -254,17 +254,10 @@
 }
 
 .topbar {
-  height: 56px;
-  min-height: 56px;
-  padding: 0 28px;
+  min-height: 61px;
+  padding: 10px 28px;
   border-bottom: 1px solid var(--border-default);
   background: var(--bg-canvas);
-}
-
-@media (min-width: 901px) {
-  .sidebar-logo {
-    padding-bottom: 24px;
-  }
 }
 
 .topbar-actions,
@@ -272,15 +265,22 @@
   gap: 8px;
 }
 
+.topbar__left {
+  row-gap: 1px;
+}
+
 .title.topbar-title {
   font-size: 15px;
   font-weight: 500;
+  line-height: 1.2;
   letter-spacing: -0.01em;
 }
 
 .meta.topbar-count {
   font-size: 12px;
   font-family: var(--font-mono);
+  line-height: 1.25;
+  opacity: 0.86;
 }
 
 .search-input {
@@ -456,6 +456,34 @@
 
 .demo-hint {
   margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+#demoHintText {
+  flex: 1 1 auto;
+  min-width: 0;
+  line-height: 1.35;
+}
+
+#demoHintAdd {
+  flex: 0 0 auto;
+  min-width: 168px;
+  white-space: nowrap;
+}
+
+@media (max-width: 1100px) {
+  .demo-hint {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  #demoHintAdd {
+    width: 100%;
+    min-width: 0;
+  }
 }
 
 .grid {
@@ -1865,4 +1893,52 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+
+/* -- Mobile fixes -- */
+@media (max-width: 900px) {
+  .sidebar {
+    width: 236px;
+    flex-basis: 236px;
+  }
+
+  .main {
+    margin-left: 236px;
+    width: calc(100% - 236px);
+  }
+}
+
+@media (max-width: 700px) {
+  .main {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .sidebar {
+    width: var(--mobile-sidebar-width, min(272px, calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right) - 12px)));
+  }
+
+  body.mobile-menu-open .mobile-overlay {
+    left: calc(env(safe-area-inset-left) + var(--mobile-sidebar-width, min(272px, calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right) - 12px))));
+  }
+
+  .topbar {
+    min-height: auto;
+    padding:
+      10px
+      calc(10px + env(safe-area-inset-right))
+      10px
+      calc(10px + env(safe-area-inset-left));
+  }
+
+  .topbar__right {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
 }
