@@ -466,7 +466,11 @@ function isGenericRole(role: string) {
 
 function hasLevelInText(input: string) {
   const lower = input.toLowerCase();
-  return ["junior", "middle", "senior", "джуниор", "мидл", "сеньор"].some((x) => lower.includes(x));
+  return [
+    "junior", "middle", "senior", "beginner",
+    "джуниор", "мидл", "сеньор", "нович", "новеньк",
+    "начальн", "средн", "продвинут"
+  ].some((x) => lower.includes(x));
 }
 
 function hasFormatInText(input: string) {
@@ -916,10 +920,24 @@ Deno.serve(async (req) => {
 
     const fallback = buildFallbackFollowUp(role, fullAnswers, lang);
     const parsedQuestion = String(parsed?.next_question || "").trim();
-    const nextQuestion = parsedQuestion || String(fallback.question || "").trim();
+    const fallbackQuestion = String(fallback.question || "").trim();
+    const lastQuestion = String(fullAnswers[fullAnswers.length - 1]?.question || "").trim().toLowerCase();
+    const initialQuestion = parsedQuestion || fallbackQuestion;
+    let nextQuestion = initialQuestion;
+    if (nextQuestion && nextQuestion.toLowerCase() === lastQuestion) {
+      const alt = fallbackQuestionsByLang(role, lang)
+        .map((x) => String(x?.question || "").trim())
+        .find((x) => x && x.toLowerCase() !== lastQuestion);
+      if (alt) nextQuestion = alt;
+    }
     const usedFallbackQuestion = !parsedQuestion;
-    const options = normalizeChatOptions(parsed?.options, lang);
-    const usedFallbackOptions = !Array.isArray(parsed?.options) || !parsed.options.length;
+
+    const parsedOptions = Array.isArray(parsed?.options)
+      ? normalizeChatOptions(parsed.options, lang)
+      : [];
+    const fallbackOptions = normalizeChatOptions(fallback.options, lang);
+    const options = parsedOptions.length ? parsedOptions : fallbackOptions;
+    const usedFallbackOptions = !parsedOptions.length;
     const payload: ChatTurnPayload = {
       next_question: nextQuestion,
       options: options.length ? options : normalizeChatOptions(fallback.options, lang),
