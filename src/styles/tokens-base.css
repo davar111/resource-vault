@@ -345,11 +345,15 @@ textarea:focus-visible,
   color: var(--text-primary);
 }
 
-.nav-item--active,
-.collection--active {
+.nav-item--active {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--accent-contrast);
+}
+.collection--active {
+  background: var(--bg-surface-2);
+  border-color: var(--border-strong);
+  color: var(--text-primary);
 }
 :root[data-theme="dark"] .collection--active {
   background: var(--bg-surface-2);
