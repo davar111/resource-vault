@@ -1,16 +1,16 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ru" data-theme="light">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Vault вЂ” Р±РёР±Р»РёРѕС‚РµРєР° СЃСЃС‹Р»РѕРє</title>
+<title>Vault — библиотека ссылок</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@300;400;500;600&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-/* в”Ђв”Ђ EXACT VAULT TOKENS (light) в”Ђв”Ђ */
+/* ── EXACT VAULT TOKENS (light) ── */
 :root {
   --bg-canvas:    #f5f4f1;
   --bg-sidebar:   #eeecea;
@@ -34,7 +34,7 @@
   --font-mono: 'Geist Mono', monospace;
 }
 
-/* в”Ђв”Ђ DARK TOKENS в”Ђв”Ђ */
+/* ── DARK TOKENS ── */
 :root[data-theme="dark"] {
   --bg-canvas:    #0e0e0d;
   --bg-sidebar:   #131312;
@@ -65,7 +65,7 @@ body {
   transition: background 0.2s, color 0.2s;
 }
 
-/* в”Ђв”Ђ NAV в”Ђв”Ђ */
+/* ── NAV ── */
 nav {
   position: fixed; top: 0; left: 0; right: 0; z-index: 100;
   height: 56px;
@@ -139,7 +139,7 @@ nav {
 .nav-theme:hover { background: var(--bg-surface-2); color: var(--text-primary); }
 .nav-theme svg { width: 15px; height: 15px; display: block; }
 
-/* в”Ђв”Ђ HERO в”Ђв”Ђ */
+/* ── HERO ── */
 .hero {
   padding: 120px 32px 80px;
   max-width: 1100px;
@@ -219,7 +219,7 @@ nav {
 }
 .btn-outline:hover { border-color: var(--border-strong); color: var(--text-primary); }
 
-/* в”Ђв”Ђ APP WINDOW в”Ђв”Ђ */
+/* ── APP WINDOW ── */
 .window-wrap {
   max-width: 1100px;
   margin: 0 auto 80px;
@@ -366,13 +366,13 @@ nav {
   font-family: var(--font-mono);
 }
 
-/* в”Ђв”Ђ DIVIDER в”Ђв”Ђ */
+/* ── DIVIDER ── */
 .divider {
   border: none; border-top: 1px solid var(--border-subtle);
   margin: 0;
 }
 
-/* в”Ђв”Ђ STACK ROW в”Ђв”Ђ */
+/* ── STACK ROW ── */
 .stack-row {
   max-width: 1100px; margin: 0 auto;
   padding: 20px 32px;
@@ -403,7 +403,7 @@ nav {
   background: var(--bg-surface-1);
 }
 
-/* в”Ђв”Ђ FEATURES в”Ђв”Ђ */
+/* ── FEATURES ── */
 .features {
   max-width: 1100px; margin: 0 auto;
   padding: 80px 32px;
@@ -453,7 +453,7 @@ nav {
 
 .feat-d { font-size: 12.5px; color: var(--text-secondary); line-height: 1.65; }
 
-/* в”Ђв”Ђ SPACE в”Ђв”Ђ */
+/* ── SPACE ── */
 .space-sec {
   max-width: 1100px; margin: 0 auto;
   padding: 0 32px 80px;
@@ -568,7 +568,7 @@ nav {
 .sp-dot.on { background: var(--text-primary); }
 .sp-streak { font-family: var(--font-mono); font-size: 9.5px; color: var(--text-secondary); }
 
-/* в”Ђв”Ђ HOW в”Ђв”Ђ */
+/* ── HOW ── */
 .how {
   max-width: 1100px; margin: 0 auto;
   padding: 0 32px 80px;
@@ -590,7 +590,7 @@ nav {
 .hs-t { font-size: 13.5px; font-weight: 500; margin-bottom: 7px; letter-spacing: -0.01em; }
 .hs-d { font-size: 12.5px; color: var(--text-secondary); line-height: 1.65; }
 
-/* в”Ђв”Ђ CTA в”Ђв”Ђ */
+/* ── CTA ── */
 .cta {
   max-width: 1100px; margin: 0 auto;
   padding: 0 32px 80px;
@@ -613,7 +613,7 @@ nav {
 }
 .cta-text p { font-size: 13.5px; color: var(--text-secondary); line-height: 1.6; }
 
-/* в”Ђв”Ђ FOOTER в”Ђв”Ђ */
+/* ── FOOTER ── */
 footer {
   border-top: 1px solid var(--border-subtle);
   padding: 18px 32px;
@@ -627,7 +627,7 @@ footer {
 .foot-sep { color: var(--border-default); }
 .foot-r { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
 
-/* в”Ђв”Ђ ANIMATIONS в”Ђв”Ђ */
+/* ── ANIMATIONS ── */
 .fade {
   opacity: 0; transform: translateY(14px);
   transition: opacity 0.5s ease, transform 0.5s ease;
@@ -637,7 +637,7 @@ footer {
 .d2 { transition-delay: 0.14s; }
 .d3 { transition-delay: 0.21s; }
 
-/* в”Ђв”Ђ RESPONSIVE в”Ђв”Ђ */
+/* ── RESPONSIVE ── */
 @media (max-width: 900px) {
   nav { padding: 0 20px; }
   .nav-links li:not(:last-child) { display: none; }
@@ -679,11 +679,11 @@ footer {
     <span class="nav-brand">Vault</span>
   </a>
   <ul class="nav-links">
-    <li><a href="#features">Р’РѕР·РјРѕР¶РЅРѕСЃС‚Рё</a></li>
-    <li><a href="#how">РљР°Рє СЂР°Р±РѕС‚Р°РµС‚</a></li>
-    <li><a href="/app" class="nav-open">РћС‚РєСЂС‹С‚СЊ в†’</a></li>
+    <li><a href="#features">Возможности</a></li>
+    <li><a href="#how">Как работает</a></li>
+    <li><a href="/app" class="nav-open">Открыть →</a></li>
   </ul>
-  <button class="nav-theme" id="themeBtn" aria-label="РџРµСЂРµРєР»СЋС‡РёС‚СЊ С‚РµРјСѓ">
+  <button class="nav-theme" id="themeBtn" aria-label="Переключить тему">
     <svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
       <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
     </svg>
@@ -695,22 +695,22 @@ footer {
   <div class="hero-top fade">
     <div class="hero-pill">
       <span class="hero-pill-dot"></span>
-      Р”РѕСЃС‚СѓРїРЅРѕ РїСЂСЏРјРѕ СЃРµР№С‡Р°СЃ
+      Доступно прямо сейчас
     </div>
   </div>
   <h1 class="fade d1">
-    РЎРѕС…СЂР°РЅСЏР№ РІСЃС‘.<br>
-    <span>РќР°С…РѕРґРё РјРіРЅРѕРІРµРЅРЅРѕ.</span>
+    Сохраняй всё.<br>
+    <span>Находи мгновенно.</span>
   </h1>
   <p class="hero-desc fade d2">
-    Vault вЂ” РїРµСЂСЃРѕРЅР°Р»СЊРЅР°СЏ Р±РёР±Р»РёРѕС‚РµРєР° СЃСЃС‹Р»РѕРє СЃ СѓРјРЅС‹Рј РїРѕРёСЃРєРѕРј, РєРѕР»Р»РµРєС†РёСЏРјРё Рё СЂРµР¶РёРјРѕРј Space РєРѕС‚РѕСЂС‹Р№ РЅРµ РґР°С‘С‚ РІР°Р¶РЅРѕРјСѓ С‚РµСЂСЏС‚СЊСЃСЏ РІ Р·Р°РєР»Р°РґРєР°С….
+    Vault — персональная библиотека ссылок с умным поиском, коллекциями и режимом Space который не даёт важному теряться в закладках.
   </p>
   <div class="hero-actions fade d3">
     <a href="/app" class="btn-main">
-      РћС‚РєСЂС‹С‚СЊ Vault
+      Открыть Vault
       <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2.5 7h9M8 3.5L11.5 7 8 10.5"/></svg>
     </a>
-    <a href="#features" class="btn-outline">РЈР·РЅР°С‚СЊ Р±РѕР»СЊС€Рµ</a>
+    <a href="#features" class="btn-outline">Узнать больше</a>
   </div>
 </section>
 
@@ -727,69 +727,69 @@ footer {
           <div class="wsb-mark"></div>
           <span class="wsb-name">Vault</span>
         </div>
-        <div class="wsb-lbl">РќР°РІРёРіР°С†РёСЏ</div>
+        <div class="wsb-lbl">Навигация</div>
         <div class="wsb-item on">
           <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="3.5" height="3.5" rx="0.8"/><rect x="7.5" y="1" width="3.5" height="3.5" rx="0.8"/><rect x="1" y="7.5" width="3.5" height="3.5" rx="0.8"/><rect x="7.5" y="7.5" width="3.5" height="3.5" rx="0.8"/></svg>
-          Р’СЃРµ СЃСЃС‹Р»РєРё
+          Все ссылки
         </div>
         <div class="wsb-item">
           <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 1.5l1.2 2.9H10L7.9 6l.8 2.9L6 7.2l-2.7 1.7.8-2.9L2 4.4h2.8L6 1.5z"/></svg>
-          РР·Р±СЂР°РЅРЅРѕРµ
+          Избранное
         </div>
         <div class="wsb-item">
           <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="6" cy="6" r="4.5"/><path d="M6 3.5v2.8l2 1.2"/></svg>
-          РќРµРґР°РІРЅРёРµ
+          Недавние
         </div>
         <div class="wsb-item">
           <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="2.5" width="10" height="8" rx="1.5"/><path d="M1 5.5h10"/><path d="M4 1v3M8 1v3"/></svg>
           Space
         </div>
-        <div class="wsb-lbl" style="margin-top:6px;">РљРѕР»Р»РµРєС†РёРё</div>
-        <div class="wsb-col"><div class="wsb-col-dot" style="background:#5b73ff;"></div>Р Р°Р±РѕС‚Р°</div>
-        <div class="wsb-col"><div class="wsb-col-dot" style="background:#f97316;"></div>Р›РёС‡РЅРѕРµ</div>
-        <div class="wsb-col"><div class="wsb-col-dot" style="background:#22c55e;"></div>Р РµС„РµСЂРµРЅСЃС‹</div>
+        <div class="wsb-lbl" style="margin-top:6px;">Коллекции</div>
+        <div class="wsb-col"><div class="wsb-col-dot" style="background:#5b73ff;"></div>Работа</div>
+        <div class="wsb-col"><div class="wsb-col-dot" style="background:#f97316;"></div>Личное</div>
+        <div class="wsb-col"><div class="wsb-col-dot" style="background:#22c55e;"></div>Референсы</div>
       </div>
       <div class="wmain">
         <div class="wtop">
-          <span class="wt-t">Р’СЃРµ СЃСЃС‹Р»РєРё</span>
-          <span class="wt-c">4 СЌР»РµРјРµРЅС‚Р°</span>
+          <span class="wt-t">Все ссылки</span>
+          <span class="wt-c">4 элемента</span>
           <div class="wt-srch">
             <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="5.5" cy="5.5" r="4"/><path d="M10 10l-2-2"/></svg>
-            РџРѕРёСЃРє РїРѕ РІСЃРµРјСѓ...
+            Поиск по всему...
           </div>
-          <div class="wt-srt">РЎРЅР°С‡Р°Р»Р° РЅРѕРІС‹Рµ</div>
+          <div class="wt-srt">Сначала новые</div>
         </div>
         <div class="wgrid">
           <div class="wcard">
-            <div class="wcard-thumb">рџЋЁ<span class="wcard-badge">РџР РРњР•Р </span></div>
+            <div class="wcard-thumb">🎨<span class="wcard-badge">ПРИМЕР</span></div>
             <div class="wcard-body">
               <div class="wcard-domain">behance.net</div>
-              <div class="wcard-title">Behance вЂ” РіР»Р°РІРЅР°СЏ</div>
-              <div class="wcard-tags"><span class="wcard-tag">РґРёР·Р°Р№РЅ</span><span class="wcard-tag">РІРґРѕС…РЅРѕРІРµРЅРёРµ</span></div>
+              <div class="wcard-title">Behance — главная</div>
+              <div class="wcard-tags"><span class="wcard-tag">дизайн</span><span class="wcard-tag">вдохновение</span></div>
             </div>
           </div>
           <div class="wcard">
-            <div class="wcard-thumb">вљЎ<span class="wcard-badge">РџР РРњР•Р </span></div>
+            <div class="wcard-thumb">⚡<span class="wcard-badge">ПРИМЕР</span></div>
             <div class="wcard-body">
               <div class="wcard-domain">gsap.com</div>
               <div class="wcard-title">GSAP Showcase</div>
-              <div class="wcard-tags"><span class="wcard-tag">Р°РЅРёРјР°С†РёСЏ</span><span class="wcard-tag">РєРѕРґ</span></div>
+              <div class="wcard-tags"><span class="wcard-tag">анимация</span><span class="wcard-tag">код</span></div>
             </div>
           </div>
           <div class="wcard">
-            <div class="wcard-thumb">рџ“ђ<span class="wcard-badge">РџР РРњР•Р </span></div>
+            <div class="wcard-thumb">📐<span class="wcard-badge">ПРИМЕР</span></div>
             <div class="wcard-body">
               <div class="wcard-domain">lawsofux.com</div>
               <div class="wcard-title">Laws of UX</div>
-              <div class="wcard-tags"><span class="wcard-tag">ux</span><span class="wcard-tag">РіР°Р№Рґ</span></div>
+              <div class="wcard-tags"><span class="wcard-tag">ux</span><span class="wcard-tag">гайд</span></div>
             </div>
           </div>
           <div class="wcard">
-            <div class="wcard-thumb">рџЏ†</div>
+            <div class="wcard-thumb">🏆</div>
             <div class="wcard-body">
               <div class="wcard-domain">cssdesignawards.com</div>
               <div class="wcard-title">CSS Design Awards</div>
-              <div class="wcard-tags"><span class="wcard-tag">С‚СЂРµРЅРґС‹</span><span class="wcard-tag">РІРµР±</span></div>
+              <div class="wcard-tags"><span class="wcard-tag">тренды</span><span class="wcard-tag">веб</span></div>
             </div>
           </div>
         </div>
@@ -800,7 +800,7 @@ footer {
 
 <!-- STACK -->
 <div class="stack-row fade">
-  <span class="stack-lbl">РЎС‚РµРє</span>
+  <span class="stack-lbl">Стек</span>
   <div class="stack-pills">
     <span class="stack-pill">Vite</span>
     <span class="stack-pill">Vanilla JS</span>
@@ -814,39 +814,39 @@ footer {
 <!-- FEATURES -->
 <section class="features" id="features">
   <div class="sec-header fade">
-    <h2 class="sec-title">Р’РѕР·РјРѕР¶РЅРѕСЃС‚Рё</h2>
-    <span class="sec-meta">06 С„РёС‡</span>
+    <h2 class="sec-title">Возможности</h2>
+    <span class="sec-meta">06 фич</span>
   </div>
   <div class="feat-grid fade">
     <div class="feat-item">
       <div class="feat-n">01</div>
-      <div class="feat-t">Р‘С‹СЃС‚СЂРѕРµ СЃРѕС…СЂР°РЅРµРЅРёРµ</div>
-      <div class="feat-d">Р’СЃС‚Р°РІСЊ URL вЂ” Vault СЃР°Рј РїРѕР»СѓС‡РёС‚ РЅР°Р·РІР°РЅРёРµ Рё РїСЂРµРІСЊСЋ. РќРёРєР°РєРёС… РѕР±СЏР·Р°С‚РµР»СЊРЅС‹С… РїРѕР»РµР№.</div>
+      <div class="feat-t">Быстрое сохранение</div>
+      <div class="feat-d">Вставь URL — Vault сам получит название и превью. Никаких обязательных полей.</div>
     </div>
     <div class="feat-item">
       <div class="feat-n">02</div>
-      <div class="feat-t">РЈРјРЅС‹Р№ РїРѕРёСЃРє</div>
-      <div class="feat-d">РџРѕРёСЃРє РїРѕ URL, РЅР°Р·РІР°РЅРёСЋ, С‚РµРіР°Рј Рё Р·Р°РјРµС‚РєР°Рј РѕРґРЅРѕРІСЂРµРјРµРЅРЅРѕ. Р РµР·СѓР»СЊС‚Р°С‚С‹ РјРіРЅРѕРІРµРЅРЅРѕ.</div>
+      <div class="feat-t">Умный поиск</div>
+      <div class="feat-d">Поиск по URL, названию, тегам и заметкам одновременно. Результаты мгновенно.</div>
     </div>
     <div class="feat-item">
       <div class="feat-n">03</div>
-      <div class="feat-t">РљРѕР»Р»РµРєС†РёРё</div>
-      <div class="feat-d">РћСЂРіР°РЅРёР·СѓР№ СЃСЃС‹Р»РєРё РІ РїР°РїРєРё. Р”РµР»Р°Р№ РѕР±С‰РёРјРё РґР»СЏ СЃРѕРІРјРµСЃС‚РЅРѕРіРѕ РґРѕСЃС‚СѓРїР°.</div>
+      <div class="feat-t">Коллекции</div>
+      <div class="feat-d">Организуй ссылки в папки. Делай общими для совместного доступа.</div>
     </div>
     <div class="feat-item">
       <div class="feat-n">04</div>
-      <div class="feat-t">РђРІС‚РѕС‚РµРіРё</div>
-      <div class="feat-d">РђРІС‚РѕРјР°С‚РёС‡РµСЃРєРё РѕРїСЂРµРґРµР»СЏРµС‚ С‚РёРї РєРѕРЅС‚РµРЅС‚Р° Рё СЃС‚Р°РІРёС‚ С‚РµРіРё РїРѕ РґРѕРјРµРЅСѓ Рё Р·Р°РіРѕР»РѕРІРєСѓ.</div>
+      <div class="feat-t">Автотеги</div>
+      <div class="feat-d">Автоматически определяет тип контента и ставит теги по домену и заголовку.</div>
     </div>
     <div class="feat-item">
       <div class="feat-n">05</div>
-      <div class="feat-t">РЎРєСЂС‹С‚С‹Рµ СЃСЃС‹Р»РєРё</div>
-      <div class="feat-d">Р›РёС‡РЅС‹Р№ СЂР°Р·РґРµР» СЃ РїР°СЂРѕР»РµРј РґР»СЏ СЃСЃС‹Р»РѕРє РєРѕС‚РѕСЂС‹Рµ РЅРµ РґРѕР»Р¶РЅС‹ Р±С‹С‚СЊ РІРёРґРЅС‹ РґСЂСѓРіРёРј.</div>
+      <div class="feat-t">Скрытые ссылки</div>
+      <div class="feat-d">Личный раздел с паролем для ссылок которые не должны быть видны другим.</div>
     </div>
     <div class="feat-item">
       <div class="feat-n">06</div>
-      <div class="feat-t">РЎРёРЅС…СЂРѕРЅРёР·Р°С†РёСЏ</div>
-      <div class="feat-d">Р”Р°РЅРЅС‹Рµ РІ Supabase вЂ” РґРѕСЃС‚СѓРїРЅС‹ СЃ Р»СЋР±РѕРіРѕ СѓСЃС‚СЂРѕР№СЃС‚РІР° РїРѕСЃР»Рµ РІС…РѕРґР° С‡РµСЂРµР· Google.</div>
+      <div class="feat-t">Синхронизация</div>
+      <div class="feat-d">Данные в Supabase — доступны с любого устройства после входа через Google.</div>
     </div>
   </div>
 </section>
@@ -855,28 +855,28 @@ footer {
 <section class="space-sec">
   <div class="space-card fade">
     <div class="sp-left">
-      <div class="sp-pill">Space вЂ” СЂРµР¶РёРј СЂР°Р·Р±РѕСЂР°</div>
-      <h2>РЎСЃС‹Р»РєРё РЅРµ РґРѕР»Р¶РЅС‹ СѓРјРёСЂР°С‚СЊ РІ Р·Р°РєР»Р°РґРєР°С…</h2>
-      <p>РљР°Р¶РґС‹Р№ РґРµРЅСЊ Space РїРѕРєР°Р·С‹РІР°РµС‚ РѕРґРЅСѓ СЃСЃС‹Р»РєСѓ РёР· РїСЂРѕС€Р»РѕРіРѕ вЂ” С‚Сѓ С‡С‚Рѕ С‚С‹ Р·Р°Р±С‹Р» РѕС‚РєСЂС‹С‚СЊ. Р”РІР° РґРµР№СЃС‚РІРёСЏ: РѕС‚РєСЂС‹С‚СЊ РёР»Рё Р°СЂС…РёРІРёСЂРѕРІР°С‚СЊ. РЎС‚СЂРёРє Р·Р° РµР¶РµРґРЅРµРІРЅС‹Р№ СЂР°Р·Р±РѕСЂ.</p>
+      <div class="sp-pill">Space — режим разбора</div>
+      <h2>Ссылки не должны умирать в закладках</h2>
+      <p>Каждый день Space показывает одну ссылку из прошлого — ту что ты забыл открыть. Два действия: открыть или архивировать. Стрик за ежедневный разбор.</p>
       <div class="sp-nums">
-        <div class="sp-num"><span class="sp-val">1</span><span class="sp-lbl">СЃСЃС‹Р»РєР° РІ РґРµРЅСЊ</span></div>
-        <div class="sp-num"><span class="sp-val">3</span><span class="sp-lbl">РґРµР№СЃС‚РІРёСЏ = СЃС‚СЂРёРє</span></div>
-        <div class="sp-num"><span class="sp-val">в€ћ</span><span class="sp-lbl">РґРЅРµР№ РїРѕРґСЂСЏРґ</span></div>
+        <div class="sp-num"><span class="sp-val">1</span><span class="sp-lbl">ссылка в день</span></div>
+        <div class="sp-num"><span class="sp-val">3</span><span class="sp-lbl">действия = стрик</span></div>
+        <div class="sp-num"><span class="sp-val">∞</span><span class="sp-lbl">дней подряд</span></div>
       </div>
     </div>
     <div class="sp-right">
       <div class="sp-demo">
         <div class="sp-demo-thumb">
-          рџ“ђ
-          <div class="sp-when">94 РґРЅСЏ РЅР°Р·Р°Рґ</div>
+          📐
+          <div class="sp-when">94 дня назад</div>
         </div>
         <div class="sp-demo-body">
           <div class="sp-domain">lawsofux.com</div>
-          <div class="sp-title">Laws of UX вЂ” Р‘Р°Р·Р° РєРѕС‚РѕСЂСѓСЋ РЅР°РґРѕ Р·РЅР°С‚СЊ</div>
-          <div class="sp-note">РџРѕСЃРјРѕС‚СЂРµС‚СЊ СЂР°Р·РґРµР» РїСЂРѕ cognitive load</div>
+          <div class="sp-title">Laws of UX — База которую надо знать</div>
+          <div class="sp-note">Посмотреть раздел про cognitive load</div>
           <div class="sp-btns">
-            <div class="sp-btn open">РћС‚РєСЂС‹С‚СЊ</div>
-            <div class="sp-btn arch">РђСЂС…РёРІ</div>
+            <div class="sp-btn open">Открыть</div>
+            <div class="sp-btn arch">Архив</div>
           </div>
         </div>
         <div class="sp-bar">
@@ -885,7 +885,7 @@ footer {
             <div class="sp-dot"></div><div class="sp-dot"></div>
             <div class="sp-dot"></div><div class="sp-dot"></div><div class="sp-dot"></div>
           </div>
-          <div class="sp-streak">рџ”Ґ 5 РґРЅРµР№</div>
+          <div class="sp-streak">🔥 5 дней</div>
         </div>
       </div>
     </div>
@@ -895,24 +895,24 @@ footer {
 <!-- HOW -->
 <section class="how" id="how">
   <div class="sec-header fade">
-    <h2 class="sec-title">РљР°Рє СЂР°Р±РѕС‚Р°РµС‚</h2>
-    <span class="sec-meta">03 С€Р°РіР°</span>
+    <h2 class="sec-title">Как работает</h2>
+    <span class="sec-meta">03 шага</span>
   </div>
   <div class="how-steps fade">
     <div class="how-step">
       <div class="hs-n">01</div>
-      <div class="hs-t">Р’РѕР№РґРё С‡РµСЂРµР· Google</div>
-      <div class="hs-d">РћРґРёРЅ РєР»РёРє вЂ” Р±РёР±Р»РёРѕС‚РµРєР° СЃРёРЅС…СЂРѕРЅРёР·РёСЂСѓРµС‚СЃСЏ С‡РµСЂРµР· Supabase РЅР° РІСЃРµС… СѓСЃС‚СЂРѕР№СЃС‚РІР°С….</div>
+      <div class="hs-t">Войди через Google</div>
+      <div class="hs-d">Один клик — библиотека синхронизируется через Supabase на всех устройствах.</div>
     </div>
     <div class="how-step">
       <div class="hs-n">02</div>
-      <div class="hs-t">РЎРѕС…СЂР°РЅСЏР№ СЃСЃС‹Р»РєРё</div>
-      <div class="hs-d">Р’СЃС‚Р°РІСЊ URL вЂ” РїСЂРёР»РѕР¶РµРЅРёРµ СЃР°РјРѕ РїРѕР»СѓС‡РёС‚ РЅР°Р·РІР°РЅРёРµ Рё РїСЂРµРІСЊСЋ. Р”РѕР±Р°РІСЊ С‚РµРі РёР»Рё Р·Р°РјРµС‚РєСѓ.</div>
+      <div class="hs-t">Сохраняй ссылки</div>
+      <div class="hs-d">Вставь URL — приложение само получит название и превью. Добавь тег или заметку.</div>
     </div>
     <div class="how-step">
       <div class="hs-n">03</div>
-      <div class="hs-t">РќР°С…РѕРґРё Рё РІРѕР·РІСЂР°С‰Р°Р№СЃСЏ</div>
-      <div class="hs-d">РЈРјРЅС‹Р№ РїРѕРёСЃРє РїРѕ РІСЃРµРјСѓ РєРѕРЅС‚РµРЅС‚Сѓ. Space РЅР°РїРѕРјРЅРёС‚ Рѕ С‚РѕРј С‡С‚Рѕ С‚С‹ Р·Р°Р±С‹Р» РѕС‚РєСЂС‹С‚СЊ.</div>
+      <div class="hs-t">Находи и возвращайся</div>
+      <div class="hs-d">Умный поиск по всему контенту. Space напомнит о том что ты забыл открыть.</div>
     </div>
   </div>
 </section>
@@ -921,11 +921,11 @@ footer {
 <section class="cta">
   <div class="cta-inner fade">
     <div class="cta-text">
-      <h2>РќР°С‡РЅРё РїСЂСЏРјРѕ СЃРµР№С‡Р°СЃ</h2>
-      <p>Р‘РµСЃРїР»Р°С‚РЅРѕ. Р‘РµР· СѓСЃС‚Р°РЅРѕРІРєРё. РџСЂРѕСЃС‚Рѕ РѕС‚РєСЂРѕР№ Рё СЃРѕС…СЂР°РЅРё РїРµСЂРІСѓСЋ СЃСЃС‹Р»РєСѓ.</p>
+      <h2>Начни прямо сейчас</h2>
+      <p>Бесплатно. Без установки. Просто открой и сохрани первую ссылку.</p>
     </div>
     <a href="/app" class="btn-main">
-      РћС‚РєСЂС‹С‚СЊ Vault
+      Открыть Vault
       <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2.5 7h9M8 3.5L11.5 7 8 10.5"/></svg>
     </a>
   </div>
@@ -935,12 +935,12 @@ footer {
 <footer>
   <div class="foot-l">
     <span>Vault</span>
-    <span class="foot-sep">В·</span>
-    <span>РњРµРЅРµРґР¶РµСЂ СЃСЃС‹Р»РѕРє</span>
-    <span class="foot-sep">В·</span>
+    <span class="foot-sep">·</span>
+    <span>Менеджер ссылок</span>
+    <span class="foot-sep">·</span>
     <span>Vanilla JS + Supabase</span>
   </div>
-  <div class="foot-r">2025вЂ“2026</div>
+  <div class="foot-r">2025–2026</div>
 </footer>
 
 <script>
@@ -980,5 +980,3 @@ btn.addEventListener('click', () => {
 </script>
 </body>
 </html>
-
-
