@@ -27,7 +27,7 @@ const FILTER_SORTS = new Set(["newest", "oldest", "title_asc", "title_desc", "so
 const THEME_MODES = new Set(["system", "light", "dark"]);
 const HIDDEN_PASSWORD_KEY = "resource_vault_hidden_password_v1";
 const DEMO_PREFS_KEY = "resource_vault_demo_prefs_v1";
-const ENABLE_AI_ONBOARDING = true;
+const ENABLE_AI_ONBOARDING = false;
 const AI_FUNCTION_PATH = "/functions/v1/ai-onboarding";
 const FETCH_PREVIEW_FUNCTION_PATH = "/functions/v1/fetch-preview";
 
@@ -279,7 +279,10 @@ function syncAuthGate() {
 function syncGuestModeUi() {
   const guestReadOnly = !!(state.isGuestMode && !state.isAuthenticated);
   if (els.btnAddLink) els.btnAddLink.disabled = guestReadOnly;
-  if (els.btnAiOnboarding) els.btnAiOnboarding.disabled = !ENABLE_AI_ONBOARDING || guestReadOnly;
+  if (els.btnAiOnboarding) {
+    els.btnAiOnboarding.hidden = true;
+    els.btnAiOnboarding.disabled = true;
+  }
   if (els.btnNewCollection) els.btnNewCollection.disabled = guestReadOnly;
   if (els.btnSaveFilterInline) els.btnSaveFilterInline.disabled = guestReadOnly;
   if (els.navHidden) els.navHidden.disabled = guestReadOnly;
