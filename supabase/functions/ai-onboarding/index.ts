@@ -44,8 +44,16 @@ type ChatTurnPayload = {
   next_question: string;
   options: string[];
   done: boolean;
+  debug?: {
+    trace_id: string;
+    used_llm: boolean;
+    llm_text_len: number;
+    parsed_ok: boolean;
+    used_fallback_question: boolean;
+    used_fallback_options: boolean;
+    done_reason: "enough_answers" | "model_done" | "continue";
+  };
 };
-
 type AiProfile = {
   role: string;
   level: "Junior" | "Middle" | "Senior";
@@ -151,6 +159,10 @@ function normalizeChatOptions(input: unknown, lang: "ru" | "en") {
     for (const item of fallback) out.add(item);
   }
   return [...out].slice(0, 4);
+}
+
+function makeTraceId() {
+  return `ct_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
 function normalizeToken(raw: string) {
@@ -826,6 +838,8 @@ Deno.serve(async (req) => {
 
   if (action === "chat_turn") {
     if (!role) return jsonResponse(400, { error: "Role is required" });
+    const debugEnabled = body?.debug === true;
+    const traceId = makeTraceId();
     const lang = String(body?.lang || "ru") === "en" ? "en" : "ru";
     const history = normalizeInterviewAnswers(body?.history);
     const answers = history.length ? history : normalizeInterviewAnswers(body?.answers);
@@ -837,37 +851,101 @@ Deno.serve(async (req) => {
     }
 
     if (fullAnswers.length >= 5) {
-      const donePayload: ChatTurnPayload = { next_question: "", options: [], done: true };
+      const donePayload: ChatTurnPayload = {
+        next_question: "",
+        options: [],
+        done: true,
+        debug: debugEnabled ? {
+          trace_id: traceId,
+          used_llm: false,
+          llm_text_len: 0,
+          parsed_ok: false,
+          used_fallback_question: false,
+          used_fallback_options: false,
+          done_reason: "enough_answers"
+        } : undefined
+      };
+      if (debugEnabled) {
+        console.log(JSON.stringify({ trace_id: traceId, action: "chat_turn", done_reason: "enough_answers", answers: fullAnswers.length }));
+      }
       return jsonResponse(200, donePayload);
     }
 
     const aiText = await askGroq(
-      "Ты помогаешь персонализировать библиотеку ресурсов. Отвечай только валидным JSON без markdown.",
+      "You personalize a learning resource library. Return strict valid JSON only, no markdown.",
       [
-        `Роль пользователя: ${role}` ,
-        `История ответов: ${JSON.stringify(fullAnswers)}` ,
-        `Последний ответ: ${lastAnswer || "(empty)"}` ,
-        "Задай один уточняющий вопрос чтобы лучше понять что ему нужно.",
-        "Верни JSON: {\"next_question\":\"string\",\"options\":[\"string\",\"string\",\"string\"],\"done\":false}",
-        "options должно быть 3-4 варианта.",
-        "done=true если уже достаточно информации (обычно 4-5 вопросов)."
+        `User role: ${role}`,
+        `Answer history: ${JSON.stringify(fullAnswers)}`,
+        `Last answer: ${lastAnswer || "(empty)"}`,
+        "Ask one clarifying follow-up question to improve personalization.",
+        "Return JSON only in schema: {\"next_question\":\"string\",\"options\":[\"string\",\"string\",\"string\"],\"done\":false}",
+        "options must contain 3-4 concise choices.",
+        "Set done=true only if there is already enough information (typically after 4-5 answers)."
       ].join("\n")
     );
     const parsed = parseJsonFromText(aiText);
-    const done = parsed?.done === true || fullAnswers.length >= 5;
+    const doneByModel = parsed?.done === true;
+    const done = doneByModel || fullAnswers.length >= 5;
     if (done) {
-      const donePayload: ChatTurnPayload = { next_question: "", options: [], done: true };
+      const donePayload: ChatTurnPayload = {
+        next_question: "",
+        options: [],
+        done: true,
+        debug: debugEnabled ? {
+          trace_id: traceId,
+          used_llm: !!aiText,
+          llm_text_len: String(aiText || "").length,
+          parsed_ok: !!parsed,
+          used_fallback_question: false,
+          used_fallback_options: false,
+          done_reason: doneByModel ? "model_done" : "enough_answers"
+        } : undefined
+      };
+      if (debugEnabled) {
+        console.log(JSON.stringify({
+          trace_id: traceId,
+          action: "chat_turn",
+          done_reason: doneByModel ? "model_done" : "enough_answers",
+          used_llm: !!aiText,
+          parsed_ok: !!parsed,
+          llm_text_len: String(aiText || "").length
+        }));
+      }
       return jsonResponse(200, donePayload);
     }
 
     const fallback = buildFallbackFollowUp(role, fullAnswers, lang);
-    const nextQuestion = String(parsed?.next_question || "").trim() || String(fallback.question || "").trim();
+    const parsedQuestion = String(parsed?.next_question || "").trim();
+    const nextQuestion = parsedQuestion || String(fallback.question || "").trim();
+    const usedFallbackQuestion = !parsedQuestion;
     const options = normalizeChatOptions(parsed?.options, lang);
+    const usedFallbackOptions = !Array.isArray(parsed?.options) || !parsed.options.length;
     const payload: ChatTurnPayload = {
       next_question: nextQuestion,
       options: options.length ? options : normalizeChatOptions(fallback.options, lang),
-      done: false
+      done: false,
+      debug: debugEnabled ? {
+        trace_id: traceId,
+        used_llm: !!aiText,
+        llm_text_len: String(aiText || "").length,
+        parsed_ok: !!parsed,
+        used_fallback_question: usedFallbackQuestion,
+        used_fallback_options: usedFallbackOptions,
+        done_reason: "continue"
+      } : undefined
     };
+    if (debugEnabled) {
+      console.log(JSON.stringify({
+        trace_id: traceId,
+        action: "chat_turn",
+        done_reason: "continue",
+        used_llm: !!aiText,
+        parsed_ok: !!parsed,
+        llm_text_len: String(aiText || "").length,
+        used_fallback_question: usedFallbackQuestion,
+        used_fallback_options: usedFallbackOptions
+      }));
+    }
     return jsonResponse(200, payload);
   }
 

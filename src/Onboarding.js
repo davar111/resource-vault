@@ -489,7 +489,8 @@ export function initOnboarding(options = {}) {
           action: "chat_turn",
           role: state.role,
           history: state.history.map((x) => ({ question: x.question, answer: x.answer })),
-          last_answer: String(lastAnswer || "")
+          last_answer: String(lastAnswer || ""),
+          debug: true
         })
       });
       if (!res.ok) {
@@ -508,9 +509,10 @@ export function initOnboarding(options = {}) {
       const options = Array.isArray(data?.options)
         ? data.options.map((x) => String(x || "").trim()).filter(Boolean).slice(0, 4)
         : [];
+      const debug = data?.debug && typeof data.debug === "object" ? data.debug : null;
       if (done) return { done: true, nextQuestion: "", options: [] };
       if (!nextQuestion || options.length < 3) throw new Error("Malformed chat_turn response");
-      return { done: false, nextQuestion, options };
+      return { done: false, nextQuestion, options, debug };
     } finally {
       clearTimeout(timeoutId);
     }
@@ -721,6 +723,14 @@ export function initOnboarding(options = {}) {
     setLoading(true);
     try {
       const aiTurn = await requestChatTurn(answer);
+      if (aiTurn?.debug) {
+        const dbg = aiTurn.debug;
+        setStatus(
+          `diag: llm=${dbg.used_llm ? 1 : 0} parsed=${dbg.parsed_ok ? 1 : 0} fq=${dbg.used_fallback_question ? 1 : 0} fo=${dbg.used_fallback_options ? 1 : 0} id=${String(dbg.trace_id || "").slice(-8)}`
+        );
+      } else {
+        setStatus("");
+      }
       if (aiTurn.done) {
         state.aiMode = true;
         state.currentQuestion = null;
@@ -739,6 +749,7 @@ export function initOnboarding(options = {}) {
       return;
     } catch {
       state.aiMode = false;
+      setStatus("diag: local_fallback=1");
       const answeredIds = new Set(state.history.map((x) => x.questionId));
       state.currentQuestion = resolveNextQuestion(prevQuestion, answer, state.allQuestions, answeredIds);
       setLoading(false);
