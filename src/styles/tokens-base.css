@@ -381,8 +381,14 @@ textarea:focus-visible,
 .collection--dragging { opacity: 0.7; }
 
 .collections { display: flex; flex-direction: column; gap: 6px; }
-.collection__left { display: inline-flex; align-items: center; gap: 10px; }
-.collection__name { display: inline-flex; align-items: center; gap: 8px; }
+.collection__left { display: inline-flex; align-items: center; gap: 10px; min-width: 0; flex: 1 1 auto; }
+.collection__name { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.collection__name > div {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .collection__right { display: inline-flex; align-items: center; gap: 4px; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dot-idle); }
 .collection--active .dot { background: var(--dot-active); }
@@ -422,6 +428,10 @@ textarea:focus-visible,
   color: var(--text-secondary);
   font-size: 11px;
   line-height: 1;
+}
+.badge--compact {
+  padding: 1px 6px 2px;
+  font-size: 10px;
 }
 
 .collection__menu { position: relative; }

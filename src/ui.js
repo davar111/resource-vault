@@ -70,7 +70,9 @@ function renderCollections(state, els, onChange, L) {
     const canLeave = !!(state.currentUserId && c.isShared && !isOwner);
     const hasMenu = canInvite || canManage || canLeave;
     const isPinned = (state.ui?.pinnedCollectionIds || []).includes(c.id);
-    const sharedBadge = c.isShared ? `<span class="badge badge--smart">${escapeHtml(t(L, "sharedBadge"))}</span>` : "";
+    const sharedBadge = c.isShared
+      ? `<span class="badge badge--smart badge--compact" title="${escapeHtml(t(L, "sharedBadge"))}">${escapeHtml(t(L, "sharedBadgeCompact"))}</span>`
+      : "";
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "collection" + (state.activeCollectionId === c.id ? " collection--active" : "");
