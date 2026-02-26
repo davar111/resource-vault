@@ -325,7 +325,8 @@ export function initOnboarding(options = {}) {
     resources: [],
     loading: false,
     importSummary: null,
-    aiMode: false
+    aiMode: false,
+    authRequired: false
   };
 
   let state = { ...initialState };
@@ -342,6 +343,8 @@ export function initOnboarding(options = {}) {
   function setLoading(next) {
     state.loading = !!next;
     if (els.skip) els.skip.disabled = state.loading;
+    if (els.send) els.send.disabled = state.loading;
+    if (els.input) els.input.disabled = state.loading || state.step !== "questions";
   }
 
   function setStatus(text = "") {
@@ -385,15 +388,25 @@ export function initOnboarding(options = {}) {
     return textByLang(getLang(), "Сессия истекла. Войди снова через Google.", "Session expired. Please sign in again with Google.");
   }
 
-  function hideFreeInput() {
+  function isAuthError(err) {
+    const message = String(err?.message || "").toLowerCase();
+    if (!message) return false;
+    return /session expired|сессия истекла|unauthorized|invalid jwt|401|403/.test(message);
+  }
+
+  function setFreeInputVisible(visible) {
+    const show = !!visible;
     if (els.input) {
-      els.input.value = "";
-      els.input.disabled = true;
+      if (!show) els.input.value = "";
+      els.input.disabled = !show || state.loading;
       const row = els.input.closest(".row") || els.input.parentElement;
-      if (row) row.style.display = "none";
-      else els.input.style.display = "none";
+      if (row) row.style.display = show ? "" : "none";
+      else els.input.style.display = show ? "" : "none";
     }
-    if (els.send) els.send.style.display = "none";
+    if (els.send) {
+      els.send.style.display = show ? "" : "none";
+      els.send.disabled = !show || state.loading;
+    }
     if (els.footer) els.footer.classList.add("onboarding-footer");
   }
 
@@ -562,6 +575,7 @@ export function initOnboarding(options = {}) {
   async function finalizeProfileAndResources() {
     setLoading(true);
     setStatus(textByLang(getLang(), "Подбираю лучшие ресурсы...", "Finding the best resources..."));
+    state.authRequired = false;
     void appendMessageWithTyping(textByLang(getLang(), "Собираю подборку под твой профиль...", "Building a resource set for your profile..."), "bot");
     showSkeletonResources(5);
     try {
@@ -595,9 +609,15 @@ export function initOnboarding(options = {}) {
       state.profile = data?.ai_profile || buildProfile(state.role, state.history);
       state.resources = Array.isArray(data?.resources) ? data.resources : [];
     } catch (err) {
-      state.profile = state.profile || buildProfile(state.role, state.history);
-      state.resources = [];
-      void appendMessageWithTyping(err?.message || "Failed to fetch resources.", "bot");
+      if (isAuthError(err)) {
+        state.authRequired = true;
+        state.profile = null;
+        state.resources = [];
+      } else {
+        state.profile = state.profile || buildProfile(state.role, state.history);
+        state.resources = [];
+        void appendMessageWithTyping(err?.message || "Failed to fetch resources.", "bot");
+      }
     } finally {
       removeSkeletonResources();
       setLoading(false);
@@ -607,13 +627,22 @@ export function initOnboarding(options = {}) {
     }
   }
   function renderResult() {
-    if (els.subtitle) els.subtitle.textContent = textByLang(getLang(), "Готово: профиль и ресурсы", "Done: profile and resources");
+    if (els.subtitle) {
+      els.subtitle.textContent = state.authRequired
+        ? textByLang(getLang(), "Требуется повторный вход", "Sign in required")
+        : textByLang(getLang(), "Готово: профиль и ресурсы", "Done: profile and resources");
+    }
     if (els.chips) {
       els.chips.dataset.mode = "result";
       els.chips.innerHTML = "";
     }
+    setFreeInputVisible(false);
     renderInlineImportButton();
     if (!els.chat) return;
+    if (state.authRequired) {
+      void appendMessageWithTyping(authErrorMessage(), "bot");
+      return;
+    }
     void appendMessageWithTyping(
       state.resources.length
         ? textByLang(getLang(), `Нашел ${state.resources.length} ресурсов:`, `Found ${state.resources.length} resources:`)
@@ -654,6 +683,7 @@ export function initOnboarding(options = {}) {
       return;
     }
     state.step = "questions";
+    setFreeInputVisible(true);
     void appendMessageWithTyping(String(state.currentQuestion.text || ""), "bot");
     updateSubtitle();
     renderQuestionChips(state.currentQuestion);
@@ -668,6 +698,7 @@ export function initOnboarding(options = {}) {
     state.resources = [];
     state.importSummary = null;
     state.aiMode = false;
+    state.authRequired = false;
     state.allQuestions = buildQuestionBank(getLang())[state.role] || buildDefaultQuestions(getLang());
     state.currentQuestion = state.allQuestions[0] || null;
     state.step = "questions";
@@ -678,7 +709,7 @@ export function initOnboarding(options = {}) {
 
   async function submitAnswer(answerRaw) {
     const answer = String(answerRaw || "").trim();
-    if (!answer || !state.currentQuestion) return;
+    if (!answer || !state.currentQuestion || state.loading) return;
     const prevQuestion = state.currentQuestion;
     appendMessage(answer, "user");
     state.history.push({
@@ -687,11 +718,13 @@ export function initOnboarding(options = {}) {
       answer
     });
     persist();
+    setLoading(true);
     try {
       const aiTurn = await requestChatTurn(answer);
       if (aiTurn.done) {
         state.aiMode = true;
         state.currentQuestion = null;
+        setLoading(false);
         askCurrentQuestion();
         return;
       }
@@ -701,12 +734,14 @@ export function initOnboarding(options = {}) {
         text: aiTurn.nextQuestion,
         options: aiTurn.options
       };
+      setLoading(false);
       askCurrentQuestion();
       return;
     } catch {
       state.aiMode = false;
       const answeredIds = new Set(state.history.map((x) => x.questionId));
       state.currentQuestion = resolveNextQuestion(prevQuestion, answer, state.allQuestions, answeredIds);
+      setLoading(false);
       askCurrentQuestion();
     }
   }
@@ -736,10 +771,18 @@ export function initOnboarding(options = {}) {
         "bot"
       );
     }
+    setFreeInputVisible(false);
     renderRoleChips();
     removeInlineImportButton();
     updateSubtitle();
     setStatus("");
+  }
+
+  function submitFreeTextAnswer() {
+    const value = String(els.input?.value || "").trim();
+    if (!value || state.loading || state.step !== "questions") return;
+    if (els.input) els.input.value = "";
+    void submitAnswer(value);
   }
 
   function open() {
@@ -748,7 +791,7 @@ export function initOnboarding(options = {}) {
     if (cached && typeof cached === "object") state = { ...initialState, ...cached, loading: false };
     else resetState();
     applyButtonsText();
-    hideFreeInput();
+    setFreeInputVisible(state.step === "questions");
     if (state.step === "result") renderResult();
     else if (state.step === "questions") askCurrentQuestion();
     else renderRole();
@@ -758,7 +801,7 @@ export function initOnboarding(options = {}) {
   function restart() {
     resetState();
     applyButtonsText();
-    hideFreeInput();
+    setFreeInputVisible(false);
     renderRole();
   }
 
@@ -776,6 +819,12 @@ export function initOnboarding(options = {}) {
     els.close?.addEventListener("click", () => modal.close());
     els.skip?.addEventListener("click", skip);
     els.restart?.addEventListener("click", restart);
+    els.send?.addEventListener("click", submitFreeTextAnswer);
+    els.input?.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter") return;
+      e.preventDefault();
+      submitFreeTextAnswer();
+    });
   }
 
   bind();
