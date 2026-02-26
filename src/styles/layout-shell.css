@@ -7,6 +7,7 @@
   pointer-events: auto;
 }
 .collection__menu-trigger:hover { color: var(--text-primary); }
+.collection--active .collection__menu-trigger:hover { color: inherit; }
 .collection__menu-pop {
   position: absolute;
   top: 28px;

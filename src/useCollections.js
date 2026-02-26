@@ -110,3 +110,16 @@ export async function createCollectionInvite(collectionId, email, ownerUserId) {
   });
   return rows?.[0] || null;
 }
+
+export async function leaveCollection(collectionId, inviteeEmail) {
+  const normalized = normalizeEmail(inviteeEmail);
+  if (!normalized) return;
+  await supabaseRequest(restPath(COLLECTION_INVITES_TABLE), {
+    method: "DELETE",
+    query: {
+      collection_id: `eq.${collectionId}`,
+      invitee_email: `eq.${normalized}`
+    },
+    prefer: "return=minimal"
+  });
+}

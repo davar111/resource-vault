@@ -351,6 +351,11 @@ textarea:focus-visible,
   border-color: var(--accent);
   color: var(--accent-contrast);
 }
+:root[data-theme="dark"] .collection--active {
+  background: var(--bg-surface-2);
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
 .nav-item::before {
   content: "";
   width: 15px;
@@ -406,6 +411,9 @@ textarea:focus-visible,
 }
 .collection__pin:hover { color: var(--text-primary); }
 .collection__pin--on { color: var(--accent); }
+:root[data-theme="dark"] .collection--active .collection__pin:hover {
+  color: inherit;
+}
 .badge--smart {
   min-width: auto;
   padding: 2px 8px 3px;

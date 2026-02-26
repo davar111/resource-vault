@@ -279,4 +279,5 @@ create policy "collection_invites_insert_owner_only" on public.collection_invite
 );
 create policy "collection_invites_delete_owner_only" on public.collection_invites for delete to authenticated using (
   owner_user_id = auth.uid()
+  or lower(invitee_email) = lower(coalesce(auth.jwt()->>'email', ''))
 );

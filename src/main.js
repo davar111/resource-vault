@@ -14,7 +14,7 @@ import { SOURCE_CODES, TYPE_CODES } from "./domain.js";
 import { makeDemoLinks } from "./demo-data.js";
 import { initAuth, loginWithGoogle, logout } from "./useAuth.js";
 import { createLink, deleteLink, listLinks, updateLink } from "./useLinks.js";
-import { addLinkCollections, createCollection, createCollectionInvite, deleteCollection, listCollections, listLinkCollections, replaceLinkCollections, updateCollection } from "./useCollections.js";
+import { addLinkCollections, createCollection, createCollectionInvite, deleteCollection, leaveCollection, listCollections, listLinkCollections, replaceLinkCollections, updateCollection } from "./useCollections.js";
 import { createSavedFilter, deleteSavedFilter, listSavedFilters } from "./useSavedFilters.js";
 import { getSpaceStats, upsertSpaceStats } from "./useSpaceStats.js";
 import { getAuthIssue, getSessionAccessToken } from "./supabase.js";
@@ -1540,6 +1540,34 @@ const actions = {
       requestRender();
     } catch (err) {
       notify(err?.message || (state.lang === "ru" ? "Не удалось удалить коллекцию." : "Failed to delete collection."), "error");
+    } finally {
+      pendingCollectionOps.delete(collectionId);
+    }
+  },
+  onLeaveCollection: async (collectionId) => {
+    if (!ensureAuth()) return;
+    if (pendingCollectionOps.has(collectionId)) return;
+    const col = state.collections.find((x) => x.id === collectionId);
+    if (!col || !col.isShared || col.ownerId === currentUser?.id) return;
+    const email = normalizeEmail(authEmail(currentUser));
+    if (!email) {
+      notify(state.lang === "ru" ? "Не удалось определить email текущего пользователя." : "Unable to detect current user email.", "error");
+      return;
+    }
+    pendingCollectionOps.add(collectionId);
+    try {
+      await leaveCollection(collectionId, email);
+      state.collections = state.collections.filter((x) => x.id !== collectionId);
+      state.ui.collectionOrderIds = (state.ui.collectionOrderIds || []).filter((id) => id !== collectionId);
+      state.ui.pinnedCollectionIds = (state.ui.pinnedCollectionIds || []).filter((id) => id !== collectionId);
+      for (const item of state.items) item.collectionIds = (item.collectionIds || []).filter((id) => id !== collectionId);
+      if (state.activeCollectionId === collectionId) state.activeCollectionId = "all";
+      applyCollectionUiSettings();
+      renderAddCollectionChoices();
+      notify(t(state.lang, "leaveCollectionSuccess"), "ok");
+      requestRender();
+    } catch (err) {
+      notify(err?.message || (state.lang === "ru" ? "Не удалось выйти из коллекции." : "Failed to leave collection."), "error");
     } finally {
       pendingCollectionOps.delete(collectionId);
     }

@@ -67,7 +67,8 @@ function renderCollections(state, els, onChange, L) {
     const isOwner = !!(state.currentUserId && c.ownerId === state.currentUserId);
     const canInvite = !!(isOwner && c.isShared);
     const canManage = !!isOwner;
-    const hasMenu = canInvite || canManage;
+    const canLeave = !!(state.currentUserId && c.isShared && !isOwner);
+    const hasMenu = canInvite || canManage || canLeave;
     const isPinned = (state.ui?.pinnedCollectionIds || []).includes(c.id);
     const sharedBadge = c.isShared ? `<span class="badge badge--smart">${escapeHtml(t(L, "sharedBadge"))}</span>` : "";
     const btn = document.createElement("button");
@@ -89,6 +90,7 @@ function renderCollections(state, els, onChange, L) {
             ${canInvite ? `<button class="collection__menu-item" type="button" data-col-invite="1">${escapeHtml(t(L, "inviteToCollection"))}</button>` : ""}
             ${canManage ? `<button class="collection__menu-item" type="button" data-col-rename="1">${escapeHtml(t(L, "renameCollection"))}</button>` : ""}
             ${canManage ? `<button class="collection__menu-item collection__menu-item--danger" type="button" data-col-del="1">${escapeHtml(t(L, "deleteCollection"))}</button>` : ""}
+            ${canLeave ? `<button class="collection__menu-item collection__menu-item--danger" type="button" data-col-leave="1">${escapeHtml(t(L, "leaveCollection"))}</button>` : ""}
           </div>
         </div>` : ""}
       </div>
@@ -178,6 +180,18 @@ function wireCollectionInteractions({ btn, collection, state, els, onChange, L }
     });
     if (!ok) return;
     await activeActions?.onDeleteCollection?.(collection.id);
+  });
+
+  btn.querySelector("[data-col-leave]")?.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    closeAllCollectionMenus();
+    const ok = await confirmAction(els, L, {
+      title: t(L, "leaveCollectionTitle"),
+      text: t(L, "leaveCollectionText"),
+      confirm: t(L, "leaveCollection")
+    });
+    if (!ok) return;
+    await activeActions?.onLeaveCollection?.(collection.id);
   });
 }
 
