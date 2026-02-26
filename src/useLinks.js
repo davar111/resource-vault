@@ -5,6 +5,7 @@ import { restPath, supabaseRequest } from "./supabase.js";
 const TABLE = "links";
 
 function mapRow(row) {
+  const preview = String(row.preview_image || "").trim();
   return {
     id: row.id,
     ownerId: String(row.user_id || ""),
@@ -18,7 +19,7 @@ function mapRow(row) {
     hidden: !!row.is_hidden,
     createdAt: Date.parse(row.created_at || "") || Date.now(),
     updatedAt: Date.parse(row.updated_at || row.created_at || "") || Date.now(),
-    previewImage: ""
+    previewImage: preview || null
   };
 }
 
@@ -26,7 +27,7 @@ export async function listLinks() {
   const rows = await supabaseRequest(restPath(TABLE), {
     method: "GET",
     query: {
-      select: "id,user_id,url,title,note,tags,type,source,favorite,is_hidden,created_at,updated_at",
+      select: "id,user_id,url,preview_image,title,note,tags,type,source,favorite,is_hidden,created_at,updated_at",
       order: "created_at.desc"
     }
   });
@@ -37,6 +38,7 @@ export async function createLink(input, userId) {
   const payload = {
     user_id: userId,
     url: String(input.url || ""),
+    preview_image: input.previewImage || null,
     title: input.title ? String(input.title) : null,
     note: input.note ? String(input.note) : null,
     tags: normalizeTags(input.tags || []),
@@ -71,7 +73,7 @@ export async function updateLink(id, input) {
 
   const rows = await supabaseRequest(restPath(TABLE), {
     method: "PATCH",
-    query: { id: `eq.${id}`, select: "id,user_id,url,title,note,tags,type,source,favorite,is_hidden,created_at,updated_at" },
+    query: { id: `eq.${id}`, select: "id,user_id,url,preview_image,title,note,tags,type,source,favorite,is_hidden,created_at,updated_at" },
     body: payload,
     prefer: "return=representation"
   });

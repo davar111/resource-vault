@@ -327,6 +327,14 @@ select option { background: var(--bg-surface-1); color: var(--text-primary); }
 }
 .card__preview-link { display: block; }
 .card__preview { width: 100%; display: block; aspect-ratio: 16 / 9; object-fit: cover; }
+.card__preview-placeholder {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  display: grid;
+  place-items: center;
+  font-size: 42px;
+  background: var(--bg-surface-2);
+}
 .card__fav-preview {
   position: absolute;
   top: 8px;
@@ -486,6 +494,14 @@ select option { background: var(--bg-surface-1); color: var(--text-primary); }
   aspect-ratio: 16 / 9;
   object-fit: cover;
   display: block;
+}
+.space-card__preview-fallback {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  display: grid;
+  place-items: center;
+  font-size: 54px;
+  background: var(--bg-surface-2);
 }
 .space-card__when {
   position: absolute;

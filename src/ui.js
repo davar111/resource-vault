@@ -628,8 +628,9 @@ function renderSpace(state, els, onChange, actions, L) {
 
   const safeUrl = toHttpUrl(item.url);
   const hrefUrl = safeUrl || "#";
-  const previewSeed = safeUrl || "https://example.com";
-  const previewSrc = item.previewImage || previewFallbackUrl(previewSeed);
+  const previewSrc = item.previewImage || previewFallbackUrl(item);
+  const previewFallback = previewFallbackUrl(safeUrl || "https://example.com");
+  const hasPreview = !!previewSrc;
   const domain = domainFromUrl(safeUrl) || "other";
   const sourceBadge = sourceBadgeText(item?.source, domain);
   const note = String(item.note || "").trim();
@@ -662,7 +663,9 @@ function renderSpace(state, els, onChange, actions, L) {
 
       <article class="space-card" data-space-card>
         <a class="space-card__preview" href="${escapeHtml(hrefUrl)}" target="_blank" rel="noreferrer">
-          <img class="space-card__preview-img" src="${escapeHtml(previewSrc)}" data-fallback="${escapeHtml(previewFallbackUrl(previewSeed))}" alt="${escapeHtml(item.title || domain)}" loading="lazy" referrerpolicy="no-referrer" />
+          ${hasPreview
+    ? `<img class="space-card__preview-img" src="${escapeHtml(previewSrc)}" data-fallback="${escapeHtml(previewFallback || "")}" alt="${escapeHtml(item.title || domain)}" loading="lazy" referrerpolicy="no-referrer" />`
+    : `<span class="space-card__preview-fallback" aria-hidden="true">${escapeHtml(previewPlaceholderEmoji(domain))}</span>`}
           <span class="space-card__when">${escapeHtml(when)}</span>
         </a>
         <div class="space-card__body">
@@ -779,8 +782,9 @@ function renderGrid(state, els, onChange, actions, L) {
     const domain = domainFromUrl(safeUrl);
     const tags = (item.tags || []).slice(0, 10);
     const icon = faviconUrl(safeUrl);
-    const previewSeed = safeUrl || "https://example.com";
-    const previewSrc = item.previewImage || previewFallbackUrl(previewSeed);
+    const previewSrc = item.previewImage || previewFallbackUrl(item);
+    const previewFallback = previewFallbackUrl(safeUrl || "https://example.com");
+    const hasPreview = !!previewSrc;
     const noteText = String(item.note || "").trim();
     const hasNote = !!noteText;
     const noteNeedsExpand = hasNote && (noteText.length > 90 || /\r?\n/.test(noteText));
@@ -793,9 +797,11 @@ function renderGrid(state, els, onChange, actions, L) {
       <div class="card__preview-wrap">
         ${item.isDemo ? `<span class="demo-badge">${escapeHtml(t(L, "demoBadge"))}</span>` : ""}
         ${item.isAiNew ? `<span class="new-badge">NEW</span>` : ""}
-        <a class="card__preview-link" href="${escapeHtml(hrefUrl)}" target="_blank" rel="noreferrer" draggable="false">
-          <img class="card__preview" src="${escapeHtml(previewSrc)}" data-fallback="${escapeHtml(previewFallbackUrl(previewSeed))}" alt="${escapeHtml(item.title || "preview")}" loading="lazy" referrerpolicy="no-referrer" />
-        </a>
+        ${hasPreview
+    ? `<a class="card__preview-link" href="${escapeHtml(hrefUrl)}" target="_blank" rel="noreferrer" draggable="false">
+          <img class="card__preview" src="${escapeHtml(previewSrc)}" data-fallback="${escapeHtml(previewFallback || "")}" alt="${escapeHtml(item.title || "preview")}" loading="lazy" referrerpolicy="no-referrer" />
+        </a>`
+    : `<div class="card__preview-placeholder" aria-hidden="true">${escapeHtml(previewPlaceholderEmoji(domain))}</div>`}
         <button class="card__fav-preview ${item.favorite ? "card__fav-preview--on" : ""} ${!canManage ? "card__fav-preview--disabled" : ""}" type="button" title="${escapeHtml(t(L, "favorites"))}" ${!canManage ? "disabled" : ""}>
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" focusable="false">
             <path d="M8 2.5L9.9 6.3l4.2.6-3 2.9.7 4.2L8 11.8l-3.8 2.2.7-4.2-3-2.9 4.2-.6L8 2.5z"></path>
@@ -861,6 +867,15 @@ function sourceBadgeText(source, domain) {
   const d = String(domain || "").trim();
   if (!d) return "•";
   return d.slice(0, 1).toUpperCase();
+}
+
+function previewPlaceholderEmoji(domain) {
+  const host = String(domain || "").toLowerCase();
+  if (host.includes("pinterest.")) return "📌";
+  if (host.includes("instagram.")) return "📸";
+  if (host.includes("linkedin.")) return "💼";
+  if (host.includes("facebook.") || host === "fb.com" || host.endsWith(".fb.com")) return "👥";
+  return "🔗";
 }
 
 function wireCardInteractions({ card, item, noteText, actions, els, L, canManage, safeUrl }) {

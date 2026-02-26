@@ -14,6 +14,7 @@ create table if not exists public.links (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null,
   url text not null,
+  preview_image text null,
   title text null,
   note text null,
   tags text[] not null default '{}',
@@ -25,6 +26,7 @@ create table if not exists public.links (
   updated_at timestamptz not null default now()
 );
 alter table public.links add column if not exists is_hidden boolean not null default false;
+alter table public.links add column if not exists preview_image text;
 do $$
 begin
   if not exists (

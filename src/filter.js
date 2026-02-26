@@ -1,5 +1,13 @@
 export const TAG_MIN_LEN = 2;
 export const TAG_MAX_LEN = 24;
+export const BLOCKED_PREVIEW_DOMAINS = [
+  "pinterest.com",
+  "pinterest.ru",
+  "instagram.com",
+  "linkedin.com",
+  "fb.com",
+  "facebook.com"
+];
 
 export function toHttpUrl(input) {
   const raw = String(input || "").trim();
@@ -64,6 +72,12 @@ export function domainFromUrl(url) {
   } catch {
     return "";
   }
+}
+
+export function isBlockedPreviewDomain(hostname) {
+  const host = String(hostname || "").trim().toLowerCase();
+  if (!host) return false;
+  return BLOCKED_PREVIEW_DOMAINS.some((domain) => host === domain || host.endsWith(`.${domain}`));
 }
 
 export function faviconUrl(url) {
@@ -177,10 +191,16 @@ export async function tryFetchPreview(url) {
   return "";
 }
 
-export function previewFallbackUrl(url) {
-  const clean = String(url || "").trim();
-  if (!clean) return "";
+export function previewFallbackUrl(itemOrUrl) {
+  const item = itemOrUrl && typeof itemOrUrl === "object" ? itemOrUrl : null;
+  if (item && item.previewImage) return String(item.previewImage);
+
+  const rawUrl = item ? item.url : itemOrUrl;
+  const clean = String(rawUrl || "").trim();
+  if (!clean) return null;
   const normalized = clean.startsWith("http://") || clean.startsWith("https://") ? clean : `https://${clean}`;
+  const domain = domainFromUrl(normalized);
+  if (isBlockedPreviewDomain(domain)) return null;
   return `https://image.thum.io/get/width/1200/noanimate/${encodeURI(normalized)}`;
 }
 

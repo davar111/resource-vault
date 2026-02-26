@@ -14,16 +14,6 @@ const BASE_DEMO_LINKS = [
     note: "Лучшее для поиска идей"
   },
   {
-    id: "demo-pinterest",
-    url: "https://ru.pinterest.com/pin/1139199668273118074/",
-    title: "Pinterest: креативная типографика",
-    type: "inspiration",
-    source: "pinterest",
-    tags: ["типографика", "плакат", "графический дизайн"],
-    favorite: false,
-    note: "Интересный пример шрифтовой композиции"
-  },
-  {
     id: "demo-cssda",
     url: "https://www.cssdesignawards.com/",
     title: "CSS Design Awards — сайт дня",
@@ -44,16 +34,6 @@ const BASE_DEMO_LINKS = [
     note: "База, которую надо знать"
   },
   {
-    id: "demo-humane",
-    url: "https://humanebydesign.ru/principles/empowering/index.html#best-practices",
-    title: "Humane by Design: Расширение возможностей",
-    type: "article",
-    source: "site",
-    tags: ["этика", "ux", "гуманный дизайн"],
-    favorite: false,
-    note: "Принципы человеко-ориентированного дизайна"
-  },
-  {
     id: "demo-gsap",
     url: "https://gsap.com/showcase/?page=3",
     title: "GSAP Showcase",
@@ -62,16 +42,6 @@ const BASE_DEMO_LINKS = [
     tags: ["анимация", "javascript", "портфолио"],
     favorite: true,
     note: "Примеры крутой веб-анимации"
-  },
-  {
-    id: "demo-smashing",
-    url: "https://www.smashingmagazine.com/category/web-design/",
-    title: "Smashing Magazine — Web Design",
-    type: "article",
-    source: "site",
-    tags: ["статьи", "ui", "туториалы"],
-    favorite: false,
-    note: "Кладезь полезных материалов"
   }
 ];
 
@@ -86,4 +56,3 @@ export function makeDemoLinks() {
     collectionIds: []
   }));
 }
-

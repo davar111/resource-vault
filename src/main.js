@@ -29,6 +29,7 @@ const HIDDEN_PASSWORD_KEY = "resource_vault_hidden_password_v1";
 const DEMO_PREFS_KEY = "resource_vault_demo_prefs_v1";
 const ENABLE_AI_ONBOARDING = true;
 const AI_FUNCTION_PATH = "/functions/v1/ai-onboarding";
+const FETCH_PREVIEW_FUNCTION_PATH = "/functions/v1/fetch-preview";
 
 const els = {
   langSelect: document.getElementById("langSelect"),
@@ -184,6 +185,7 @@ let sourceAutofillEnabled = true;
 let addFlowStep = 1;
 let addFlowAutoTags = [];
 let addFlowManualTags = [];
+let addFlowPreviewUrl = "";
 let addFlowSelectedCollectionId = "";
 let addFlowParseToken = 0;
 let prevGateVisible = null;
@@ -665,6 +667,42 @@ async function parseLinkWithAi(meta) {
   }
 }
 
+async function fetchPreviewViaEdge(rawUrl) {
+  const normalized = toHttpUrl(rawUrl);
+  if (!normalized) return { preview: "", blocked: false };
+
+  let token = "";
+  try {
+    token = String(await getSessionAccessToken() || "").trim();
+  } catch {}
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 5200);
+  try {
+    const headers = {
+      "Content-Type": "application/json"
+    };
+    if (token) headers.Authorization = `Bearer ${token}`;
+
+    const response = await fetch(FETCH_PREVIEW_FUNCTION_PATH, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ url: normalized }),
+      signal: controller.signal
+    });
+    if (!response.ok) return { preview: "", blocked: false };
+    const data = await response.json().catch(() => null);
+    if (!data || typeof data !== "object") return { preview: "", blocked: false };
+    const preview = toHttpUrl(String(data.preview || "").trim());
+    const blocked = !!data.blocked;
+    return { preview: preview || "", blocked };
+  } catch {
+    return { preview: "", blocked: false };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function syncAddTagsInput() {
   if (!els.inputAddTags) return;
   const merged = normalizeTags([...(addFlowAutoTags || []), ...(addFlowManualTags || [])]);
@@ -743,6 +781,7 @@ function setAddFlowStep(step) {
 
 async function parseAddUrl(urlRaw) {
   const currentToken = ++addFlowParseToken;
+  addFlowPreviewUrl = "";
   const raw = String(urlRaw || "").trim();
   const normalized = toHttpUrl(raw);
   if (!normalized) {
@@ -763,19 +802,29 @@ async function parseAddUrl(urlRaw) {
 
   let fetchedTitle = "";
   let fetchedPreview = "";
+  let blockedPreviewDomain = false;
   try {
     fetchedTitle = await tryFetchTitle(normalized);
   } catch {}
   try {
     fetchedPreview = await tryFetchPreview(normalized);
   } catch {}
+  if (!fetchedPreview) {
+    const edge = await fetchPreviewViaEdge(normalized);
+    if (edge.blocked) {
+      blockedPreviewDomain = true;
+      fetchedPreview = "";
+    } else if (edge.preview) {
+      fetchedPreview = edge.preview;
+    }
+  }
   if (currentToken !== addFlowParseToken) return { ok: false, error: "stale" };
 
   let finalTitle = String(fetchedTitle || domainFromUrl(normalized) || normalized).trim().slice(0, TITLE_MAX_LEN);
   let finalPreview = fetchedPreview;
   const baseTags = inferAutoTags(normalized, finalTitle, source);
 
-  const aiParsed = await parseLinkWithAi({
+  const aiParsed = blockedPreviewDomain ? null : await parseLinkWithAi({
     url: normalized,
     title: finalTitle,
     preview: finalPreview,
@@ -802,6 +851,7 @@ async function parseAddUrl(urlRaw) {
       if (els.addParsedThumbEmoji) els.addParsedThumbEmoji.textContent = emoji;
     }
   }
+  addFlowPreviewUrl = blockedPreviewDomain ? null : (finalPreview || "");
 
   addFlowAutoTags = normalizeTags([...(aiParsed?.tags || []), ...baseTags]).slice(0, 5);
   if (els.addAutoTags) {
@@ -892,6 +942,7 @@ function openNewLinkModal(preset = {}) {
   addFlowSelectedCollectionId = String(presetCollections[0] || "");
   addFlowAutoTags = [];
   addFlowManualTags = [];
+  addFlowPreviewUrl = "";
   addFlowParseToken += 1;
   renderAddCollectionChoices(presetCollections);
   renderTagSuggestions();
@@ -1224,7 +1275,7 @@ async function loadData() {
     if (!list.includes(colId)) list.push(colId);
     relMap.set(linkId, list);
   }
-  state.items = links.map((x) => ({ ...x, isDemo: false, previewImage: previewFallbackUrl(x.url), collectionIds: relMap.get(x.id) || [] }));
+  state.items = links.map((x) => ({ ...x, isDemo: false, previewImage: previewFallbackUrl(x), collectionIds: relMap.get(x.id) || [] }));
   pruneSpaceDismissedIds();
   state.collections = collections;
   applyCollectionUiSettings();
@@ -1283,7 +1334,7 @@ async function importOnboardingResources(resources, profile) {
         skipped += 1;
         continue;
       }
-      state.items.unshift({ ...created, isDemo: false, isAiNew: true, previewImage: previewFallbackUrl(created.url), collectionIds: [] });
+      state.items.unshift({ ...created, isDemo: false, isAiNew: true, previewImage: previewFallbackUrl(created), collectionIds: [] });
       imported += 1;
     } catch {
       skipped += 1;
@@ -1879,6 +1930,7 @@ function setupEvents() {
     try {
       const created = await createLink({
         url,
+        previewImage: addFlowPreviewUrl || null,
         title: title || domainFromUrl(url),
         note,
         tags: normalizeTags(fd.get("tags")),
@@ -1894,7 +1946,7 @@ function setupEvents() {
         }
         // For newly created links we only need INSERT into relation table.
         await addLinkCollections(created.id, selectedCollections, currentUser.id);
-        state.items.unshift({ ...created, isDemo: false, previewImage: previewFallbackUrl(created.url), collectionIds: selectedCollections });
+        state.items.unshift({ ...created, isDemo: false, previewImage: previewFallbackUrl(created), collectionIds: selectedCollections });
         stopFeedbackSpinner("addSpinner");
         feedback.addFlashCancel = flashStatus(
           addStatusLine,
