@@ -334,6 +334,21 @@
   align-self: flex-end;
   background: var(--bg-surface-3);
 }
+.onboarding-chat__msg--typing {
+  min-width: 56px;
+}
+.ob-typing {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.ob-typing span {
+  display: inline-block;
+  opacity: .35;
+  animation: onboardingTypingPulse 760ms ease-in-out infinite;
+}
+.ob-typing span:nth-child(2) { animation-delay: 110ms; }
+.ob-typing span:nth-child(3) { animation-delay: 220ms; }
 .onboarding-chat__json {
   margin: 0;
   padding: 10px;
@@ -382,8 +397,26 @@
   justify-content: flex-start;
   text-align: left;
 }
+.onboarding-chips .chip--role {
+  min-height: 40px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.onboarding-chips .chip--answer {
+  min-height: 34px;
+  font-size: 12px;
+}
+.chip__emoji {
+  font-size: 15px;
+  line-height: 1;
+}
 .onboarding-chips[data-mode="answers"] {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+@keyframes onboardingTypingPulse {
+  0%, 80%, 100% { transform: translateY(0); opacity: .35; }
+  40% { transform: translateY(-1px); opacity: 1; }
 }

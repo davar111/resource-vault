@@ -40,6 +40,12 @@ type InterviewAnswer = {
   answer: string;
 };
 
+type ChatTurnPayload = {
+  next_question: string;
+  options: string[];
+  done: boolean;
+};
+
 type AiProfile = {
   role: string;
   level: "Junior" | "Middle" | "Senior";
@@ -115,6 +121,36 @@ function normalizeList(input: unknown) {
     out.add(value);
   }
   return [...out];
+}
+
+function normalizeInterviewAnswers(input: unknown) {
+  const arr = Array.isArray(input) ? input : [];
+  const out: InterviewAnswer[] = [];
+  for (const raw of arr) {
+    const row = raw && typeof raw === "object" ? raw as Record<string, unknown> : {};
+    const question = String(row.question || "").trim();
+    const answer = String(row.answer || "").trim();
+    if (!question && !answer) continue;
+    out.push({ question, answer });
+  }
+  return out.slice(0, 24);
+}
+
+function normalizeChatOptions(input: unknown, lang: "ru" | "en") {
+  const arr = Array.isArray(input) ? input : [];
+  const out = new Set<string>();
+  for (const raw of arr) {
+    const value = String(raw || "").trim();
+    if (!value) continue;
+    out.add(value.slice(0, 96));
+  }
+  if (out.size < 3) {
+    const fallback = lang === "en"
+      ? ["Beginner level", "Intermediate level", "Advanced level", "Mixed"]
+      : ["РќР°С‡Р°Р»СЊРЅС‹Р№ СѓСЂРѕРІРµРЅСЊ", "РЎСЂРµРґРЅРёР№ СѓСЂРѕРІРµРЅСЊ", "РџСЂРѕРґРІРёРЅСѓС‚С‹Р№ СѓСЂРѕРІРµРЅСЊ", "РЎРјРµС€Р°РЅРЅС‹Р№"];
+    for (const item of fallback) out.add(item);
+  }
+  return [...out].slice(0, 4);
 }
 
 function normalizeToken(raw: string) {
@@ -790,41 +826,49 @@ Deno.serve(async (req) => {
 
   if (action === "chat_turn") {
     if (!role) return jsonResponse(400, { error: "Role is required" });
-    const lang = String(body?.lang || "ru");
-    const answers = Array.isArray(body?.answers) ? body.answers as InterviewAnswer[] : [];
-    const maxQuestions = 5;
-    const enoughData = answers.length >= 4;
-    if (enoughData || answers.length >= maxQuestions) {
-      const override = body?.resources_lang === "ru" || body?.resources_lang === "en" || body?.resources_lang === "both"
-        ? body.resources_lang
-        : undefined;
-      const { aiProfile, resources } = await buildProfileAndResources(admin, authData.user.id, role, answers, override);
-      return jsonResponse(200, { done: true, ai_profile: aiProfile, resources });
+    const lang = String(body?.lang || "ru") === "en" ? "en" : "ru";
+    const history = normalizeInterviewAnswers(body?.history);
+    const answers = history.length ? history : normalizeInterviewAnswers(body?.answers);
+    const lastAnswer = String(body?.last_answer || "").trim();
+    const fullAnswers = [...answers];
+    if (lastAnswer) {
+      const lastExisting = fullAnswers.length ? String(fullAnswers[fullAnswers.length - 1]?.answer || "") : "";
+      if (lastExisting !== lastAnswer) fullAnswers.push({ question: "", answer: lastAnswer });
     }
 
-    const history = answers.map((x, idx) => `${idx + 1}. Q:${x.question} A:${x.answer}`).join("\n");
-    const qText = await askGroq(
-      "You are a senior mentor conducting a natural chat. Ask exactly one short follow-up question.",
+    if (fullAnswers.length >= 5) {
+      const donePayload: ChatTurnPayload = { next_question: "", options: [], done: true };
+      return jsonResponse(200, donePayload);
+    }
+
+    const aiText = await askGroq(
+      "Ты помогаешь персонализировать библиотеку ресурсов. Отвечай только валидным JSON без markdown.",
       [
-        `Role: ${role}`,
-        `Already asked: ${answers.length}`,
-        history ? `History:\n${history}` : "No history yet.",
-        `Language: ${lang === "en" ? "English" : "Russian"}`,
-        "Return plain text only.",
-        "No JSON, no lists, no answer options, no repetition.",
-        "Do not say phrases like 'you said' or repeat user's message verbatim."
+        `Роль пользователя: ${role}` ,
+        `История ответов: ${JSON.stringify(fullAnswers)}` ,
+        `Последний ответ: ${lastAnswer || "(empty)"}` ,
+        "Задай один уточняющий вопрос чтобы лучше понять что ему нужно.",
+        "Верни JSON: {\"next_question\":\"string\",\"options\":[\"string\",\"string\",\"string\"],\"done\":false}",
+        "options должно быть 3-4 варианта.",
+        "done=true если уже достаточно информации (обычно 4-5 вопросов)."
       ].join("\n")
     );
-    const modelQuestion = extractQuestionText(qText);
-    const fallbackQuestion = buildGuidedQuestion(role, answers, lang);
-    const weakQuestion = !modelQuestion ||
-      modelQuestion.length < 12 ||
-      /С‚С‹ РЅР°РїРёСЃР°Р»|you said|i got it|РїРѕРЅСЏР»|i understand/i.test(modelQuestion.toLowerCase());
-    const question = {
-      question: String(weakQuestion ? fallbackQuestion : modelQuestion),
-      options: []
+    const parsed = parseJsonFromText(aiText);
+    const done = parsed?.done === true || fullAnswers.length >= 5;
+    if (done) {
+      const donePayload: ChatTurnPayload = { next_question: "", options: [], done: true };
+      return jsonResponse(200, donePayload);
+    }
+
+    const fallback = buildFallbackFollowUp(role, fullAnswers, lang);
+    const nextQuestion = String(parsed?.next_question || "").trim() || String(fallback.question || "").trim();
+    const options = normalizeChatOptions(parsed?.options, lang);
+    const payload: ChatTurnPayload = {
+      next_question: nextQuestion,
+      options: options.length ? options : normalizeChatOptions(fallback.options, lang),
+      done: false
     };
-    return jsonResponse(200, { done: false, question });
+    return jsonResponse(200, payload);
   }
 
   if (action === "generate_questions") {
