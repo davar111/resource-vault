@@ -49,6 +49,13 @@ function getAnonKey() {
   return String(env.VITE_SUPABASE_ANON_KEY || "").trim();
 }
 
+function isLikelyJwt(token) {
+  const raw = String(token || "").trim();
+  if (!raw) return false;
+  const parts = raw.split(".");
+  return parts.length === 3 && parts.every((x) => x.length > 0);
+}
+
 function detectResourcesLangFromHistory(history) {
   const text = history.map((x) => `${x.question} ${x.answer}`).join(" ").toLowerCase();
   const ru = /рус|russian|на русском|кирилл/.test(text);
@@ -374,6 +381,10 @@ export function initOnboarding(options = {}) {
     els.chat.scrollTop = els.chat.scrollHeight;
   }
 
+  function authErrorMessage() {
+    return textByLang(getLang(), "Сессия истекла. Войди снова через Google.", "Session expired. Please sign in again with Google.");
+  }
+
   function hideFreeInput() {
     if (els.input) {
       els.input.value = "";
@@ -447,10 +458,10 @@ export function initOnboarding(options = {}) {
     }
     els.chips.appendChild(wrap);
   }
-
   async function requestChatTurn(lastAnswer) {
     const token = String(await getAccessToken() || "").trim();
     if (!token) throw new Error(textByLang(getLang(), "Нет активной сессии.", "No active session."));
+    if (!isLikelyJwt(token)) throw new Error(authErrorMessage());
     const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
     const anonKey = getAnonKey();
     if (anonKey) headers.apikey = anonKey;
@@ -468,7 +479,16 @@ export function initOnboarding(options = {}) {
           last_answer: String(lastAnswer || "")
         })
       });
-      if (!res.ok) throw new Error((await res.text().catch(() => "")) || `Chat turn failed (${res.status})`);
+      if (!res.ok) {
+        if (res.status === 401 || res.status === 403) throw new Error(authErrorMessage());
+        const raw = String(await res.text().catch(() => "")).trim();
+        let msg = raw;
+        try {
+          const parsed = JSON.parse(raw);
+          msg = String(parsed?.message || parsed?.error || raw);
+        } catch {}
+        throw new Error(msg || `Chat turn failed (${res.status})`);
+      }
       const data = await res.json();
       const done = !!data?.done;
       const nextQuestion = String(data?.next_question || "").trim();
@@ -482,7 +502,6 @@ export function initOnboarding(options = {}) {
       clearTimeout(timeoutId);
     }
   }
-
   function showSkeletonResources(count = 5) {
     if (!els.chat) return;
     const wrap = document.createElement("div");
@@ -540,7 +559,6 @@ export function initOnboarding(options = {}) {
       setLoading(false);
     }
   }
-
   async function finalizeProfileAndResources() {
     setLoading(true);
     setStatus(textByLang(getLang(), "Подбираю лучшие ресурсы...", "Finding the best resources..."));
@@ -549,6 +567,7 @@ export function initOnboarding(options = {}) {
     try {
       const token = String(await getAccessToken() || "").trim();
       if (!token) throw new Error(textByLang(getLang(), "Нет активной сессии.", "No active session."));
+      if (!isLikelyJwt(token)) throw new Error(authErrorMessage());
       const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
       const anonKey = getAnonKey();
       if (anonKey) headers.apikey = anonKey;
@@ -562,7 +581,16 @@ export function initOnboarding(options = {}) {
           resources_lang: detectResourcesLangFromHistory(state.history)
         })
       });
-      if (!res.ok) throw new Error((await res.text().catch(() => "")) || `Finalize failed (${res.status})`);
+      if (!res.ok) {
+        if (res.status === 401 || res.status === 403) throw new Error(authErrorMessage());
+        const raw = String(await res.text().catch(() => "")).trim();
+        let msg = raw;
+        try {
+          const parsed = JSON.parse(raw);
+          msg = String(parsed?.message || parsed?.error || raw);
+        } catch {}
+        throw new Error(msg || `Finalize failed (${res.status})`);
+      }
       const data = await res.json();
       state.profile = data?.ai_profile || buildProfile(state.role, state.history);
       state.resources = Array.isArray(data?.resources) ? data.resources : [];
@@ -578,7 +606,6 @@ export function initOnboarding(options = {}) {
       renderResult();
     }
   }
-
   function renderResult() {
     if (els.subtitle) els.subtitle.textContent = textByLang(getLang(), "Готово: профиль и ресурсы", "Done: profile and resources");
     if (els.chips) {
@@ -754,4 +781,3 @@ export function initOnboarding(options = {}) {
   bind();
   return { open };
 }
-

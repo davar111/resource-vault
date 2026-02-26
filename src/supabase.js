@@ -99,6 +99,13 @@ function decodeBase64Url(input) {
   return "";
 }
 
+function isLikelyJwt(token) {
+  const raw = String(token || "").trim();
+  if (!raw) return false;
+  const parts = raw.split(".");
+  return parts.length === 3 && parts.every((x) => x.length > 0);
+}
+
 function getUserIdFromAccessToken(accessToken) {
   if (!accessToken || !String(accessToken).includes(".")) return null;
 
@@ -185,7 +192,10 @@ export async function completeAuthFromUrl() {
 export async function ensureValidSession() {
   const session = getSession();
   if (!session?.access_token || !session?.refresh_token) return null;
-  if (session.expires_at && session.expires_at > Date.now()) return session;
+  const accessToken = String(session.access_token || "").trim();
+  const tokenNotExpired = Number(session.expires_at || 0) > Date.now();
+  const tokenLooksValid = isLikelyJwt(accessToken) && !!getUserIdFromAccessToken(accessToken);
+  if (tokenNotExpired && tokenLooksValid) return session;
 
   const url = `${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`;
   let res = null;
@@ -214,7 +224,7 @@ export async function ensureValidSession() {
     expires_at: Date.now() + Math.max(1, expiresIn - 30) * 1000
   };
 
-  if (!refreshed.access_token) {
+  if (!refreshed.access_token || !isLikelyJwt(refreshed.access_token) || !getUserIdFromAccessToken(refreshed.access_token)) {
     clearSession();
     setAuthIssue("SESSION_EXPIRED", "Session expired, please sign in again.");
     return null;
