@@ -99,3 +99,6 @@
 - [2026-02-26] UI micro-tweak: в `src/styles/redesign-exact.css` у `.card__add-plus` уменьшена толщина знака `+` для карточки быстрого добавления (`font-weight: 400 -> 300`) по запросу пользователя.
 - [2026-02-26] UI micro-tweak 2: по дополнительному запросу пользователя знак `+` в карточке быстрого добавления облегчён ещё на шаг (`font-weight: 300 -> 200`) в `src/styles/redesign-exact.css`.
 - [2026-02-26] Font-weight availability fix: в `index.html` обновлено подключение Google Fonts для `DM Sans` с добавлением веса `200`, чтобы изменение `.card__add-plus { font-weight: 200; }` реально применялось визуально.
+- [2026-02-27] Dev route parity: добавлен `vite.config.js` с middleware, который в локальной разработке повторяет продовое поведение маршрутов (`/ -> /landing/`, `/landing/ -> /landing/index.html`, `/app* -> SPA entry`). Это позволяет смотреть лендинг на localhost как основной вход.
+
+- [2026-02-27] Проверка после dev-route parity: `npm run build` — OK; smoke-test dev-сервера подтверждает `302 / -> /landing/`, корректную отдачу landing по `/landing/` и приложения по `/app`.

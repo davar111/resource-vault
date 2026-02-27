@@ -48,3 +48,7 @@
 [2026-02-26 16:55] Лендинг переключен в главный вход: для Vercel добавлен redirect `/ -> /landing/`.
 [2026-02-26 16:55] Приложение перенесено на entrypoint `/app` через rewrite на `index.html`; CTA лендинга ведут на `/app`.
 [2026-02-26 17:05] Исправлена кодировка `public/landing/index.html`: восстановлен исходный UTF-8 текст без кракозябр, сохранены CTA на `/app`.
+[2026-02-27] Локальный роутинг dev приведён к поведению Vercel: добавлен `vite.config.js` с redirect `/ -> /landing/` и rewrite (`/landing/ -> /landing/index.html`, `/app* -> /`).
+[2026-02-27] Следующий шаг: ручной smoke-тест маршрутов `http://localhost:5173/`, `/landing/`, `/app`.
+
+[2026-02-27] Smoke-тест dev-маршрутов выполнен: `/` => 302 на `/landing/`, `/landing/` => `public/landing/index.html`, `/app` => SPA (`/src/main.js`).
