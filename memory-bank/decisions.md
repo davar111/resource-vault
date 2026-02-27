@@ -151,3 +151,7 @@
 37. Для консистентности бренда использовать общий favicon и на лендинге, и в приложении.
 - Решение: в `public/landing/index.html` добавлен `<link rel="icon" type="image/svg+xml" href="/favicon.svg?v=3" />`, идентичный `index.html`.
 - Причина: без явного тега лендинг не показывал иконку вкладки, хотя файл favicon был доступен в `public/`.
+
+38. Для правок лендинга с кириллицей избегать PowerShell string rewrite.
+- Решение: восстановление `public/landing/index.html` из known-good коммита (`git restore --source=e319bf4`) + точечная вставка favicon через Node `fs.readFileSync/writeFileSync(..., "utf8")`.
+- Причина: PowerShell-правка строками вызвала регрессию кодировки (кракозябры) в лендинге.

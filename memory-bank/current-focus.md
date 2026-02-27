@@ -55,3 +55,5 @@
 [2026-02-27] Hotfix landing: добавлен favicon-тег в `public/landing/index.html` (`/favicon.svg?v=3`), чтобы иконка отображалась на `/landing/` в dev/prod.
 [2026-02-27] Следующий шаг: проверить отображение favicon в браузере после hard refresh.
 [2026-02-27] Проверено: `/landing/` в dev отдает favicon-тег (`/favicon.svg?v=3`), `npm run build` — OK.
+[2026-02-27] Hotfix-regression: `public/landing/index.html` восстановлен из корректного коммита `e319bf4`, favicon добавлен точечно через Node (`utf8`) без PowerShell-перекодировки.
+[2026-02-27] Проверки выполнены: `/landing/` отдает нормальный title `Vault — библиотека ссылок` и favicon; `npm run check` + `npm run build` — OK.
