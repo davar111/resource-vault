@@ -147,3 +147,7 @@
 36. Уточнение dev-route parity для лендинга в Vite.
 - Решение: в `vite.config.js` middleware дополнительно переписывает `/landing` и `/landing/` на `/landing/index.html`, чтобы dev-сервер отдавал именно landing-файл из `public/landing/`.
 - Причина: Vite fallback для `/landing/` может отдавать SPA `index.html`, из-за чего редирект с `/` не показывал лендинг.
+
+37. Для консистентности бренда использовать общий favicon и на лендинге, и в приложении.
+- Решение: в `public/landing/index.html` добавлен `<link rel="icon" type="image/svg+xml" href="/favicon.svg?v=3" />`, идентичный `index.html`.
+- Причина: без явного тега лендинг не показывал иконку вкладки, хотя файл favicon был доступен в `public/`.

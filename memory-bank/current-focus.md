@@ -52,3 +52,6 @@
 [2026-02-27] Следующий шаг: ручной smoke-тест маршрутов `http://localhost:5173/`, `/landing/`, `/app`.
 
 [2026-02-27] Smoke-тест dev-маршрутов выполнен: `/` => 302 на `/landing/`, `/landing/` => `public/landing/index.html`, `/app` => SPA (`/src/main.js`).
+[2026-02-27] Hotfix landing: добавлен favicon-тег в `public/landing/index.html` (`/favicon.svg?v=3`), чтобы иконка отображалась на `/landing/` в dev/prod.
+[2026-02-27] Следующий шаг: проверить отображение favicon в браузере после hard refresh.
+[2026-02-27] Проверено: `/landing/` в dev отдает favicon-тег (`/favicon.svg?v=3`), `npm run build` — OK.

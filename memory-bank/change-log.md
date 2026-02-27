@@ -102,3 +102,5 @@
 - [2026-02-27] Dev route parity: добавлен `vite.config.js` с middleware, который в локальной разработке повторяет продовое поведение маршрутов (`/ -> /landing/`, `/landing/ -> /landing/index.html`, `/app* -> SPA entry`). Это позволяет смотреть лендинг на localhost как основной вход.
 
 - [2026-02-27] Проверка после dev-route parity: `npm run build` — OK; smoke-test dev-сервера подтверждает `302 / -> /landing/`, корректную отдачу landing по `/landing/` и приложения по `/app`.
+- [2026-02-27] Landing favicon fix: в `public/landing/index.html` добавлен `<link rel="icon" type="image/svg+xml" href="/favicon.svg?v=3" />`; favicon теперь отображается и на `/landing/`.
+- [2026-02-27] Проверка favicon-fix: smoke-test `/landing/` подтвердил наличие `rel="icon"`; `npm run build` — OK.
