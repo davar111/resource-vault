@@ -87,7 +87,7 @@ function renderCollections(state, els, onChange, L) {
         <button class="collection__pin ${isPinned ? "collection__pin--on" : ""}" type="button" data-col-pin="1" title="${escapeHtml(t(L, isPinned ? "unpinCollection" : "pinCollection"))}" aria-label="${escapeHtml(t(L, isPinned ? "unpinCollection" : "pinCollection"))}">&#128204;</button>
         <div class="badge">${count}</div>
         ${hasMenu ? `<div class="collection__menu">
-          <button class="collection__menu-trigger" type="button" data-col-menu="1"><span class="collection__menu-dots">&#8943;</span></button>
+          <button class="collection__menu-trigger" type="button" data-col-menu="1" aria-label="${escapeHtml(t(L, "collectionActions"))}" aria-haspopup="menu" aria-expanded="false"><span class="collection__menu-dots">&#8943;</span></button>
           <div class="collection__menu-pop" data-col-pop hidden>
             ${canInvite ? `<button class="collection__menu-item" type="button" data-col-invite="1">${escapeHtml(t(L, "inviteToCollection"))}</button>` : ""}
             ${canManage ? `<button class="collection__menu-item" type="button" data-col-rename="1">${escapeHtml(t(L, "renameCollection"))}</button>` : ""}
@@ -215,7 +215,7 @@ function renderSavedFilters(state, els, onChange, actions, L) {
       </div>
       <div class="collection__right">
         <div class="collection__menu">
-          <button class="collection__menu-trigger" type="button" data-filter-menu="1"><span class="collection__menu-dots">&#8943;</span></button>
+          <button class="collection__menu-trigger" type="button" data-filter-menu="1" aria-label="${escapeHtml(t(L, "savedFilterActions"))}" aria-haspopup="menu" aria-expanded="false"><span class="collection__menu-dots">&#8943;</span></button>
           <div class="collection__menu-pop" data-filter-pop hidden>
             <button class="collection__menu-item collection__menu-item--danger" type="button" data-filter-del="1">${escapeHtml(t(L, "del"))}</button>
           </div>
@@ -273,6 +273,7 @@ function bindCollectionMenuToggle(root, triggerSelector, popSelector) {
     const wasHidden = pop.hidden;
     closeAllCollectionMenus();
     pop.hidden = !wasHidden;
+    trigger.setAttribute("aria-expanded", pop.hidden ? "false" : "true");
     trigger.closest(".collection__menu")?.classList.toggle("collection__menu--open", !pop.hidden);
   });
 }
@@ -332,9 +333,94 @@ function renderHeader(state, els, L) {
 function renderActiveFilters(state, els, onChange, L) {
   const bar = els.activeFilters;
   if (!bar) return;
-  bar.innerHTML = "";
   const chipsBar = bar.closest(".chipsbar");
-  if (chipsBar) chipsBar.hidden = true;
+  bar.innerHTML = "";
+
+  const chips = [];
+  const search = String(state.search || "").trim();
+  if (search) {
+    chips.push({
+      label: `${t(L, "chipSearch")}: ${search}`,
+      remove: () => {
+        state.search = "";
+      }
+    });
+  }
+  for (const type of state.filters.types || []) {
+    chips.push({
+      label: `${t(L, "chipType")}: ${displayOptionLabel(type, "type", L)}`,
+      remove: () => {
+        state.filters.types = state.filters.types.filter((x) => x !== type);
+      }
+    });
+  }
+  for (const source of state.filters.sources || []) {
+    chips.push({
+      label: `${t(L, "chipSource")}: ${displayOptionLabel(source, "source", L)}`,
+      remove: () => {
+        state.filters.sources = state.filters.sources.filter((x) => x !== source);
+      }
+    });
+  }
+  if (state.filters.tag) {
+    chips.push({
+      label: `${t(L, "chipTag")}: ${state.filters.tag}`,
+      remove: () => {
+        state.filters.tag = "";
+      }
+    });
+  }
+  if (state.filters.favoriteOnly) {
+    chips.push({
+      label: t(L, "chipFav"),
+      remove: () => {
+        state.filters.favoriteOnly = false;
+      }
+    });
+  }
+
+  if (!chips.length) {
+    if (chipsBar) chipsBar.hidden = true;
+    return;
+  }
+
+  const applyFilterChange = () => {
+    state.activeSavedFilterId = null;
+    syncFilterInputs(state, els);
+    if (els.searchInput) els.searchInput.value = state.search || "";
+    onChange?.();
+    render(state, els, onChange, activeActions);
+  };
+
+  chips.forEach((chip) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "chip";
+    btn.textContent = chip.label;
+    btn.title = t(L, "clearFilters");
+    btn.addEventListener("click", () => {
+      chip.remove();
+      applyFilterChange();
+    });
+    bar.appendChild(btn);
+  });
+
+  const clearAll = document.createElement("button");
+  clearAll.type = "button";
+  clearAll.className = "chip";
+  clearAll.textContent = t(L, "clearFilters");
+  clearAll.addEventListener("click", () => {
+    state.activeSavedFilterId = null;
+    state.search = "";
+    state.filters.types = [];
+    state.filters.sources = [];
+    state.filters.tag = "";
+    state.filters.favoriteOnly = false;
+    applyFilterChange();
+  });
+  bar.appendChild(clearAll);
+
+  if (chipsBar) chipsBar.hidden = false;
 }
 
 function renderSmartSearchPanel(state, els, onChange, L) {
@@ -802,7 +888,7 @@ function renderGrid(state, els, onChange, actions, L) {
           <img class="card__preview" src="${escapeHtml(previewSrc)}" data-fallback="${escapeHtml(previewFallback || "")}" alt="${escapeHtml(item.title || "preview")}" loading="lazy" referrerpolicy="no-referrer" />
         </a>`
     : `<div class="card__preview-placeholder" aria-hidden="true">${escapeHtml(previewPlaceholderEmoji(domain))}</div>`}
-        <button class="card__fav-preview ${item.favorite ? "card__fav-preview--on" : ""} ${!canManage ? "card__fav-preview--disabled" : ""}" type="button" title="${escapeHtml(t(L, "favorites"))}" ${!canManage ? "disabled" : ""}>
+        <button class="card__fav-preview ${item.favorite ? "card__fav-preview--on" : ""} ${!canManage ? "card__fav-preview--disabled" : ""}" type="button" title="${escapeHtml(t(L, "toggleFavorite"))}" aria-label="${escapeHtml(t(L, "toggleFavorite"))}" ${!canManage ? "disabled" : ""}>
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" focusable="false">
             <path d="M8 2.5L9.9 6.3l4.2.6-3 2.9.7 4.2L8 11.8l-3.8 2.2.7-4.2-3-2.9 4.2-.6L8 2.5z"></path>
           </svg>
@@ -1086,6 +1172,9 @@ function closeAllCollectionMenus() {
   document.querySelectorAll("[data-col-pop], [data-filter-pop]").forEach((el) => {
     el.hidden = true;
     el.closest(".collection__menu")?.classList.remove("collection__menu--open");
+  });
+  document.querySelectorAll("[data-col-menu], [data-filter-menu]").forEach((trigger) => {
+    trigger.setAttribute("aria-expanded", "false");
   });
 }
 

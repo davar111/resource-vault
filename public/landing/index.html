@@ -23,7 +23,7 @@
   --border-strong:  #c8c6c2;
   --text-primary:   #1a1916;
   --text-secondary: #6b6860;
-  --text-muted:     #9e9c98;
+  --text-muted:     #726f68;
   --accent:         #1a1916;
   --accent-contrast:#f5f4f1;
   --tag-bg:         #f0eeeb;
@@ -47,7 +47,7 @@
   --border-strong:  #2e2e2c;
   --text-primary:   #f0efe9;
   --text-secondary: #8a8880;
-  --text-muted:     #555450;
+  --text-muted:     #7e7a70;
   --accent:         #f0efe9;
   --accent-contrast:#0e0e0d;
   --tag-bg:         #1e1e1c;
@@ -662,13 +662,25 @@ footer {
   .feat-item:nth-child(n) { border-right: none; }
   .hero h1 { font-size: 38px; }
 }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  .fade {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
 </style>
 </head>
 <body>
 
 <!-- NAV -->
 <nav>
-  <a href="#" class="nav-logo">
+  <a href="/landing/" class="nav-logo">
     <div class="nav-logomark">
       <svg viewBox="0 0 12 12" fill="none">
         <rect x="0.5" y="0.5" width="4.5" height="4.5" rx="1.2" fill="var(--accent-contrast)"/>
@@ -945,18 +957,23 @@ footer {
 </footer>
 
 <script>
-// scroll reveal
-const io = new IntersectionObserver(entries => {
-  entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }});
-}, { threshold: 0.06 });
-document.querySelectorAll('.fade').forEach(el => io.observe(el));
+const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+if (prefersReducedMotion) {
+  document.querySelectorAll('.fade').forEach(el => el.classList.add('in'));
+} else {
+  // scroll reveal
+  const io = new IntersectionObserver(entries => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }});
+  }, { threshold: 0.06 });
+  document.querySelectorAll('.fade').forEach(el => io.observe(el));
 
-// hero immediate
-setTimeout(() => {
-  document.querySelectorAll('.hero .fade').forEach((el, i) => {
-    setTimeout(() => el.classList.add('in'), i * 90);
-  });
-}, 60);
+  // hero immediate
+  setTimeout(() => {
+    document.querySelectorAll('.hero .fade').forEach((el, i) => {
+      setTimeout(() => el.classList.add('in'), i * 90);
+    });
+  }, 60);
+}
 
 // theme toggle
 const root = document.documentElement;
@@ -965,6 +982,10 @@ const icon = document.getElementById('themeIcon');
 
 const sunSvg = `<circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 2.8v2.1M12 19.1v2.1M4.9 4.9l1.5 1.5M17.6 17.6l1.5 1.5M2.8 12h2.1M19.1 12h2.1M4.9 19.1l1.5-1.5M17.6 6.4l1.5-1.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/>`;
 const moonSvg = `<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>`;
+const setThemeButtonLabel = () => {
+  const isDark = root.dataset.theme === 'dark';
+  btn.setAttribute('aria-label', isDark ? 'Переключить на светлую тему' : 'Переключить на темную тему');
+};
 
 // detect system preference
 const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -972,11 +993,13 @@ if (prefersDark) {
   root.dataset.theme = 'dark';
   icon.innerHTML = sunSvg;
 }
+setThemeButtonLabel();
 
 btn.addEventListener('click', () => {
   const isDark = root.dataset.theme === 'dark';
   root.dataset.theme = isDark ? 'light' : 'dark';
   icon.innerHTML = isDark ? moonSvg : sunSvg;
+  setThemeButtonLabel();
 });
 </script>
 </body>

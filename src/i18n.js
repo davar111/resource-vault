@@ -124,6 +124,9 @@
     renameCollection: "Переименовать",
     pinCollection: "Закрепить коллекцию",
     unpinCollection: "Открепить коллекцию",
+    collectionActions: "Действия коллекции",
+    savedFilterActions: "Действия фильтра",
+    toggleFavorite: "Переключить избранное",
     renameCollectionPrompt: "Новое название коллекции",
     deleteCollectionConfirm: "Удалить коллекцию без возможности восстановления?",
 
@@ -307,6 +310,9 @@
     renameCollection: "Rename",
     pinCollection: "Pin collection",
     unpinCollection: "Unpin collection",
+    collectionActions: "Collection actions",
+    savedFilterActions: "Filter actions",
+    toggleFavorite: "Toggle favorite",
     renameCollectionPrompt: "New collection name",
     deleteCollectionConfirm: "Delete this collection permanently?",
 

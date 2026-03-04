@@ -374,6 +374,14 @@
     width: 100%;
   }
   .smart-search-panel {
+    position: static;
+    margin-top: 8px;
+    border-radius: 10px;
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+  }
+  .smart-search-panel[hidden] {
     display: none !important;
   }
   .topbar__left {
@@ -401,6 +409,18 @@
     grid-row: 2;
     width: auto;
     margin-top: 0;
+  }
+  .collection__pin,
+  .collection__menu-trigger {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    opacity: 1;
+    pointer-events: auto;
+    transform: none;
+  }
+  .collection__right {
+    gap: 6px;
   }
 }
 

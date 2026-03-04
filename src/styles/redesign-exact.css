@@ -11,7 +11,7 @@
   --border-strong: #c8c6c2;
   --text-primary: #1a1916;
   --text-secondary: #6b6860;
-  --text-muted: #9e9c98;
+  --text-muted: #726f68;
   --accent: #1a1916;
   --accent-contrast: #f5f4f1;
   --tag-bg: #f0eeeb;
@@ -35,7 +35,7 @@
   --border-strong: #2e2e2c;
   --text-primary: #f0efe9;
   --text-secondary: #8a8880;
-  --text-muted: #555450;
+  --text-muted: #7e7a70;
   --accent: #f0efe9;
   --accent-contrast: #0e0e0d;
   --tag-bg: #1e1e1c;
@@ -303,7 +303,7 @@
 .field textarea:focus,
 .field textarea:focus-visible {
   border-color: var(--text-primary) !important;
-  box-shadow: none !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--text-primary) 18%, transparent) !important;
   outline: none;
 }
 
@@ -1280,6 +1280,7 @@
 .smart-search-panel__result:focus-visible {
   background: var(--search-result-hover-bg);
   outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--text-primary) 20%, transparent) inset;
 }
 
 .smart-search-panel__favicon {

@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vault - Условия использования</title>
+    <style>
+      :root {
+        --bg: #f5f4f1;
+        --surface: #ffffff;
+        --border: #dddbd7;
+        --text: #1a1916;
+        --muted: #726f68;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0e0e0d;
+          --surface: #181817;
+          --border: #272725;
+          --text: #f0efe9;
+          --muted: #7e7a70;
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: "DM Sans", "Segoe UI", Arial, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+      }
+      main {
+        width: min(760px, 100%);
+        margin: 0 auto;
+        padding: 40px 20px 56px;
+      }
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 24px;
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 28px;
+        line-height: 1.2;
+      }
+      p, li { line-height: 1.6; color: var(--muted); }
+      a { color: inherit; }
+      .back {
+        display: inline-block;
+        margin-top: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="card">
+        <h1>Условия использования</h1>
+        <p>Используя Vault, вы соглашаетесь использовать сервис добросовестно и не нарушать права других пользователей.</p>
+        <ul>
+          <li>Вы несете ответственность за добавляемые ссылки и заметки.</li>
+          <li>Сервис может обновляться без отдельного уведомления.</li>
+          <li>При нарушении правил доступ может быть ограничен.</li>
+        </ul>
+        <a class="back" href="/app">Вернуться в Vault</a>
+      </section>
+    </main>
+  </body>
+</html>
