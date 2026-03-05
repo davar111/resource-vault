@@ -622,6 +622,25 @@ function looksGenericParsedTitle(title, normalizedUrl) {
   return false;
 }
 
+function withTimeoutFallback(promise, timeoutMs, fallbackValue) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(value);
+    };
+    const timer = setTimeout(
+      () => finish(fallbackValue),
+      Math.max(0, Number(timeoutMs) || 0)
+    );
+    Promise.resolve(promise)
+      .then((value) => finish(value))
+      .catch(() => finish(fallbackValue));
+  });
+}
+
 async function parseLinkWithAi(meta) {
   let token = "";
   try {
@@ -807,13 +826,13 @@ async function parseAddUrl(urlRaw) {
   let fetchedPreview = "";
   let blockedPreviewDomain = false;
   try {
-    fetchedTitle = await tryFetchTitle(normalized);
-  } catch {}
-  try {
-    fetchedPreview = await tryFetchPreview(normalized);
+    [fetchedTitle, fetchedPreview] = await Promise.all([
+      withTimeoutFallback(tryFetchTitle(normalized), 2200, ""),
+      withTimeoutFallback(tryFetchPreview(normalized), 2200, "")
+    ]);
   } catch {}
   if (!fetchedPreview) {
-    const edge = await fetchPreviewViaEdge(normalized);
+    const edge = await withTimeoutFallback(fetchPreviewViaEdge(normalized), 1800, { preview: "", blocked: false });
     if (edge.blocked) {
       blockedPreviewDomain = true;
       fetchedPreview = "";
@@ -827,13 +846,15 @@ async function parseAddUrl(urlRaw) {
   let finalPreview = fetchedPreview;
   const baseTags = inferAutoTags(normalized, finalTitle, source);
 
-  const aiParsed = blockedPreviewDomain ? null : await parseLinkWithAi({
-    url: normalized,
-    title: finalTitle,
-    preview: finalPreview,
-    source,
-    tags: baseTags
-  });
+  const aiParsed = blockedPreviewDomain
+    ? null
+    : await withTimeoutFallback(parseLinkWithAi({
+      url: normalized,
+      title: finalTitle,
+      preview: finalPreview,
+      source,
+      tags: baseTags
+    }), 1600, null);
   if (currentToken !== addFlowParseToken) return { ok: false, error: "stale" };
   if (aiParsed?.title && looksGenericParsedTitle(finalTitle, normalized)) {
     finalTitle = aiParsed.title;
@@ -896,10 +917,18 @@ function ensureModalStatusLine(form, id) {
     line = document.createElement("div");
     line.id = id;
     line.className = "status-line status-line--inline mono status-info";
+    if (id === "addStatusLine") line.classList.add("status-line--modal-add");
     line.setAttribute("role", "status");
     line.setAttribute("aria-live", "polite");
     line.setAttribute("aria-atomic", "true");
-    form.append(line);
+    const addFooter = form.querySelector(".modal-add-flow__footer");
+    if (addFooter) form.insertBefore(line, addFooter);
+    else form.append(line);
+  } else {
+    const addFooter = form.querySelector(".modal-add-flow__footer");
+    if (id === "addStatusLine" && addFooter && line.nextElementSibling !== addFooter) {
+      form.insertBefore(line, addFooter);
+    }
   }
   return line;
 }
@@ -1951,15 +1980,12 @@ function setupEvents() {
         await addLinkCollections(created.id, selectedCollections, currentUser.id);
         state.items.unshift({ ...created, isDemo: false, previewImage: previewFallbackUrl(created), collectionIds: selectedCollections });
         stopFeedbackSpinner("addSpinner");
-        feedback.addFlashCancel = flashStatus(
-          addStatusLine,
-          state.lang === "ru" ? "сохранено" : "saved",
-          "ok",
-          1000
-        );
+        if (typeof feedback.addFlashCancel === "function") feedback.addFlashCancel();
+        feedback.addFlashCancel = null;
+        if (addStatusLine) addStatusLine.textContent = "";
         setAddFlowStep(3);
         clearFeedbackTimer("addCloseTimer");
-        feedback.addCloseTimer = setTimeout(() => closeAddModal(), 420);
+        feedback.addCloseTimer = setTimeout(() => closeAddModal(), 760);
         renderTagSuggestions();
       }
       requestRender();
