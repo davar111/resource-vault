@@ -9,13 +9,6 @@ function devRouteParityPlugin() {
         const [pathname, query = ""] = rawUrl.split("?");
         const querySuffix = query ? `?${query}` : "";
 
-        if (pathname === "/") {
-          res.statusCode = 302;
-          res.setHeader("Location", `/landing/${querySuffix}`);
-          res.end();
-          return;
-        }
-
         if (pathname === "/landing" || pathname === "/landing/") {
           req.url = `/landing/index.html${querySuffix}`;
           next();
