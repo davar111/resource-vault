@@ -1,1 +1,412 @@
-<!DOCTYPE html> <html lang="ru" data-theme="light"> <head> <meta charset="UTF-8"> <meta name="viewport" content="width=device-width, initial-scale=1.0"> <title>Vault — библиотека ссылок</title> <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=3" /> <link rel="preconnect" href="https://fonts.googleapis.com"> <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin> <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@300;400;500;600&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet"> <style> *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }  /* ── EXACT VAULT TOKENS (light) ── */ :root {   --bg-canvas:    #f5f4f1;   --bg-sidebar:   #eeecea;   --bg-surface-1: #ffffff;   --bg-surface-2: #f0eeeb;   --bg-surface-3: #e8e6e2;   --border-subtle:  #e8e6e2;   --border-default: #dddbd7;   --border-strong:  #c8c6c2;   --text-primary:   #1a1916;   --text-secondary: #6b6860;   --text-muted:     #726f68;   --accent:         #1a1916;   --accent-contrast:#f5f4f1;   --tag-bg:         #f0eeeb;   --tag-border:     #dddbd7;   --radius-sm: 6px;   --radius-md: 10px;   --shadow-card: 0 1px 4px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.04);   --font-sans: 'DM Sans', sans-serif;   --font-mono: 'Geist Mono', monospace; }  /* ── DARK TOKENS ── */ :root[data-theme="dark"] {   --bg-canvas:    #0e0e0d;   --bg-sidebar:   #131312;   --bg-surface-1: #181817;   --bg-surface-2: #1e1e1c;   --bg-surface-3: #1e1e1c;   --border-subtle:  #222220;   --border-default: #272725;   --border-strong:  #2e2e2c;   --text-primary:   #f0efe9;   --text-secondary: #8a8880;   --text-muted:     #7e7a70;   --accent:         #f0efe9;   --accent-contrast:#0e0e0d;   --tag-bg:         #1e1e1c;   --tag-border:     #2a2a28;   --shadow-card: 0 1px 3px rgba(0,0,0,0.4), 0 6px 20px rgba(0,0,0,0.3); }  html { scroll-behavior: smooth; }  body {   font-family: var(--font-sans);   background: var(--bg-canvas);   color: var(--text-primary);   -webkit-font-smoothing: antialiased;   overflow-x: hidden;   transition: background 0.2s, color 0.2s; }  /* ── NAV ── */ nav {   position: fixed; top: 0; left: 0; right: 0; z-index: 100;   height: 56px;   display: flex; align-items: center; gap: 14px;   padding: 0 32px;   border-bottom: 1px solid var(--border-default);   background: var(--bg-canvas);   backdrop-filter: blur(12px); }  .nav-logo {   display: flex; align-items: center; gap: 9px;   text-decoration: none; }  .nav-logomark {   width: 24px; height: 24px;   background: var(--accent);   border-radius: 5px;   display: grid; place-items: center; } .nav-logomark svg { width: 12px; height: 12px; display: block; }  .nav-brand {   font-family: var(--font-mono);   font-size: 13px; font-weight: 500;   color: var(--text-primary);   letter-spacing: -0.02em; }  .nav-links {   margin-left: 18px;   display: flex; align-items: center; gap: 4px;   list-style: none; }  .nav-links a {   font-size: 13px;   color: var(--text-secondary);   text-decoration: none;   padding: 6px 11px;   border-radius: var(--radius-sm);   transition: color 0.12s, background 0.12s; } .nav-links a:hover { color: var(--text-primary); background: var(--bg-surface-2); }  .nav-open {   display: inline-flex; align-items: center; justify-content: center; gap: 10px;   padding: 7px 16px;   background: var(--accent);   color: var(--accent-contrast);   border-radius: var(--radius-sm);   font-size: 13px; font-weight: 500;   text-decoration: none;   transition: opacity 0.12s; } .nav-open:hover { opacity: 0.82; } .nav-open svg { width: 14px; height: 14px; display: block; margin-left: 2px; }  /* theme toggle */ .nav-actions {   margin-left: auto;   display: flex; align-items: center; gap: 8px; }  .nav-theme {   width: 34px; height: 34px;   border-radius: 999px;   border: 1px solid var(--border-default);   background: transparent;   cursor: pointer;   display: grid; place-items: center;   color: var(--text-secondary);   transition: background 0.12s, color 0.12s; } .nav-theme:hover { background: var(--bg-surface-2); color: var(--text-primary); } .nav-theme svg { width: 15px; height: 15px; display: block; }  /* ── HERO ── */ .hero {   padding: 120px 32px 80px;   max-width: 1100px;   margin: 0 auto; }  .hero-top {   display: flex; align-items: center; gap: 10px;   margin-bottom: 32px; }  .hero-pill {   display: inline-flex; align-items: center; gap: 7px;   padding: 4px 12px;   border: 1px solid var(--border-default);   border-radius: 999px;   font-family: var(--font-mono);   font-size: 11px; color: var(--text-muted);   letter-spacing: 0.03em; }  .hero-pill-dot {   width: 5px; height: 5px; border-radius: 50%;   background: var(--text-primary);   animation: pd 3s ease infinite; } @keyframes pd { 0%,100%{opacity:1} 55%{opacity:0.2} }  .hero h1 {   font-size: clamp(40px, 5.5vw, 72px);   font-weight: 500;   letter-spacing: -0.035em;   line-height: 1.06;   margin-bottom: 20px;   max-width: 760px; }  .hero h1 span {   color: var(--text-secondary); }  .hero-desc {   font-size: 16px;   color: var(--text-secondary);   line-height: 1.7;   max-width: 480px;   margin-bottom: 36px; }  .hero-actions {   display: flex; align-items: center; gap: 10px;   flex-wrap: wrap; }  .btn-main {   display: inline-flex; align-items: center; gap: 10px;   padding: 11px 22px;   background: var(--accent);   color: var(--accent-contrast);   border-radius: var(--radius-sm);   font-size: 13.5px; font-weight: 500;   text-decoration: none;   transition: opacity 0.12s, transform 0.12s; } .btn-main:hover { opacity: 0.85; transform: translateY(-1px); } .btn-main svg { width: 14px; height: 14px; margin-left: 2px; }  .btn-outline {   display: inline-flex; align-items: center;   padding: 11px 18px;   border: 1px solid var(--border-default);   border-radius: var(--radius-sm);   font-size: 13.5px;   color: var(--text-secondary);   text-decoration: none;   transition: border-color 0.12s, color 0.12s; } .btn-outline:hover { border-color: var(--border-strong); color: var(--text-primary); }  /* ── APP WINDOW ── */ .window-wrap {   max-width: 1100px;   margin: 0 auto 80px;   padding: 0 32px; }  .app-window {   border-radius: var(--radius-md);   overflow: hidden;   border: 1px solid var(--border-default);   background: var(--bg-surface-1);   box-shadow: var(--shadow-card); }  .win-bar {   height: 36px;   background: var(--bg-surface-2);   border-bottom: 1px solid var(--border-default);   display: flex; align-items: center;   padding: 0 12px; gap: 5px; } .wdot { width: 9px; height: 9px; border-radius: 50%; background: var(--border-default); } .wurl {   margin-left: 10px;   padding: 3px 10px;   background: var(--bg-surface-3);   border-radius: 4px;   font-family: var(--font-mono);   font-size: 10.5px; color: var(--text-muted); }  .win-app {   display: grid;   grid-template-columns: 196px 1fr;   height: 420px; }  /* sidebar */ .wsb {   background: var(--bg-sidebar);   border-right: 1px solid var(--border-default);   padding: 14px 0;   display: flex; flex-direction: column; } .wsb-brand {   display: flex; align-items: center; gap: 8px;   padding: 0 13px 13px;   border-bottom: 1px solid var(--border-default);   margin-bottom: 6px; } .wsb-mark { width: 19px; height: 19px; background: var(--accent); border-radius: 4px; } .wsb-name { font-family: var(--font-mono); font-size: 12px; font-weight: 500; color: var(--text-primary); }  .wsb-lbl {   font-family: var(--font-mono); font-size: 9px;   color: var(--text-muted); text-transform: uppercase;   letter-spacing: 0.09em; padding: 7px 13px 3px; }  .wsb-item {   display: flex; align-items: center; gap: 7px;   padding: 6px 13px;   font-size: 12px; color: var(--text-secondary);   border-radius: var(--radius-sm); margin: 1px 6px;   cursor: default; } .wsb-item.on { background: var(--accent); color: var(--accent-contrast); } .wsb-item svg { width: 12px; height: 12px; flex-shrink: 0; opacity: 0.65; } .wsb-item.on svg { opacity: 1; }  .wsb-col {   display: flex; align-items: center; gap: 7px;   padding: 5px 13px; font-size: 11.5px; color: var(--text-muted);   margin: 1px 6px; } .wsb-col-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }  /* main */ .wmain { background: var(--bg-canvas); display: flex; flex-direction: column; }  .wtop {   height: 50px; border-bottom: 1px solid var(--border-default);   display: flex; align-items: center;   padding: 0 18px; gap: 10px; flex-shrink: 0; } .wt-t { font-size: 13px; font-weight: 500; } .wt-c { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); margin-left: 2px; }  .wt-srch {   margin-left: auto;   display: flex; align-items: center; gap: 6px;   padding: 5px 10px;   background: var(--bg-surface-2);   border: 1px solid var(--border-default);   border-radius: var(--radius-sm);   width: 200px;   font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); } .wt-srch svg { width: 10px; height: 10px; }  .wt-srt {   padding: 5px 10px;   background: var(--bg-surface-2);   border: 1px solid var(--border-default);   border-radius: var(--radius-sm);   font-family: var(--font-mono); font-size: 10px; color: var(--text-secondary);   white-space: nowrap; }  .wgrid {   display: grid; grid-template-columns: repeat(3,1fr);   gap: 10px; padding: 12px; flex: 1; overflow: hidden; }  .wcard {   background: var(--bg-surface-1);   border: 1px solid var(--border-subtle);   border-radius: var(--radius-sm);   overflow: hidden; display: flex; flex-direction: column;   box-shadow: var(--shadow-card); } .wcard-thumb {   height: 82px; display: flex; align-items: center; justify-content: center;   font-size: 22px; flex-shrink: 0; position: relative; overflow: hidden;   background: var(--bg-surface-2); } .wcard-badge {   position: absolute; top: 5px; left: 5px;   padding: 1px 5px; background: rgba(26,25,22,0.08);   border-radius: 3px; font-family: var(--font-mono);   font-size: 7.5px; color: var(--text-muted); } :root[data-theme="dark"] .wcard-badge { background: rgba(255,255,255,0.08); }  .wcard-body { padding: 7px 9px 9px; } .wcard-domain { font-family: var(--font-mono); font-size: 8.5px; color: var(--text-muted); margin-bottom: 3px; } .wcard-title { font-size: 11px; font-weight: 500; line-height: 1.35; margin-bottom: 5px; color: var(--text-primary); } .wcard-tags { display: flex; gap: 3px; flex-wrap: wrap; } .wcard-tag {   padding: 1px 6px;   background: var(--tag-bg); border: 1px solid var(--tag-border);   border-radius: 999px;   font-size: 8.5px; color: var(--text-secondary);   font-family: var(--font-mono); }  /* ── DIVIDER ── */ .divider {   border: none; border-top: 1px solid var(--border-subtle);   margin: 0; }  /* ── STACK ROW ── */ .stack-row {   max-width: 1100px; margin: 0 auto;   padding: 20px 32px;   display: flex; align-items: center; gap: 0;   border-top: 1px solid var(--border-subtle);   border-bottom: 1px solid var(--border-subtle); }  .stack-lbl {   font-family: var(--font-mono); font-size: 10px;   color: var(--text-muted); text-transform: uppercase;   letter-spacing: 0.09em; white-space: nowrap;   margin-right: 28px; flex-shrink: 0; }  .stack-pills {   display: flex; align-items: center; gap: 6px;   flex-wrap: wrap; }  .stack-pill {   display: inline-flex; align-items: center; gap: 6px;   padding: 4px 12px;   border: 1px solid var(--border-default);   border-radius: 999px;   font-family: var(--font-mono); font-size: 11px;   color: var(--text-secondary);   background: var(--bg-surface-1); }  /* ── FEATURES ── */ .features {   max-width: 1100px; margin: 0 auto;   padding: 80px 32px; }  .sec-header {   display: flex; align-items: baseline; justify-content: space-between;   padding-bottom: 20px;   border-bottom: 1px solid var(--border-default);   margin-bottom: 40px; }  .sec-title {   font-size: 22px; font-weight: 500;   letter-spacing: -0.02em; }  .sec-meta {   font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }  .feat-grid {   display: grid; grid-template-columns: repeat(3,1fr);   border: 1px solid var(--border-default);   border-radius: var(--radius-md); overflow: hidden; }  .feat-item {   padding: 24px 22px 26px;   border-right: 1px solid var(--border-default);   border-bottom: 1px solid var(--border-default);   transition: background 0.15s; } .feat-item:hover { background: var(--bg-surface-2); } .feat-item:nth-child(3n) { border-right: none; } .feat-item:nth-child(n+4) { border-bottom: none; }  .feat-n {   font-family: var(--font-mono); font-size: 10px;   color: var(--text-muted); margin-bottom: 12px; }  .feat-t {   font-size: 13.5px; font-weight: 500;   margin-bottom: 7px; letter-spacing: -0.01em; }  .feat-d { font-size: 12.5px; color: var(--text-secondary); line-height: 1.65; }  /* ── SPACE ── */ .space-sec {   max-width: 1100px; margin: 0 auto;   padding: 0 32px 80px; }  .space-card {   display: grid; grid-template-columns: 1fr 380px;   border: 1px solid var(--border-default);   border-radius: var(--radius-md); overflow: hidden;   background: var(--bg-surface-1);   box-shadow: var(--shadow-card); }  .sp-left {   padding: 44px 40px;   border-right: 1px solid var(--border-default);   display: flex; flex-direction: column; justify-content: center; }  .sp-pill {   display: inline-flex; align-items: center; gap: 6px;   padding: 3px 10px;   border: 1px solid var(--border-default);   border-radius: 999px;   font-family: var(--font-mono); font-size: 10.5px;   color: var(--text-muted); margin-bottom: 18px; width: fit-content; }  .sp-left h2 {   font-size: clamp(22px, 2.5vw, 30px);   font-weight: 500; letter-spacing: -0.025em;   line-height: 1.25; margin-bottom: 12px; }  .sp-left p {   font-size: 13.5px; color: var(--text-secondary);   line-height: 1.7; margin-bottom: 24px; max-width: 380px; }  .sp-nums { display: flex; gap: 20px; } .sp-num { display: flex; flex-direction: column; gap: 2px; } .sp-val {   font-family: var(--font-mono); font-size: 22px;   font-weight: 500; color: var(--text-primary);   letter-spacing: -0.03em; } .sp-lbl { font-family: var(--font-mono); font-size: 9.5px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.07em; }  /* space demo card */ .sp-right {   background: var(--bg-surface-2);   display: flex; align-items: center; justify-content: center;   padding: 28px; }  .sp-demo {   width: 100%;   background: var(--bg-surface-1);   border: 1px solid var(--border-default);   border-radius: var(--radius-md); overflow: hidden;   box-shadow: var(--shadow-card); }  .sp-demo-thumb {   height: 88px;   background: var(--bg-surface-3);   display: flex; align-items: center; justify-content: center;   font-size: 26px; position: relative; }  .sp-when {   position: absolute; bottom: 6px; left: 8px;   padding: 2px 8px;   background: var(--bg-canvas);   border: 1px solid var(--border-subtle);   border-radius: 999px;   font-family: var(--font-mono); font-size: 9px; color: var(--text-muted); }  .sp-demo-body { padding: 10px 12px 12px; } .sp-domain { font-family: var(--font-mono); font-size: 9px; color: var(--text-muted); margin-bottom: 3px; } .sp-title { font-size: 12px; font-weight: 500; line-height: 1.35; margin-bottom: 7px; }  .sp-note {   font-size: 11px; color: var(--text-secondary);   font-style: italic; line-height: 1.5;   padding: 5px 8px;   background: var(--bg-surface-2);   border-left: 2px solid var(--border-default);   border-radius: 0 3px 3px 0; margin-bottom: 9px; }  .sp-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; } .sp-btn {   padding: 7px; border-radius: var(--radius-sm);   font-size: 11px; font-weight: 500; text-align: center; } .sp-btn.open { background: var(--accent); color: var(--accent-contrast); } .sp-btn.arch {   background: transparent;   border: 1px solid var(--border-default);   color: var(--text-secondary); }  .sp-bar {   padding: 8px 12px;   border-top: 1px solid var(--border-subtle);   display: flex; align-items: center; justify-content: space-between; } .sp-dots { display: flex; gap: 3px; } .sp-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--border-default); } .sp-dot.on { background: var(--text-primary); } .sp-streak { font-family: var(--font-mono); font-size: 9.5px; color: var(--text-secondary); }  /* ── HOW ── */ .how {   max-width: 1100px; margin: 0 auto;   padding: 0 32px 80px; }  .how-steps {   display: grid; grid-template-columns: repeat(3,1fr);   border: 1px solid var(--border-default);   border-radius: var(--radius-md); overflow: hidden; }  .how-step {   padding: 28px 24px;   border-right: 1px solid var(--border-default); } .how-step:last-child { border-right: none; }  .hs-n { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); margin-bottom: 12px; } .hs-t { font-size: 13.5px; font-weight: 500; margin-bottom: 7px; letter-spacing: -0.01em; } .hs-d { font-size: 12.5px; color: var(--text-secondary); line-height: 1.65; }  /* ── CTA ── */ .cta {   max-width: 1100px; margin: 0 auto;   padding: 0 32px 80px; }  .cta-inner {   background: var(--bg-surface-1);   border: 1px solid var(--border-default);   border-radius: var(--radius-md);   padding: 56px 52px;   display: flex; align-items: center; justify-content: space-between;   gap: 32px; flex-wrap: wrap;   box-shadow: var(--shadow-card); }  .cta-text h2 {   font-size: clamp(22px, 2.8vw, 32px);   font-weight: 500; letter-spacing: -0.025em;   margin-bottom: 8px; } .cta-text p { font-size: 13.5px; color: var(--text-secondary); line-height: 1.6; }  /* ── FOOTER ── */ footer {   border-top: 1px solid var(--border-subtle);   padding: 18px 32px;   display: flex; align-items: center; justify-content: space-between; }  .foot-l {   display: flex; align-items: center; gap: 8px;   font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); } .foot-sep { color: var(--border-default); } .foot-r { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }  /* ── ANIMATIONS ── */ .fade {   opacity: 0; transform: translateY(14px);   transition: opacity 0.5s ease, transform 0.5s ease; } .fade.in { opacity: 1; transform: none; } .d1 { transition-delay: 0.07s; } .d2 { transition-delay: 0.14s; } .d3 { transition-delay: 0.21s; }  /* ── RESPONSIVE ── */ @media (max-width: 900px) {   nav { padding: 0 20px; }   .nav-links { display: none; }   .hero, .window-wrap, .stack-row, .features, .space-sec, .how, .cta { padding-left: 20px; padding-right: 20px; }   .win-app { grid-template-columns: 1fr; }   .wsb { display: none; }   .wgrid { grid-template-columns: repeat(2,1fr); height: 270px; }   .feat-grid { grid-template-columns: 1fr 1fr; }   .feat-item:nth-child(3n) { border-right: 1px solid var(--border-default); }   .feat-item:nth-child(2n) { border-right: none; }   .space-card { grid-template-columns: 1fr; }   .sp-left { border-right: none; border-bottom: 1px solid var(--border-default); }   .how-steps { grid-template-columns: 1fr; }   .how-step { border-right: none; border-bottom: 1px solid var(--border-default); }   .how-step:last-child { border-bottom: none; }   .cta-inner { flex-direction: column; align-items: flex-start; padding: 32px 28px; } }  @media (max-width: 560px) {   .feat-grid { grid-template-columns: 1fr; }   .feat-item:nth-child(n) { border-right: none; }   .hero h1 { font-size: 38px; } }  @media (prefers-reduced-motion: reduce) {   html { scroll-behavior: auto; }   *, *::before, *::after {     animation: none !important;     transition: none !important;   }   .fade {     opacity: 1 !important;     transform: none !important;   } } </style> </head> <body>  <!-- NAV --> <nav>   <a href="/landing/" class="nav-logo">     <div class="nav-logomark">       <svg viewBox="0 0 12 12" fill="none">         <rect x="0.5" y="0.5" width="4.5" height="4.5" rx="1.2" fill="var(--accent-contrast)"/>         <rect x="7" y="0.5" width="4.5" height="4.5" rx="1.2" fill="var(--accent-contrast)" opacity="0.5"/>         <rect x="0.5" y="7" width="4.5" height="4.5" rx="1.2" fill="var(--accent-contrast)" opacity="0.4"/>         <rect x="7" y="7" width="4.5" height="4.5" rx="1.2" fill="var(--accent-contrast)" opacity="0.2"/>       </svg>     </div>     <span class="nav-brand">Vault</span>   </a>   <ul class="nav-links">     <li><a href="#features">Возможности</a></li>     <li><a href="#how">Как работает</a></li>   </ul>   <div class="nav-actions">     <button class="nav-theme" id="themeBtn" aria-label="Переключить тему">       <svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">         <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>       </svg>     </button>     <a href="/app" class="nav-open">Открыть <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2.5 7h9M8 3.5L11.5 7 8 10.5"/></svg></a>   </div> </nav>  <!-- HERO --> <section class="hero">   <div class="hero-top fade">     <div class="hero-pill">       <span class="hero-pill-dot"></span>       Доступно прямо сейчас     </div>   </div>   <h1 class="fade d1">     Сохраняй всё.<br>     <span>Находи мгновенно.</span>   </h1>   <p class="hero-desc fade d2">     Vault — персональная библиотека ссылок с умным поиском, коллекциями и режимом Space который не даёт важному теряться в закладках.   </p>   <div class="hero-actions fade d3">     <a href="/app" class="btn-main">       Открыть Vault       <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2.5 7h9M8 3.5L11.5 7 8 10.5"/></svg>     </a>     <a href="#features" class="btn-outline">Узнать больше</a>   </div> </section>  <!-- APP WINDOW --> <div class="window-wrap fade">   <div class="app-window">     <div class="win-bar">       <div class="wdot"></div><div class="wdot"></div><div class="wdot"></div>       <div class="wurl">vault-resource-library.vercel.app</div>     </div>     <div class="win-app">       <div class="wsb">         <div class="wsb-brand">           <div class="wsb-mark"></div>           <span class="wsb-name">Vault</span>         </div>         <div class="wsb-lbl">Навигация</div>         <div class="wsb-item on">           <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="3.5" height="3.5" rx="0.8"/><rect x="7.5" y="1" width="3.5" height="3.5" rx="0.8"/><rect x="1" y="7.5" width="3.5" height="3.5" rx="0.8"/><rect x="7.5" y="7.5" width="3.5" height="3.5" rx="0.8"/></svg>           Все ссылки         </div>         <div class="wsb-item">           <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 1.5l1.2 2.9H10L7.9 6l.8 2.9L6 7.2l-2.7 1.7.8-2.9L2 4.4h2.8L6 1.5z"/></svg>           Избранное         </div>         <div class="wsb-item">           <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="6" cy="6" r="4.5"/><path d="M6 3.5v2.8l2 1.2"/></svg>           Недавние         </div>         <div class="wsb-item">           <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="2.5" width="10" height="8" rx="1.5"/><path d="M1 5.5h10"/><path d="M4 1v3M8 1v3"/></svg>           Space         </div>         <div class="wsb-lbl" style="margin-top:6px;">Коллекции</div>         <div class="wsb-col"><div class="wsb-col-dot" style="background:#5b73ff;"></div>Работа</div>         <div class="wsb-col"><div class="wsb-col-dot" style="background:#f97316;"></div>Личное</div>         <div class="wsb-col"><div class="wsb-col-dot" style="background:#22c55e;"></div>Референсы</div>       </div>       <div class="wmain">         <div class="wtop">           <span class="wt-t">Все ссылки</span>           <span class="wt-c">4 элемента</span>           <div class="wt-srch">             <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="5.5" cy="5.5" r="4"/><path d="M10 10l-2-2"/></svg>             Поиск по всему...           </div>           <div class="wt-srt">Сначала новые</div>         </div>         <div class="wgrid">           <div class="wcard">             <div class="wcard-thumb">🎨<span class="wcard-badge">ПРИМЕР</span></div>             <div class="wcard-body">               <div class="wcard-domain">behance.net</div>               <div class="wcard-title">Behance — главная</div>               <div class="wcard-tags"><span class="wcard-tag">дизайн</span><span class="wcard-tag">вдохновение</span></div>             </div>           </div>           <div class="wcard">             <div class="wcard-thumb">⚡<span class="wcard-badge">ПРИМЕР</span></div>             <div class="wcard-body">               <div class="wcard-domain">gsap.com</div>               <div class="wcard-title">GSAP Showcase</div>               <div class="wcard-tags"><span class="wcard-tag">анимация</span><span class="wcard-tag">код</span></div>             </div>           </div>           <div class="wcard">             <div class="wcard-thumb">📐<span class="wcard-badge">ПРИМЕР</span></div>             <div class="wcard-body">               <div class="wcard-domain">lawsofux.com</div>               <div class="wcard-title">Laws of UX</div>               <div class="wcard-tags"><span class="wcard-tag">ux</span><span class="wcard-tag">гайд</span></div>             </div>           </div>           <div class="wcard">             <div class="wcard-thumb">🏆</div>             <div class="wcard-body">               <div class="wcard-domain">cssdesignawards.com</div>               <div class="wcard-title">CSS Design Awards</div>               <div class="wcard-tags"><span class="wcard-tag">тренды</span><span class="wcard-tag">веб</span></div>             </div>           </div>         </div>       </div>     </div>   </div> </div>  <!-- STACK --> <div class="stack-row fade">   <span class="stack-lbl">Стек</span>   <div class="stack-pills">     <span class="stack-pill">Vite</span>     <span class="stack-pill">Vanilla JS</span>     <span class="stack-pill">Supabase</span>     <span class="stack-pill">Vercel</span>     <span class="stack-pill">Google Auth</span>     <span class="stack-pill">Edge Functions</span>   </div> </div>  <!-- FEATURES --> <section class="features" id="features">   <div class="sec-header fade">     <h2 class="sec-title">Возможности</h2>     <span class="sec-meta">06 фич</span>   </div>   <div class="feat-grid fade">     <div class="feat-item">       <div class="feat-n">01</div>       <div class="feat-t">Быстрое сохранение</div>       <div class="feat-d">Вставь URL — Vault сам получит название и превью. Никаких обязательных полей.</div>     </div>     <div class="feat-item">       <div class="feat-n">02</div>       <div class="feat-t">Умный поиск</div>       <div class="feat-d">Поиск по URL, названию, тегам и заметкам одновременно. Результаты мгновенно.</div>     </div>     <div class="feat-item">       <div class="feat-n">03</div>       <div class="feat-t">Коллекции</div>       <div class="feat-d">Организуй ссылки в папки. Делай общими для совместного доступа.</div>     </div>     <div class="feat-item">       <div class="feat-n">04</div>       <div class="feat-t">Автотеги</div>       <div class="feat-d">Автоматически определяет тип контента и ставит теги по домену и заголовку.</div>     </div>     <div class="feat-item">       <div class="feat-n">05</div>       <div class="feat-t">Скрытые ссылки</div>       <div class="feat-d">Личный раздел с паролем для ссылок которые не должны быть видны другим.</div>     </div>     <div class="feat-item">       <div class="feat-n">06</div>       <div class="feat-t">Синхронизация</div>       <div class="feat-d">Данные в Supabase — доступны с любого устройства после входа через Google.</div>     </div>   </div> </section>  <!-- SPACE --> <section class="space-sec">   <div class="space-card fade">     <div class="sp-left">       <div class="sp-pill">Space — режим разбора</div>       <h2>Ссылки не должны умирать в закладках</h2>       <p>Каждый день Space показывает одну ссылку из прошлого — ту что ты забыл открыть. Два действия: открыть или архивировать. Стрик за ежедневный разбор.</p>       <div class="sp-nums">         <div class="sp-num"><span class="sp-val">1</span><span class="sp-lbl">ссылка в день</span></div>         <div class="sp-num"><span class="sp-val">3</span><span class="sp-lbl">действия = стрик</span></div>         <div class="sp-num"><span class="sp-val">∞</span><span class="sp-lbl">дней подряд</span></div>       </div>     </div>     <div class="sp-right">       <div class="sp-demo">         <div class="sp-demo-thumb">           📐           <div class="sp-when">94 дня назад</div>         </div>         <div class="sp-demo-body">           <div class="sp-domain">lawsofux.com</div>           <div class="sp-title">Laws of UX — База которую надо знать</div>           <div class="sp-note">Посмотреть раздел про cognitive load</div>           <div class="sp-btns">             <div class="sp-btn open">Открыть</div>             <div class="sp-btn arch">Архив</div>           </div>         </div>         <div class="sp-bar">           <div class="sp-dots">             <div class="sp-dot on"></div><div class="sp-dot on"></div>             <div class="sp-dot"></div><div class="sp-dot"></div>             <div class="sp-dot"></div><div class="sp-dot"></div><div class="sp-dot"></div>           </div>           <div class="sp-streak">🔥 5 дней</div>         </div>       </div>     </div>   </div> </section>  <!-- HOW --> <section class="how" id="how">   <div class="sec-header fade">     <h2 class="sec-title">Как работает</h2>     <span class="sec-meta">03 шага</span>   </div>   <div class="how-steps fade">     <div class="how-step">       <div class="hs-n">01</div>       <div class="hs-t">Войди через Google</div>       <div class="hs-d">Один клик — библиотека синхронизируется через Supabase на всех устройствах.</div>     </div>     <div class="how-step">       <div class="hs-n">02</div>       <div class="hs-t">Сохраняй ссылки</div>       <div class="hs-d">Вставь URL — приложение само получит название и превью. Добавь тег или заметку.</div>     </div>     <div class="how-step">       <div class="hs-n">03</div>       <div class="hs-t">Находи и возвращайся</div>       <div class="hs-d">Умный поиск по всему контенту. Space напомнит о том что ты забыл открыть.</div>     </div>   </div> </section>  <!-- CTA --> <section class="cta">   <div class="cta-inner fade">     <div class="cta-text">       <h2>Начни прямо сейчас</h2>       <p>Бесплатно. Без установки. Просто открой и сохрани первую ссылку.</p>     </div>     <a href="/app" class="btn-main">       Открыть Vault       <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2.5 7h9M8 3.5L11.5 7 8 10.5"/></svg>     </a>   </div> </section>  <!-- FOOTER --> <footer>   <div class="foot-l">     <span>Vault</span>     <span class="foot-sep">·</span>     <span>Менеджер ссылок</span>     <span class="foot-sep">·</span>     <span>Vanilla JS + Supabase</span>   </div>   <div class="foot-r">2025–2026</div> </footer>  <script> const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches; if (prefersReducedMotion) {   document.querySelectorAll('.fade').forEach(el => el.classList.add('in')); } else {   /* scroll reveal */   const io = new IntersectionObserver(entries => {     entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }});   }, { threshold: 0.06 });   document.querySelectorAll('.fade').forEach(el => io.observe(el));    /* hero immediate */   setTimeout(() => {     document.querySelectorAll('.hero .fade').forEach((el, i) => {       setTimeout(() => el.classList.add('in'), i * 90);     });   }, 60); }  /* theme toggle */ const THEME_STORAGE_KEY = 'resource_vault_ui_v1'; const root = document.documentElement; const btn = document.getElementById('themeBtn'); const icon = document.getElementById('themeIcon');  const sunSvg = `<circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 2.8v2.1M12 19.1v2.1M4.9 4.9l1.5 1.5M17.6 17.6l1.5 1.5M2.8 12h2.1M19.1 12h2.1M4.9 19.1l1.5-1.5M17.6 6.4l1.5-1.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/>`; const moonSvg = `<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>`;  const readStoredThemeMode = () => {   try {     const raw = localStorage.getItem(THEME_STORAGE_KEY);     if (!raw) return '';     const parsed = JSON.parse(raw);     const mode = String(parsed?.themeMode || '').trim().toLowerCase();     return mode === 'dark' || mode === 'light' || mode === 'system' ? mode : '';   } catch {     return '';   } }; const saveStoredThemeMode = (mode) => {   try {     const raw = localStorage.getItem(THEME_STORAGE_KEY);     const parsed = raw ? JSON.parse(raw) : {};     const next = parsed && typeof parsed === 'object' ? parsed : {};     next.themeMode = mode === 'dark' ? 'dark' : 'light';     localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(next));   } catch {} }; const resolveInitialTheme = () => {   const mode = readStoredThemeMode();   if (mode === 'dark' || mode === 'light') return mode;   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; }; const setThemeButtonLabel = () => {   if (!btn) return;   const isDark = root.dataset.theme === 'dark';   btn.setAttribute('aria-label', isDark ? 'Переключить на светлую тему' : 'Переключить на темную тему'); }; const applyTheme = (theme) => {   if (!icon) return;   const isDark = theme === 'dark';   root.dataset.theme = isDark ? 'dark' : 'light';   icon.innerHTML = isDark ? sunSvg : moonSvg;   setThemeButtonLabel(); };  if (btn && icon) {   applyTheme(resolveInitialTheme());   const colorScheme = window.matchMedia('(prefers-color-scheme: dark)');   const onColorSchemeChange = () => {     const mode = readStoredThemeMode();     if (!mode || mode === 'system') {       applyTheme(colorScheme.matches ? 'dark' : 'light');     }   };   if (typeof colorScheme.addEventListener === 'function') colorScheme.addEventListener('change', onColorSchemeChange);   else if (typeof colorScheme.addListener === 'function') colorScheme.addListener(onColorSchemeChange);   btn.addEventListener('click', () => {     const next = root.dataset.theme === 'dark' ? 'light' : 'dark';     applyTheme(next);     saveStoredThemeMode(next);   }); } </script> </body> </html>
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vault — библиотека ссылок</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=3" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet" />
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#070807;--s1:#0f1110;--s2:#151816;--s3:#1b1f1c;
+      --line:rgba(255,255,255,.08);--line2:rgba(255,255,255,.14);
+      --t:#f2f4f2;--t2:#a0a79f;--t3:#7f857f;
+      --acc:#f2f4f2;--accInk:#101210;
+      --sans:'DM Sans',sans-serif;--mono:'Geist Mono',monospace;
+      --r1:10px;--r2:16px;--r3:24px;
+      --g:32px;--max:1840px;--gap:104px;
+      --shadow:0 24px 60px rgba(0,0,0,.28)
+    }
+    :root[data-theme='light']{
+      --bg:#f5f4f1;--s1:#fff;--s2:#efede9;--s3:#e9e6e2;
+      --line:rgba(24,26,23,.10);--line2:rgba(24,26,23,.2);
+      --t:#151713;--t2:#5f655e;--t3:#747a73;
+      --acc:#151713;--accInk:#f5f4f1;
+      --shadow:0 18px 36px rgba(20,24,21,.08)
+    }
+    html{scroll-behavior:smooth}
+    body{font-family:var(--sans);color:var(--t);background:radial-gradient(circle at 15% -20%,rgba(113,138,118,.08),transparent 42%),var(--bg);-webkit-font-smoothing:antialiased;overflow-x:hidden;transition:background .25s,color .25s}
+    a{text-decoration:none;color:inherit}
+    .container{width:min(var(--max),calc(100% - (var(--g)*2)));margin-inline:auto}
+    .section{padding-block:var(--gap)}
+
+    nav{position:fixed;inset:0 0 auto;z-index:40;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(14px)}
+    .nav-inner{height:64px;display:flex;align-items:center;gap:18px}
+    .nav-logo{display:inline-flex;align-items:center;gap:9px;font-family:var(--mono);font-size:13px;font-weight:500}
+    .nav-mark{width:24px;height:24px;border-radius:6px;background:var(--acc);color:var(--accInk);display:grid;place-items:center}
+    .nav-mark svg{width:12px;height:12px;display:block}
+    .nav-links{margin-left:16px;display:inline-flex;gap:2px;list-style:none}
+    .nav-links a{padding:8px 12px;border-radius:999px;color:var(--t2);font-size:14px;transition:.14s}
+    .nav-links a:hover{color:var(--t);background:var(--s2)}
+    .nav-actions{margin-left:auto;display:inline-flex;align-items:center;gap:10px}
+    .nav-theme{width:36px;height:36px;border:1px solid var(--line);border-radius:999px;background:transparent;color:var(--t2);display:grid;place-items:center;cursor:pointer;transition:.14s}
+    .nav-theme:hover{color:var(--t);border-color:var(--line2);background:var(--s2)}
+    .nav-theme svg{width:15px;height:15px;display:block}
+
+    .btn-main,.btn-ghost{display:inline-flex;align-items:center;justify-content:center;gap:10px;border-radius:12px;font-size:14px;font-weight:500;letter-spacing:-.01em;transition:.14s}
+    .btn-main{padding:11px 18px;background:var(--acc);color:var(--accInk)}
+    .btn-main:hover{opacity:.86;transform:translateY(-1px)}
+    .btn-ghost{padding:10px 16px;border:1px solid var(--line);color:var(--t2)}
+    .btn-ghost:hover{color:var(--t);border-color:var(--line2);transform:translateY(-1px)}
+
+    .hero{padding-top:138px;padding-bottom:50px}
+    .hero-grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:26px;align-items:end}
+    .hero-copy{grid-column:1/span 7}
+    .pill{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border:1px solid var(--line);border-radius:999px;color:var(--t3);font-family:var(--mono);font-size:11px;margin-bottom:28px}
+    .pill i{width:5px;height:5px;border-radius:50%;background:var(--t);display:block}
+    h1{font-size:clamp(52px,7.2vw,126px);line-height:.95;letter-spacing:-.045em;font-weight:500;max-width:11ch;margin-bottom:24px;text-wrap:balance}
+    h1 span{color:var(--t2);font-weight:400}
+    .hero-desc{max-width:34ch;color:var(--t2);font-size:clamp(18px,1.35vw,24px);line-height:1.46;margin-bottom:30px;text-wrap:pretty}
+    .hero-actions{display:flex;flex-wrap:wrap;gap:10px}
+    .hero-scene{grid-column:8/span 5;background:linear-gradient(155deg,var(--s2),var(--s1));border:1px solid var(--line);border-radius:var(--r3);padding:22px;box-shadow:var(--shadow);min-height:420px;display:grid;grid-template-rows:auto 1fr auto;gap:16px}
+    .hs-top{display:flex;justify-content:space-between;align-items:center;color:var(--t3);font:11px var(--mono)}
+    .dots{display:flex;gap:5px}.dots b{width:7px;height:7px;border-radius:50%;background:color-mix(in srgb,var(--t3) 30%,transparent)}
+    .hs-grid{display:grid;grid-template-columns:1.1fr 1fr;gap:12px}
+    .tile{border-radius:14px;border:1px solid var(--line);background:linear-gradient(175deg,var(--s3),var(--s2));padding:14px;display:grid;gap:10px;align-content:start}
+    .tile.big{grid-row:span 2;min-height:240px}
+    .tile small{font:10px var(--mono);color:var(--t3);text-transform:uppercase;letter-spacing:.08em}
+    .tile h3{font-size:18px;line-height:1.2;letter-spacing:-.02em;font-weight:500}
+    .line{height:7px;border-radius:999px;background:color-mix(in srgb,var(--t) 18%,transparent)}
+    .hs-bottom{display:flex;justify-content:space-between;align-items:center;color:var(--t2);font-size:13px}
+    .hs-bottom em{font:10px var(--mono);letter-spacing:.1em;color:var(--t3);text-transform:uppercase;font-style:normal}
+
+    .scene-head{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;margin-bottom:36px}
+    .kicker{font:10px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--t3);margin-bottom:10px}
+    .scene-head h2{font-size:clamp(34px,4vw,60px);line-height:1.04;letter-spacing:-.03em;font-weight:500;max-width:11ch}
+    .scene-head p{max-width:48ch;color:var(--t2);line-height:1.6;font-size:18px}
+
+    .product{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1.35fr);gap:20px}
+    .product-copy{background:linear-gradient(165deg,color-mix(in srgb,var(--s2) 82%,transparent),var(--s1));border:1px solid var(--line);border-radius:var(--r3);padding:clamp(28px,3vw,44px);display:grid;gap:22px;align-content:start}
+    .product-copy h3{font-size:clamp(32px,3.8vw,62px);line-height:.98;letter-spacing:-.03em;font-weight:500;max-width:11ch;text-wrap:balance}
+    .product-copy p{color:var(--t2);line-height:1.55;max-width:34ch;font-size:17px;text-wrap:pretty}
+    .metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .metric{border-radius:14px;border:1px solid var(--line);padding:12px;background:color-mix(in srgb,var(--s3) 70%,transparent);display:grid;gap:5px}
+    .metric strong{font-size:30px;letter-spacing:-.04em;line-height:1;font-weight:500}
+    .metric span{font:10px var(--mono);letter-spacing:.08em;color:var(--t3);text-transform:uppercase}
+
+    .app{border:1px solid var(--line);border-radius:var(--r3);overflow:hidden;background:var(--s1);display:grid;grid-template-rows:auto auto 1fr;min-height:540px;box-shadow:var(--shadow)}
+    .app-bar{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--s2) 82%,transparent);font:10px var(--mono);letter-spacing:.07em;color:var(--t3);text-transform:uppercase}
+    .status{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:4px 8px}
+    .status:before{content:'';width:6px;height:6px;border-radius:50%;background:#95b89d}
+    .app-top{display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--line)}
+    .chip{padding:6px 10px;border-radius:999px;border:1px solid var(--line);font:10px var(--mono);letter-spacing:.06em;color:var(--t3);text-transform:uppercase}
+    .search{margin-left:auto;width:min(360px,55%);border:1px solid var(--line);border-radius:10px;padding:7px 10px;font-size:12px;color:var(--t3);background:color-mix(in srgb,var(--s2) 66%,transparent)}
+    .cards{padding:14px;display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:12px;background:linear-gradient(180deg,color-mix(in srgb,var(--s1) 98%,transparent),color-mix(in srgb,var(--s2) 74%,transparent))}
+    .card{border:1px solid var(--line);border-radius:14px;background:linear-gradient(180deg,color-mix(in srgb,var(--s3) 70%,transparent),var(--s1));overflow:hidden;display:grid;grid-template-rows:124px auto}
+    .card:nth-child(1),.card:nth-child(2){grid-column:span 6}.card:nth-child(3){grid-column:span 4}.card:nth-child(4){grid-column:span 8}
+    .thumb{background:radial-gradient(circle at 20% 28%,rgba(119,173,134,.4),transparent 45%),radial-gradient(circle at 75% 40%,rgba(129,142,186,.38),transparent 44%),linear-gradient(140deg,color-mix(in srgb,var(--s3) 80%,transparent),var(--s2));border-bottom:1px solid var(--line)}
+    .cb{padding:11px 12px 12px;display:grid;gap:7px}
+    .cb small{font:9px var(--mono);letter-spacing:.07em;color:var(--t3);text-transform:uppercase}
+    .cb h4{font-size:13px;font-weight:500;letter-spacing:-.01em}
+    .tags{display:inline-flex;flex-wrap:wrap;gap:6px}.tags span{font:9px var(--mono);border:1px solid var(--line);border-radius:999px;padding:3px 6px;color:var(--t3)}    .features{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:18px}
+    .f-main,.f-stack article,.f-rail article{border-radius:var(--r2);border:1px solid var(--line);background:linear-gradient(175deg,color-mix(in srgb,var(--s2) 80%,transparent),var(--s1))}
+    .f-main{padding:30px;min-height:380px;display:grid;align-content:space-between;gap:20px}
+    .f-main h3{font-size:clamp(30px,3.3vw,52px);line-height:1.02;letter-spacing:-.03em;font-weight:500;max-width:10ch}
+    .f-main p{max-width:40ch;color:var(--t2);font-size:17px;line-height:1.55;text-wrap:pretty}
+    .f-main ul{list-style:none;display:grid;gap:10px;max-width:34ch}
+    .f-main li{display:flex;gap:10px;color:var(--t2);line-height:1.45}
+    .f-main li:before{content:'';width:6px;height:6px;border-radius:50%;margin-top:8px;background:color-mix(in srgb,var(--t) 70%,transparent);flex-shrink:0}
+    .f-stack{display:grid;gap:18px}.f-stack article{padding:24px;min-height:181px;display:grid;gap:10px;align-content:start}
+    .n{font:10px var(--mono);letter-spacing:.08em;color:var(--t3);text-transform:uppercase}
+    .f-stack h4,.f-rail h4{font-size:28px;line-height:1.06;letter-spacing:-.02em;font-weight:500;max-width:14ch}
+    .f-stack p,.f-rail p{color:var(--t2);line-height:1.55;max-width:38ch}
+    .f-rail{margin-top:18px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+    .f-rail article{padding:24px;min-height:200px;display:grid;gap:10px;align-content:start}
+
+    .how{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+    .step{border-radius:var(--r2);border:1px solid var(--line);background:linear-gradient(180deg,color-mix(in srgb,var(--s2) 86%,transparent),var(--s1));padding:28px;display:grid;gap:14px;min-height:234px;align-content:start}
+    .step strong{font-size:36px;letter-spacing:-.04em;line-height:1;font-weight:500}
+    .step h4{font-size:28px;line-height:1.05;letter-spacing:-.02em;font-weight:500;max-width:13ch}
+    .step p{color:var(--t2);line-height:1.55;max-width:34ch}
+
+    .cta{padding-top:calc(var(--gap) - 12px);padding-bottom:calc(var(--gap) + 8px)}
+    .cta-box{border:1px solid var(--line);border-radius:var(--r3);background:linear-gradient(160deg,color-mix(in srgb,var(--s2) 82%,transparent),color-mix(in srgb,var(--s1) 86%,transparent));padding:clamp(28px,4.4vw,64px);display:flex;align-items:center;justify-content:space-between;gap:26px;box-shadow:var(--shadow)}
+    .cta-box h2{font-size:clamp(40px,5vw,84px);line-height:.96;letter-spacing:-.04em;font-weight:500;max-width:10ch;margin-bottom:12px;text-wrap:balance}
+    .cta-box p{color:var(--t2);line-height:1.55;font-size:18px;max-width:40ch;text-wrap:pretty}
+
+    footer{border-top:1px solid var(--line);padding:20px 0 30px}
+    .foot{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;color:var(--t3);font:11px var(--mono);letter-spacing:.04em}
+    .foot-links{display:inline-flex;gap:12px}
+    .foot-links a{color:inherit;transition:.14s}.foot-links a:hover{color:var(--t2)}
+
+    .fade{opacity:0;transform:translateY(18px);transition:opacity .55s ease,transform .55s ease}
+    .fade.in{opacity:1;transform:none}.d1{transition-delay:.08s}.d2{transition-delay:.16s}.d3{transition-delay:.24s}
+
+    @media (min-width:1920px){:root{--g:40px;--gap:116px}}
+    @media (min-width:2400px){:root{--max:2080px;--gap:126px}}
+
+    @media (max-width:1320px){
+      .hero-copy{grid-column:1/span 8}.hero-scene{grid-column:1/span 12;min-height:360px}
+      .product,.features,.f-rail,.how{grid-template-columns:1fr}
+      .cta-box{flex-direction:column;align-items:flex-start}
+    }
+
+    @media (max-width:980px){
+      :root{--g:20px;--gap:86px}
+      .nav-inner{height:58px}.nav-links{display:none}.hero{padding-top:108px}
+      h1{font-size:clamp(44px,14vw,72px)}.hero-desc{font-size:18px}
+      .hero-scene{padding:16px}.hs-grid{grid-template-columns:1fr}.tile.big{min-height:184px}
+      .app-top{flex-wrap:wrap}.search{width:100%;margin-left:0}
+      .card:nth-child(1),.card:nth-child(2),.card:nth-child(3),.card:nth-child(4){grid-column:span 12}
+      .metrics{grid-template-columns:1fr 1fr}
+      .scene-head{margin-bottom:26px}.scene-head p{font-size:16px}
+    }
+
+    @media (max-width:640px){
+      .scene-head{flex-direction:column;align-items:flex-start}
+      .scene-head h2{max-width:none}
+      .metrics{grid-template-columns:1fr}
+      .cta-box h2{font-size:clamp(34px,12vw,54px)}
+      .btn-main,.btn-ghost{width:100%}
+      .hero-actions{width:100%}
+    }
+
+    @media (prefers-reduced-motion:reduce){
+      html{scroll-behavior:auto}
+      *,*::before,*::after{animation:none !important;transition:none !important}
+      .fade{opacity:1 !important;transform:none !important}
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <div class="container nav-inner">
+      <a href="/landing/" class="nav-logo">
+        <span class="nav-mark" aria-hidden="true">
+          <svg viewBox="0 0 12 12" fill="none">
+            <rect x="0.5" y="0.5" width="4.5" height="4.5" rx="1.2" fill="currentColor"/>
+            <rect x="7" y="0.5" width="4.5" height="4.5" rx="1.2" fill="currentColor" opacity="0.55"/>
+            <rect x="0.5" y="7" width="4.5" height="4.5" rx="1.2" fill="currentColor" opacity="0.4"/>
+            <rect x="7" y="7" width="4.5" height="4.5" rx="1.2" fill="currentColor" opacity="0.26"/>
+          </svg>
+        </span>
+        <span>Vault</span>
+      </a>
+      <ul class="nav-links">
+        <li><a href="#features">Возможности</a></li>
+        <li><a href="#how">Как работает</a></li>
+      </ul>
+      <div class="nav-actions">
+        <button class="nav-theme" id="themeBtn" aria-label="Переключить тему">
+          <svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+            <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+          </svg>
+        </button>
+        <a href="/app" class="btn-main">Открыть →</a>
+      </div>
+    </div>
+  </nav>
+
+  <main>
+    <section class="hero">
+      <div class="container hero-grid">
+        <div class="hero-copy">
+          <div class="pill fade"><i></i>доступно прямо сейчас</div>
+          <h1 class="fade d1">Сохраняй всё. <span>Находи мгновенно.</span></h1>
+          <p class="hero-desc fade d2">Vault — персональная библиотека ссылок с умным поиском, коллекциями и режимом Space, который возвращает к важному.</p>
+          <div class="hero-actions fade d3">
+            <a href="/app" class="btn-main">Открыть Vault</a>
+            <a href="#features" class="btn-ghost">Узнать больше</a>
+          </div>
+        </div>
+
+        <aside class="hero-scene fade d2" aria-hidden="true">
+          <div class="hs-top"><div class="dots"><b></b><b></b><b></b></div><span>vault-resource-library.vercel.app</span></div>
+          <div class="hs-grid">
+            <article class="tile big">
+              <small>умный поиск</small>
+              <h3>По URL, тегам, заметкам и названиям одновременно</h3>
+              <div class="line"></div><div class="line" style="width:82%"></div><div class="line" style="width:65%"></div>
+            </article>
+            <article class="tile"><small>коллекции</small><h3>Личные и рабочие пространства в одном месте</h3></article>
+            <article class="tile"><small>space</small><h3>Ежедневный разбор, чтобы полезное не терялось</h3></article>
+          </div>
+          <div class="hs-bottom"><span>4 демо-ссылки · гостевой режим</span><em>live preview</em></div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="section" id="features">
+      <div class="container">
+        <div class="scene-head fade">
+          <div><div class="kicker">scene 01</div><h2>Продукт как единая рабочая сцена</h2></div>
+          <p>Вместо плотных одинаковых блоков здесь одна большая сцена: контекст, интерфейс и результат считываются за пару секунд.</p>
+        </div>
+        <div class="product fade d1">
+          <article class="product-copy">
+            <h3>Интерфейс, в котором приятно разбирать ссылки</h3>
+            <p>Один экран для сохранения, поиска и возврата к материалам. Никакого визуального шума, только понятный фокус на действиях.</p>
+            <div class="metrics">
+              <div class="metric"><strong>1</strong><span>поиск везде</span></div>
+              <div class="metric"><strong>3</strong><span>контекста</span></div>
+              <div class="metric"><strong>∞</strong><span>повторов</span></div>
+            </div>
+          </article>
+          <div class="app" aria-hidden="true">
+            <div class="app-bar"><span>vault workspace</span><span class="status">online</span></div>
+            <div class="app-top"><span class="chip">все ссылки</span><span class="chip">избранное</span><span class="chip">space</span><div class="search">Поиск по всему — URL, названию, тегам...</div></div>
+            <div class="cards">
+              <article class="card"><div class="thumb"></div><div class="cb"><small>behance.net</small><h4>Behance — лучшие креативные подборки</h4><div class="tags"><span>дизайн</span><span>референсы</span></div></div></article>
+              <article class="card"><div class="thumb"></div><div class="cb"><small>cssdesignawards.com</small><h4>CSS Design Awards — свежие интерактивы</h4><div class="tags"><span>тренды</span><span>веб</span></div></div></article>
+              <article class="card"><div class="thumb"></div><div class="cb"><small>lawsofux.com</small><h4>Laws of UX</h4><div class="tags"><span>ux</span><span>гайд</span></div></div></article>
+              <article class="card"><div class="thumb"></div><div class="cb"><small>gsap.com</small><h4>GSAP Showcase</h4><div class="tags"><span>анимация</span><span>код</span></div></div></article>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>    <section class="section">
+      <div class="container">
+        <div class="scene-head fade">
+          <div><div class="kicker">scene 02</div><h2>Функции, которые читаются сразу</h2></div>
+          <p>Блоки с разной плотностью: главный акцент, два поддерживающих сценария и короткая лента возможностей вместо однообразной таблицы.</p>
+        </div>
+
+        <div class="features fade d1">
+          <article class="f-main">
+            <div><div class="n">01 · core</div><h3>Быстрое сохранение и контекст без ручной рутины</h3></div>
+            <p>Вставляешь URL — Vault подтягивает название и превью, а ты добавляешь только то, что действительно важно для будущего поиска.</p>
+            <ul>
+              <li>Автозаполнение карточки по ссылке</li>
+              <li>Заметки и теги рядом с источником</li>
+              <li>Один паттерн для любых ссылок</li>
+            </ul>
+          </article>
+          <div class="f-stack">
+            <article><div class="n">02 · retrieve</div><h4>Умный поиск по всему контенту</h4><p>Поиск сразу по URL, названию, тегам и заметкам. Результаты появляются мгновенно, без переключений между фильтрами.</p></article>
+            <article><div class="n">03 · organize</div><h4>Коллекции и режим Space</h4><p>Коллекции держат структуру, а Space ежедневно возвращает к ссылкам, которые ты когда-то отложил на потом.</p></article>
+          </div>
+        </div>
+
+        <div class="f-rail fade d2">
+          <article><div class="n">04</div><h4>Автотеги</h4><p>Система подсказывает релевантные категории по домену и содержимому карточки.</p></article>
+          <article><div class="n">05</div><h4>Скрытые ссылки</h4><p>Отдельный приватный контекст для материалов, которые не должны быть видны другим.</p></article>
+          <article><div class="n">06</div><h4>Синхронизация</h4><p>Данные хранятся в Supabase и доступны на любом устройстве после входа.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="how">
+      <div class="container">
+        <div class="scene-head fade">
+          <div><div class="kicker">scene 03</div><h2>Как работает в реальном ритме</h2></div>
+          <p>Три шага с разным акцентом: вход, добавление, возврат к полезному. Без лишних экранов и ветвлений.</p>
+        </div>
+        <div class="how fade d1">
+          <article class="step"><strong>01</strong><h4>Войди через Google</h4><p>Один клик, и библиотека синхронизируется через Supabase между всеми твоими устройствами.</p></article>
+          <article class="step"><strong>02</strong><h4>Сохраняй ссылки</h4><p>Вставь URL, добавь нужные теги и короткую заметку. Всё остальное Vault сделает сам.</p></article>
+          <article class="step"><strong>03</strong><h4>Находи и возвращайся</h4><p>Умный поиск решает вопрос «где это было», а Space напоминает о забытых, но ценных находках.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="cta" id="cta">
+      <div class="container">
+        <div class="cta-box fade">
+          <div><h2>Начни прямо сейчас</h2><p>Бесплатно, без установки и долгого онбординга. Открой Vault и сохрани первую ссылку в своей системе.</p></div>
+          <a href="/app" class="btn-main">Открыть Vault →</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container foot">
+      <div>Vault · Менеджер ссылок · Vanilla JS + Supabase</div>
+      <div class="foot-links"><a href="/terms.html">Условия</a><a href="/privacy.html">Конфиденциальность</a><span>2025–2026</span></div>
+    </div>
+  </footer>
+
+  <script>
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion) {
+      document.querySelectorAll('.fade').forEach((el) => el.classList.add('in'));
+    } else {
+      const io = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('in');
+            io.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.08 });
+      document.querySelectorAll('.fade').forEach((el) => io.observe(el));
+      setTimeout(() => {
+        document.querySelectorAll('.hero .fade').forEach((el, i) => {
+          setTimeout(() => el.classList.add('in'), i * 90);
+        });
+      }, 60);
+    }
+
+    const THEME_STORAGE_KEY = 'resource_vault_ui_v1';
+    const root = document.documentElement;
+    const btn = document.getElementById('themeBtn');
+    const icon = document.getElementById('themeIcon');
+    const sunSvg = `<circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 2.8v2.1M12 19.1v2.1M4.9 4.9l1.5 1.5M17.6 17.6l1.5 1.5M2.8 12h2.1M19.1 12h2.1M4.9 19.1l1.5-1.5M17.6 6.4l1.5-1.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/>`;
+    const moonSvg = `<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>`;
+
+    const readStoredThemeMode = () => {
+      try {
+        const raw = localStorage.getItem(THEME_STORAGE_KEY);
+        if (!raw) return '';
+        const parsed = JSON.parse(raw);
+        const mode = String(parsed?.themeMode || '').trim().toLowerCase();
+        return mode === 'dark' || mode === 'light' || mode === 'system' ? mode : '';
+      } catch {
+        return '';
+      }
+    };
+
+    const saveStoredThemeMode = (mode) => {
+      try {
+        const raw = localStorage.getItem(THEME_STORAGE_KEY);
+        const parsed = raw ? JSON.parse(raw) : {};
+        const next = parsed && typeof parsed === 'object' ? parsed : {};
+        next.themeMode = mode === 'dark' ? 'dark' : 'light';
+        localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(next));
+      } catch {}
+    };
+
+    const resolveInitialTheme = () => {
+      const mode = readStoredThemeMode();
+      if (mode === 'dark' || mode === 'light') return mode;
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    };
+
+    const setThemeButtonLabel = () => {
+      if (!btn) return;
+      const isDark = root.dataset.theme === 'dark';
+      btn.setAttribute('aria-label', isDark ? 'Переключить на светлую тему' : 'Переключить на темную тему');
+    };
+
+    const applyTheme = (theme) => {
+      if (!icon) return;
+      const isDark = theme === 'dark';
+      root.dataset.theme = isDark ? 'dark' : 'light';
+      icon.innerHTML = isDark ? sunSvg : moonSvg;
+      setThemeButtonLabel();
+    };
+
+    if (btn && icon) {
+      applyTheme(resolveInitialTheme());
+      const colorScheme = window.matchMedia('(prefers-color-scheme: dark)');
+      const onColorSchemeChange = () => {
+        const mode = readStoredThemeMode();
+        if (!mode || mode === 'system') {
+          applyTheme(colorScheme.matches ? 'dark' : 'light');
+        }
+      };
+      if (typeof colorScheme.addEventListener === 'function') colorScheme.addEventListener('change', onColorSchemeChange);
+      else if (typeof colorScheme.addListener === 'function') colorScheme.addListener(onColorSchemeChange);
+
+      btn.addEventListener('click', () => {
+        const next = root.dataset.theme === 'dark' ? 'light' : 'dark';
+        applyTheme(next);
+        saveStoredThemeMode(next);
+      });
+    }
+  </script>
+</body>
+</html>
